@@ -1,0 +1,2 @@
+cd training
+npm install axios jsdom csv-writer
