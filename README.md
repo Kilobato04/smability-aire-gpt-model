@@ -1,4 +1,30 @@
-AIreGPT - Modelo Predictivo de Calidad del Aire para el Valle de MéxicoEste proyecto implementa un sistema híbrido de Machine Learning (XGBoost) para modelar la calidad del aire en la Zona Metropolitana del Valle de México (ZMVM). Combina datos históricos oficiales de la red de monitoreo (RAMA) con datos en tiempo real de sensores Smability para generar un mapa de calor interpolado de alta resolución.🏗️ Arquitectura del ProyectoEl sistema se divide en dos entornos:1. Entorno de Entrenamiento (/training)Aquí se descargan los datos históricos, se limpian y se entrena el modelo.Input: Datos históricos de aire.cdmx.gob.mx (2023-2025).Output: Archivo del modelo entrenado (model.json).2. Entorno de Producción (/app)Esta es la aplicación Serverless (AWS Lambda) que corre en tiempo real.Input: API en tiempo real de Smability + model.json.Output: Archivo GeoJSON (Mapa) y JSON (API para el Chatbot).📂 Estructura de Carpetassmability-aire-gpt-model/
+AIreGPT - Modelo Predictivo de Calidad del Aire para el Valle de México
+
+Este proyecto implementa un sistema híbrido de Machine Learning (XGBoost) para modelar la calidad del aire en la Zona Metropolitana del Valle de México (ZMVM). Combina datos históricos oficiales de la red de monitoreo (RAMA) con datos en tiempo real de sensores Smability para generar un mapa de calor interpolado de alta resolución.
+
+🏗️ Arquitectura del Proyecto
+
+El sistema se divide en dos entornos:
+
+1. Entorno de Entrenamiento (/training)
+
+Aquí se descargan los datos históricos, se limpian y se entrena el modelo.
+
+Input: Datos históricos de aire.cdmx.gob.mx (2023-2025).
+
+Output: Archivo del modelo entrenado (model.json).
+
+2. Entorno de Producción (/app)
+
+Esta es la aplicación Serverless (AWS Lambda) que corre en tiempo real.
+
+Input: API en tiempo real de Smability + model.json.
+
+Output: Archivo GeoJSON (Mapa) y JSON (API para el Chatbot).
+
+📂 Estructura de Carpetas
+
+smability-aire-gpt-model/
 │
 ├── training/               # 🧪 LABORATORIO DE DATA SCIENCE
 │   ├── raw_data/           # CSVs descargados (Ignorados por git)
@@ -13,12 +39,38 @@ AIreGPT - Modelo Predictivo de Calidad del Aire para el Valle de MéxicoEste pro
 │
 ├── Dockerfile              # Configuración para AWS Lambda
 └── requirements.txt        # Librerías de Python
-🛠️ Instrucciones de UsoFase 1: Obtención de Datos HistóricosEjecuta el scraper para descargar los datos de 2023, 2024 y 2025 (al corte).cd training
+
+
+🛠️ Instrucciones de Uso
+
+Fase 1: Obtención de Datos Históricos
+
+Ejecuta el scraper para descargar los datos de 2023, 2024 y 2025 (al corte).
+
+cd training
 python scraper_cdmx.py
 # Resultado: Archivos CSV anuales en la carpeta /raw_data
-Fase 2: Entrenamiento del ModeloUnifica los CSVs y entrena el modelo XGBoost.cd training
+
+
+Fase 2: Entrenamiento del Modelo
+
+Unifica los CSVs y entrena el modelo XGBoost.
+
+cd training
 python train_model.py
 # Resultado: Genera 'model.json' y lo mueve a la carpeta /app
-Fase 3: Despliegue (AWS Lambda)Construye la imagen Docker y súbela a ECR.docker build -t airegpt-model .
+
+
+Fase 3: Despliegue (AWS Lambda)
+
+Construye la imagen Docker y súbela a ECR.
+
+docker build -t airegpt-model .
 # (Ver pasos de AWS CLI para push y deploy)
-📊 Fuentes de DatosRAMA (Red Automática de Monitoreo Atmosférico): Datos oficiales de la CDMX.Smability Network: Sensores IoT privados para hiper-localidad.
+
+
+📊 Fuentes de Datos
+
+RAMA (Red Automática de Monitoreo Atmosférico): Datos oficiales de la CDMX.
+
+Smability Network: Sensores IoT privados para hiper-localidad.
