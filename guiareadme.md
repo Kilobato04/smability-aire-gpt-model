@@ -1,0 +1,52 @@
+🗺️ Guía Rápida de Navegación en AWS CloudShell
+
+Cuando inicias sesión en AWS CloudShell, siempre aterrizas en tu directorio de inicio (~). Utiliza estos comandos para regresar rápidamente a la carpeta del proyecto smability-aire-gpt-model.
+
+1. Comandos de Navegación Esenciales
+
+Tarea
+
+Comando
+
+Descripción
+
+Volver al Directorio de Inicio
+
+cd
+
+Te lleva a la ruta /home/cloudshell-user.
+
+Ir al Proyecto
+
+cd smability-aire-gpt-model
+
+Te mueve directamente al directorio principal del repositorio.
+
+Verificar Contenido
+
+ls -l
+
+Lista los archivos principales del proyecto (Dockerfile, requirements.txt).
+
+Verificar Rutas
+
+pwd
+
+Muestra la ruta de la carpeta actual (ej: /home/cloudshell-user/smability-aire-gpt-model).
+
+2. Acceso Rápido al Proyecto
+
+Para ir directamente al directorio de trabajo en una sola línea (ideal al iniciar sesión):
+
+cd smability-aire-gpt-model
+
+
+3. Activación del Entorno (Solo para Pruebas Locales)
+
+Si necesitas ejecutar scripts de Python directamente en la consola (no para Docker build), recuerda activar el entorno virtual:
+
+# Navegar y activar en una línea
+cd smability-aire-gpt-model && source env_temp/bin/activate
+
+# Para desactivar:
+deactivate
