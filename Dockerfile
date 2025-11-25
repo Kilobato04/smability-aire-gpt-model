@@ -4,7 +4,7 @@ FROM public.ecr.aws/lambda/python:3.11
 # 1. Copiar y instalar las dependencias
 # Esto se hace antes de copiar el código para aprovechar la caché de Docker
 COPY requirements.txt ${LAMBDA_TASK_ROOT}
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 2. Copiar el código de la aplicación
 COPY app/lambda_function.py ${LAMBDA_TASK_ROOT}
