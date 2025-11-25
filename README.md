@@ -1,6 +1,8 @@
-# AIreGPT - Modelo Predictivo de Calidad del Aire para el Valle de México
+# smability-aire-gpt-model - Modelo Predictivo de Calidad del Aire para el Valle de México
 
-Este proyecto implementa un sistema híbrido de Machine Learning (XGBoost) para modelar la calidad del aire en la Zona Metropolitana del Valle de México (ZMVM). Combina datos históricos oficiales de la red de monitoreo (RAMA) con datos en tiempo real de sensores Smability para generar un mapa de calor interpolado de alta resolución.
+Este repositorio contiene los scripts de entrenamiento y los archivos de inferencia (modelo y grid base) para el sistema de predicción de calidad del aire en CDMX, utilizando AWS Lambda (Container Image) y XGBoost.
+
+El código de inferencia se encuentra en la carpeta `app/`.
 
 ## 🏗️ Arquitectura del Proyecto
 
@@ -40,36 +42,47 @@ smability-aire-gpt-model/
 └── requirements.txt        # Librerías de Python
 ```
 
-## 🛠️ Instrucciones de Uso
+## ⚙️ Guía de Navegación en CloudShell
 
-### Fase 1: Obtención de Datos Históricos
+Para facilitar el trabajo en el entorno de AWS CloudShell, consulta la guía de comandos de navegación para acceder rápidamente a la carpeta del proyecto:
 
-Ejecuta el scraper para descargar los datos de 2023, 2024 y 2025 (al corte).
+[Guía Rápida de Navegación en AWS CloudShell](guiareadme.md)
 
-```bash
-cd training
-python scraper_cdmx.py
-# Resultado: Archivos CSV anuales en la carpeta /raw_data
-```
+## 🚀 Despliegue en AWS Lambda (Estrategia CodeBuild)
 
-### Fase 2: Entrenamiento del Modelo
+El despliegue de este proyecto se realiza mediante una imagen Docker.
 
-Unifica los CSVs y entrena el modelo XGBoost.
+**¡IMPORTANTE!** Debido a que las librerías de Machine Learning (`pandas`, `xgboost`) superan el límite de disco de AWS CloudShell (~1GB), la compilación no debe realizarse en la consola.
 
-```bash
-cd training
-python train_model.py
-# Resultado: Genera 'model.json' y lo mueve a la carpeta /app
-```
+### Ruta de Despliegue Recomendada: AWS CodeBuild
 
-### Fase 3: Despliegue (AWS Lambda)
+Para asegurar compilaciones exitosas y sin restricciones de espacio, se recomienda usar AWS CodeBuild como el motor de compilación que subirá la imagen directamente a ECR.
 
-Construye la imagen Docker y súbela a ECR.
+#### 1. Preparación de Archivos
+Asegúrate de que los archivos `requirements.txt` y `Dockerfile` estén optimizados (versión ligera sin `scikit-learn` ni `scipy`) y que todos los archivos de `app/` estén listos.
+
+#### 2. Empaquetado para CodeBuild (Desde CloudShell)
 
 ```bash
-docker build -t airegpt-model .
-# (Ver pasos de AWS CLI para push y deploy)
+# Comprime los archivos esenciales para CodeBuild
+zip -r source_code.zip Dockerfile requirements.txt app/
 ```
+
+#### 3. Subida a S3
+Sube el `source_code.zip` a un bucket de S3, el cual actuará como fuente de CodeBuild.
+
+```bash
+aws s3 cp source_code.zip s3://<TU_BUCKET_DE_FUENTE>/
+```
+
+#### 4. Configuración de CodeBuild
+Configura un proyecto en la consola de AWS CodeBuild que:
+- Tome S3 como fuente de código
+- Tenga activada la opción Privileged (para construir Docker)
+- Use un `buildspec.yml` para construir y subir la imagen a ECR
+
+#### 5. Despliegue Final en Lambda
+Una vez que CodeBuild haya terminado, crea o actualiza la función Lambda con la opción Container image, seleccionando la imagen recién subida a ECR. Asegúrate de ajustar la memoria a 1024 MB y el timeout a 1 minuto.
 
 ## 📊 Fuentes de Datos
 
