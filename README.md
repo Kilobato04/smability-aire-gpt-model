@@ -68,6 +68,16 @@ Construye la imagen Docker y súbela a ECR.
 docker build -t airegpt-model .
 # (Ver pasos de AWS CLI para push y deploy)
 
+## Despliegue en AWS Lambda
+
+Este proyecto utiliza una imagen Docker debido al tamaño de las librerías (XGBoost/Pandas).
+
+**Nota sobre CloudShell:** El entorno gratuito de AWS CloudShell puede quedarse sin espacio al construir esta imagen. Se recomienda usar **AWS CodeBuild** o construir localmente si esto ocurre.
+
+**Comandos de Build:**
+```bash
+docker build -t smability-aire-model .
+
 
 📊 Fuentes de Datos
 
