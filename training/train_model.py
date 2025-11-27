@@ -7,142 +7,109 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 
 # --- CONFIGURACIÓN ---
-# Leemos de la carpeta temporal donde unimos todo (2023+2024+2025)
-RAW_DATA_DIR = '/tmp/dataset_final' 
-MODEL_OUTPUT_PATH = 'app/model.json'
+RAW_DATA_DIR = '/tmp/dataset_final'
+MODEL_OUTPUT_PATH = 'model_o3.json' 
+STATIONS_FILE = os.path.join(os.path.dirname(__file__), 'raw_data/stationssimat.csv')
 
 def load_and_merge_data():
     print(f"🔄 Buscando archivos CSV en: {RAW_DATA_DIR}")
-    
-    # Buscar CSVs
     all_files = glob.glob(os.path.join(RAW_DATA_DIR, "*.csv"))
     
-    if not all_files:
-        raise Exception(f"❌ No hay archivos en {RAW_DATA_DIR}. Verifica que hayas descomprimido el ZIP.")
+    if not all_files: raise Exception(f"❌ No hay archivos CSV.")
 
-    print(f"📂 Encontrados {len(all_files)} archivos. Cargando...")
-    
     df_list = []
     for filename in all_files:
         try:
             df = pd.read_csv(filename)
-            # Normalizar nombres de columnas a minúsculas
             df.columns = [c.lower() for c in df.columns]
             df_list.append(df)
-        except Exception as e:
-            print(f"⚠️ Error leyendo {filename}: {e}")
-
-    if not df_list:
-        raise Exception("❌ No se pudo cargar ningún dato.")
+        except Exception as e: print(f"⚠️ Error leyendo {filename}: {e}")
 
     full_df = pd.concat(df_list, ignore_index=True)
-    print(f"📊 Total registros crudos: {len(full_df)}")
-    
-    print("🔄 Pivoteando tabla (esto toma unos segundos)...")
-    # Pivotear: [Fecha, Hora, Estacion, Param, Valor] -> [Cols: PM10, O3...]
+    if 'station_id' in full_df.columns: full_df['station_id'] = full_df['station_id'].astype(str)
+
+    print("🔄 Pivoteando tabla...")
     pivot_df = full_df.pivot_table(
         index=['date', 'hour', 'station_id'], 
         columns='parameter', 
         values='value'
     ).reset_index()
     
-    print(f"✅ Tabla maestra lista: {len(pivot_df)} filas.")
+    # --- MERGE CON CATALOGO (Coords + Altitud) ---
+    if os.path.exists(STATIONS_FILE):
+        print(f"🗺️ Cruzando con catálogo: {STATIONS_FILE}")
+        stations_df = pd.read_csv(STATIONS_FILE)
+        stations_df.columns = [c.lower() for c in stations_df.columns]
+        
+        if 'station_id' in stations_df.columns: stations_df = stations_df.drop(columns=['station_id'])
+        if 'station_code' in stations_df.columns: stations_df = stations_df.rename(columns={'station_code': 'station_id'})
+        
+        cols_needed = ['station_id', 'lat', 'lon', 'altitude']
+        stations_subset = stations_df[cols_needed].copy()
+        
+        stations_subset['station_id'] = stations_subset['station_id'].astype(str).str.strip()
+        pivot_df['station_id'] = pivot_df['station_id'].astype(str).str.strip()
+        
+        pivot_df = pd.merge(pivot_df, stations_subset, on='station_id', how='inner')
+    
     return pivot_df
 
 def feature_engineering(df):
     print("🛠️ Ingeniería de Características...")
+    TARGET = 'o3'
     
-    # 1. Definir Target (PM10)
-    TARGET = 'pm10'
-    if TARGET not in df.columns:
-        # Fallback a O3 si no hay PM10
-        if 'o3' in df.columns: 
-            TARGET = 'o3'
-            print("⚠️ No encontré PM10, entrenaré con O3.")
-        else: 
-            raise Exception("❌ El dataset no tiene PM10 ni O3.")
-    
-    # Eliminar filas donde no sepamos la respuesta (target nulo)
+    if TARGET not in df.columns: raise Exception("Falta Target O3")
     df = df.dropna(subset=[TARGET])
-    
-    # 2. Features Temporales (Ciclos)
     df['date'] = pd.to_datetime(df['date'])
     
-    # Hora (Seno/Coseno)
+    # Ciclos temporales
     df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
     df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
-    
-    # Mes (Estacionalidad)
     df['month'] = df['date'].dt.month
     df['month_sin'] = np.sin(2 * np.pi * df['month'] / 12)
     df['month_cos'] = np.cos(2 * np.pi * df['month'] / 12)
     
-    # 3. Imputar Meteorología (Rellenar huecos con media)
-    meteo_cols = ['tmp', 'rh', 'wsp', 'wdr']
-    for col in meteo_cols:
-        if col in df.columns:
-            df[col] = df[col].fillna(df[col].mean())
-        else:
-            df[col] = 0
-            
-    # 4. Encoding de Estaciones (Texto -> Número)
-    df['station_code'] = df['station_id'].astype('category').cat.codes
+    # Rellenar nulos
+    for col in ['tmp', 'rh', 'wsp', 'wdr']:
+        if col in df.columns: df[col] = df[col].fillna(df[col].mean())
+        else: df[col] = 0 
     
+    if 'altitude' in df.columns: df['altitude'] = df['altitude'].fillna(2240)
+            
+    df['station_numeric'] = df['station_id'].astype('category').cat.codes
     return df, TARGET
 
 def train():
     try:
-        # Asegurar carpeta de salida
-        os.makedirs(os.path.dirname(MODEL_OUTPUT_PATH), exist_ok=True)
-        
         df = load_and_merge_data()
         df, TARGET = feature_engineering(df)
         
-        # Variables que usará el modelo
+        # FEATURES COMPLETOS
         POSSIBLE_FEATURES = [
-            'station_code', 
-            'hour_sin', 'hour_cos', 
-            'month_sin', 'month_cos', 
+            'lat', 'lon', 'altitude',
+            'station_numeric',       
+            'hour_sin', 'hour_cos',  
+            'month_sin', 'month_cos',
             'tmp', 'rh', 'wsp', 'wdr'
         ]
-        # Solo usar las que existan en los datos descargados
         FEATURES = [f for f in POSSIBLE_FEATURES if f in df.columns]
-        
-        print(f"🧠 Entrenando modelo para predecir '{TARGET}' con: {FEATURES}")
+        print(f"🧠 Entrenando con: {FEATURES}")
         
         X = df[FEATURES]
         y = df[TARGET]
         
-        # Split 80/20
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         
-        # Configuración XGBoost
-        model = xgb.XGBRegressor(
-            n_estimators=500,
-            learning_rate=0.05,
-            max_depth=6,
-            n_jobs=-1
-        )
-        
-        print("⏳ Entrenando... (patience please)")
+        model = xgb.XGBRegressor(n_estimators=100, learning_rate=0.05, n_jobs=-1)
         model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
         
-        # Evaluar
-        preds = model.predict(X_test)
-        rmse = np.sqrt(mean_squared_error(y_test, preds))
-        
-        print("-" * 30)
-        print(f"✅ ¡ENTRENAMIENTO EXITOSO!")
-        print(f"📉 Error Promedio (RMSE): {rmse:.2f}")
-        print("-" * 30)
-        
+        rmse = np.sqrt(mean_squared_error(y_test, model.predict(X_test)))
+        print(f"✅ RMSE Final: {rmse:.2f}")
         model.save_model(MODEL_OUTPUT_PATH)
-        print(f"💾 Modelo guardado en: {MODEL_OUTPUT_PATH}")
         
     except Exception as e:
         print(f"❌ Error crítico: {e}")
-        import traceback
-        traceback.print_exc()
+        exit(1)
 
 if __name__ == "__main__":
     train()
