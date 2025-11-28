@@ -35,7 +35,7 @@ def load_and_merge_data():
         values='value'
     ).reset_index()
     
-    # --- MERGE CON CATALOGO (Coords + Altitud) ---
+    # Merge con Catálogo (Lat/Lon/Altitud)
     if os.path.exists(STATIONS_FILE):
         print(f"🗺️ Cruzando con catálogo: {STATIONS_FILE}")
         stations_df = pd.read_csv(STATIONS_FILE)
@@ -46,7 +46,6 @@ def load_and_merge_data():
         
         cols_needed = ['station_id', 'lat', 'lon', 'altitude']
         stations_subset = stations_df[cols_needed].copy()
-        
         stations_subset['station_id'] = stations_subset['station_id'].astype(str).str.strip()
         pivot_df['station_id'] = pivot_df['station_id'].astype(str).str.strip()
         
@@ -57,12 +56,11 @@ def load_and_merge_data():
 def feature_engineering(df):
     print("🛠️ Ingeniería de Características...")
     TARGET = 'o3'
-    
     if TARGET not in df.columns: raise Exception("Falta Target O3")
     df = df.dropna(subset=[TARGET])
     df['date'] = pd.to_datetime(df['date'])
     
-    # Ciclos temporales
+    # Ciclos
     df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
     df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
     df['month'] = df['date'].dt.month
