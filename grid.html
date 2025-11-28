@@ -4,45 +4,123 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smability Dashboard - CDMX</title>
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+    
     <style>
         body { margin: 0; padding: 0; background: #0f172a; font-family: 'Inter', sans-serif; color: #e2e8f0; overflow: hidden; }
         #map { height: 100vh; width: 100%; background: #0f172a; }
-        .sidebar { position: absolute; top: 20px; left: 20px; z-index: 1000; background: rgba(15, 23, 42, 0.95); width: 300px; border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.6); backdrop-filter: blur(10px); display: flex; flex-direction: column; overflow: hidden; max-height: calc(100vh - 40px); }
-        .header { padding: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: linear-gradient(to right, rgba(56,189,248,0.1), transparent); }
+        
+        /* --- PANEL LATERAL --- */
+        .sidebar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.95);
+            width: 300px;
+            border-radius: 12px;
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            max-height: calc(100vh - 40px);
+        }
+
+        .header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            background: linear-gradient(to right, rgba(56,189,248,0.1), transparent);
+        }
         h1 { margin: 0; font-size: 18px; font-weight: 600; color: #38bdf8; letter-spacing: -0.5px; }
         .subtitle { font-size: 11px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Selector de Variables */
         .controls { padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .btn-var { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; padding: 10px; border-radius: 8px; cursor: pointer; font-size: 12px; text-align: center; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        
+        .btn-var {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #cbd5e1;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
         .btn-var:hover { background: rgba(255,255,255,0.1); }
-        .btn-var.active { background: rgba(56, 189, 248, 0.2); border-color: #38bdf8; color: #fff; font-weight: 600; }
-        .upload-area { margin: 0 15px; border: 2px dashed #475569; border-radius: 8px; padding: 15px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .btn-var.active {
+            background: rgba(56, 189, 248, 0.2);
+            border-color: #38bdf8;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        /* Zona de Carga */
+        .upload-area {
+            margin: 0 15px;
+            border: 2px dashed #475569;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
         .upload-area:hover { border-color: #94a3b8; background: rgba(255,255,255,0.02); }
         .upload-txt { font-size: 11px; color: #64748b; }
+
+        /* Leyenda Dinámica */
         .legend-panel { padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); }
         .legend-title { font-size: 12px; color: #e2e8f0; margin-bottom: 10px; display: flex; justify-content: space-between; }
         .legend-bar { height: 12px; border-radius: 6px; position: relative; margin-bottom: 8px; }
         .legend-labels { display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; font-family: 'Roboto Mono'; }
+
+        /* Stats Rápidos */
         .stats-row { display: flex; justify-content: space-between; margin-top: 15px; }
         .stat-item { text-align: center; }
         .stat-val { display: block; font-size: 16px; font-weight: 600; color: #fff; font-family: 'Roboto Mono'; }
         .stat-lbl { font-size: 9px; color: #64748b; text-transform: uppercase; }
-        .leaflet-popup-content-wrapper { background: rgba(15, 23, 42, 0.95); color: white; border: 1px solid #38bdf8; border-radius: 8px; }
-        .leaflet-popup-tip { background: #38bdf8; }
+
+        /* --- POPUPS MEJORADOS (Fondo Blanco) --- */
+        .leaflet-popup-content-wrapper {
+            background: #ffffff !important; /* Fondo Blanco */
+            color: #1e293b !important;      /* Texto Oscuro */
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: none;
+        }
+        .leaflet-popup-tip {
+            background: #ffffff !important; /* Punta Blanca */
+        }
+        .leaflet-popup-content {
+            margin: 10px 12px;
+            line-height: 1.5;
+        }
+
     </style>
 </head>
 <body>
+
     <div class="sidebar">
         <div class="header">
             <h1>Smability AI</h1>
             <div class="subtitle">Modelo de Calidad del Aire V9</div>
         </div>
+
         <div class="upload-area" id="drop-zone" onclick="document.getElementById('fileInput').click()">
             <div style="font-size: 20px; margin-bottom: 5px;">📂</div>
             <div class="upload-txt" id="file-name">Arrastra latest_grid.json</div>
             <input type="file" id="fileInput" accept=".json" style="display: none;" />
         </div>
+
         <div class="controls">
             <div class="btn-var active" onclick="setMode('o3', this)">🔴 Ozono</div>
             <div class="btn-var" onclick="setMode('tmp', this)">🌡️ Temp</div>
@@ -50,6 +128,7 @@
             <div class="btn-var" onclick="setMode('wsp', this)">💨 Viento</div>
             <div class="btn-var" style="grid-column: span 2;" onclick="setMode('alt', this)">⛰️ Altitud</div>
         </div>
+
         <div class="legend-panel">
             <div class="legend-title">
                 <span id="legend-name">Ozono (O3)</span>
@@ -59,68 +138,191 @@
             <div class="legend-labels" id="legend-ticks">
                 <span>0</span><span>50</span><span>100</span><span>150</span><span>200</span>
             </div>
+
             <div class="stats-row">
-                <div class="stat-item"><span class="stat-val" id="stat-min">--</span><span class="stat-lbl">Mínimo</span></div>
-                <div class="stat-item"><span class="stat-val" id="stat-avg">--</span><span class="stat-lbl">Promedio</span></div>
-                <div class="stat-item"><span class="stat-val" id="stat-max">--</span><span class="stat-lbl">Máximo</span></div>
+                <div class="stat-item">
+                    <span class="stat-val" id="stat-min">--</span>
+                    <span class="stat-lbl">Mínimo</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val" id="stat-avg">--</span>
+                    <span class="stat-lbl">Promedio</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-val" id="stat-max">--</span>
+                    <span class="stat-lbl">Máximo</span>
+                </div>
             </div>
         </div>
     </div>
+
     <div id="map"></div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         const map = L.map('map', { zoomControl: false }).setView([19.4326, -99.1332], 10);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'Smability AI', maxZoom: 19 }).addTo(map);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: 'Smability AI', maxZoom: 19
+        }).addTo(map);
+
+        // CONFIGURACIÓN DE ESCALAS (Ajustadas a CDMX)
         const CONFIG = {
-            o3: { name: 'Ozono', unit: 'ppb', min: 0, max: 200, stops: [0, 50, 100, 150, 200], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97'] },
-            tmp: { name: 'Temperatura', unit: '°C', min: 0, max: 35, stops: [0, 10, 20, 30, 35], colors: ['#0000ff', '#00ffff', '#ffff00', '#ff0000', '#800000'] },
-            rh: { name: 'Humedad', unit: '%', min: 0, max: 100, stops: [0, 25, 50, 75, 100], colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b'] },
-            wsp: { name: 'Velocidad Viento', unit: 'm/s', min: 0, max: 20, stops: [0, 5, 10, 15, 20], colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c'] },
-            alt: { name: 'Altitud', unit: 'm', min: 2200, max: 3200, stops: [2200, 2450, 2700, 2950, 3200], colors: ['#4caf50', '#8bc34a', '#ffeb3b', '#ff9800', '#795548'] }
+            o3: {
+                name: 'Ozono', unit: 'ppb', min: 0, max: 200,
+                stops: [0, 50, 100, 150, 200],
+                colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97']
+            },
+            tmp: {
+                name: 'Temperatura', unit: '°C', min: 0, max: 35,
+                stops: [0, 10, 20, 30, 35],
+                colors: ['#0000ff', '#00ffff', '#ffff00', '#ff0000', '#800000']
+            },
+            rh: {
+                name: 'Humedad', unit: '%', min: 0, max: 100,
+                stops: [0, 25, 50, 75, 100],
+                colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b']
+            },
+            wsp: {
+                name: 'Velocidad Viento', unit: 'm/s', min: 0, max: 20,
+                stops: [0, 5, 10, 15, 20],
+                colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c']
+            },
+            alt: {
+                name: 'Altitud', unit: 'm', min: 2200, max: 3200,
+                stops: [2200, 2450, 2700, 2950, 3200],
+                colors: ['#4caf50', '#8bc34a', '#ffeb3b', '#ff9800', '#795548']
+            }
         };
-        let globalData = null; let currentMetric = 'o3'; let geoLayer = null;
+
+        let globalData = null;
+        let currentMetric = 'o3';
+        let geoLayer = null;
+
         function getColor(val, metric) {
             const conf = CONFIG[metric];
-            let t = (val - conf.min) / (conf.max - conf.min); t = Math.max(0, Math.min(1, t));
-            const segment = 0.25; const idx = Math.floor(t / segment); const localT = (t % segment) / segment;
-            const c1 = hexToRgb(conf.colors[Math.min(idx, 3)]); const c2 = hexToRgb(conf.colors[Math.min(idx + 1, 4)]);
+            let t = (val - conf.min) / (conf.max - conf.min);
+            t = Math.max(0, Math.min(1, t));
+            const segment = 0.25;
+            const idx = Math.floor(t / segment);
+            const localT = (t % segment) / segment;
+            const c1 = hexToRgb(conf.colors[Math.min(idx, 3)]);
+            const c2 = hexToRgb(conf.colors[Math.min(idx + 1, 4)]);
             return `rgb(${lerp(c1.r, c2.r, localT)}, ${lerp(c1.g, c2.g, localT)}, ${lerp(c1.b, c2.b, localT)})`;
         }
-        function hexToRgb(hex) { const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0}; }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0};
+        }
         function lerp(start, end, t) { return Math.round(start + (end - start) * t); }
+
         function renderMap() {
             if (!globalData) return;
             if (geoLayer) map.removeLayer(geoLayer);
-            const conf = CONFIG[currentMetric]; const RECT_SIZE = 0.01 / 2;
-            const rectangles = []; let sum = 0, min = Infinity, max = -Infinity, validCount = 0;
+
+            const conf = CONFIG[currentMetric];
+            const RECT_SIZE = 0.01 / 2;
+
+            const rectangles = [];
+            let sum = 0, min = Infinity, max = -Infinity;
+            let validCount = 0;
+
             globalData.forEach(p => {
-                let val = currentMetric === 'o3' ? p.o3 : currentMetric === 'tmp' ? p.tmp : currentMetric === 'rh' ? p.rh : currentMetric === 'wsp' ? p.wsp : p.altitude;
+                let val = 0;
+                if (currentMetric === 'o3') val = p.o3;
+                else if (currentMetric === 'tmp') val = p.tmp;
+                else if (currentMetric === 'rh') val = p.rh;
+                else if (currentMetric === 'wsp') val = p.wsp;
+                else if (currentMetric === 'alt') val = p.altitude;
+
                 if (val === undefined || val === null) return;
-                sum += val; if (val < min) min = val; if (val > max) max = val; validCount++;
+
+                sum += val;
+                if (val < min) min = val;
+                if (val > max) max = val;
+                validCount++;
+
                 const color = getColor(val, currentMetric);
+                
                 const bounds = [[p.lat - RECT_SIZE, p.lon - RECT_SIZE], [p.lat + RECT_SIZE, p.lon + RECT_SIZE]];
-                const rect = L.rectangle(bounds, { color: color, weight: 0, fillOpacity: 0.65, fillColor: color });
-                rect.bindPopup(`<div style="font-family:'Inter'; color:#0f172a;"><div style="font-weight:bold; border-bottom:1px solid #ccc; margin-bottom:5px;">Datos del Grid</div><b>O3:</b> ${p.o3.toFixed(1)} ppb<br><b>Temp:</b> ${p.tmp?.toFixed(1)} °C<br><b>Humedad:</b> ${p.rh?.toFixed(0)} %<br><b>Viento:</b> ${p.wsp?.toFixed(1)} m/s<br><b>Altitud:</b> ${p.altitude?.toFixed(0)} m</div>`);
+                const rect = L.rectangle(bounds, {
+                    color: color, weight: 0, fillOpacity: 0.65, fillColor: color
+                });
+
+                // --- POPUP REIMAGINADO (Blanco y legible) ---
+                // Aquí agregamos el timestamp en la parte superior
+                rect.bindPopup(`
+                    <div style="font-family:'Inter'; color:#334155; min-width: 140px;">
+                        <div style="font-size:10px; color:#94a3b8; text-align:right; margin-bottom:4px;">
+                            ${p.timestamp || 'Ahora'}
+                        </div>
+                        <div style="font-weight:bold; border-bottom:2px solid ${color}; margin-bottom:8px; padding-bottom:4px; font-size:14px; color:#0f172a;">
+                            Datos Locales
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr auto; gap: 4px; font-size:12px;">
+                            <span style="font-weight:600; color:#000;">🔴 O3:</span> <span>${p.o3.toFixed(1)} ppb</span>
+                            <span style="font-weight:600; color:#000;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span>
+                            <span style="font-weight:600; color:#000;">💧 Hum:</span> <span>${p.rh?.toFixed(0)} %</span>
+                            <span style="font-weight:600; color:#000;">💨 Viento:</span> <span>${p.wsp?.toFixed(1)} m/s</span>
+                            <span style="font-weight:600; color:#000;">⛰️ Alt:</span> <span>${p.altitude?.toFixed(0)} m</span>
+                        </div>
+                    </div>
+                `);
+                
                 rect.on('mouseover', function(){ this.setStyle({ fillOpacity: 0.9, weight: 1, color: '#fff' })});
                 rect.on('mouseout', function(){ this.setStyle({ fillOpacity: 0.65, weight: 0 })});
+
                 rectangles.push(rect);
             });
+
             geoLayer = L.layerGroup(rectangles).addTo(map);
             updateLegend(conf, min, max, sum/validCount);
         }
+
         function updateLegend(conf, min, max, avg) {
-            document.getElementById('legend-name').innerText = conf.name; document.getElementById('legend-unit').innerText = conf.unit;
-            document.getElementById('color-bar').style.background = `linear-gradient(to right, ${conf.colors.join(', ')})`;
-            document.getElementById('legend-ticks').innerHTML = conf.stops.map(s => `<span>${s}</span>`).join('');
-            document.getElementById('stat-min').innerText = min.toFixed(1); document.getElementById('stat-max').innerText = max.toFixed(1); document.getElementById('stat-avg').innerText = avg.toFixed(1);
+            document.getElementById('legend-name').innerText = conf.name;
+            document.getElementById('legend-unit').innerText = conf.unit;
+            const gradient = `linear-gradient(to right, ${conf.colors.join(', ')})`;
+            document.getElementById('color-bar').style.background = gradient;
+            const ticksHTML = conf.stops.map(s => `<span>${s}</span>`).join('');
+            document.getElementById('legend-ticks').innerHTML = ticksHTML;
+            document.getElementById('stat-min').innerText = min.toFixed(1);
+            document.getElementById('stat-max').innerText = max.toFixed(1);
+            document.getElementById('stat-avg').innerText = avg.toFixed(1);
         }
-        window.setMode = (mode, el) => { currentMetric = mode; document.querySelectorAll('.btn-var').forEach(b => b.classList.remove('active')); el.classList.add('active'); renderMap(); };
-        const dropZone = document.getElementById('drop-zone'); const fileInput = document.getElementById('fileInput');
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => { dropZone.addEventListener(e, (ev) => { ev.preventDefault(); ev.stopPropagation(); }); });
+
+        window.setMode = (mode, el) => {
+            currentMetric = mode;
+            document.querySelectorAll('.btn-var').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            renderMap();
+        };
+
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('fileInput');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => {
+            dropZone.addEventListener(e, (ev) => { ev.preventDefault(); ev.stopPropagation(); });
+        });
+
         dropZone.addEventListener('drop', (e) => loadFile(e.dataTransfer.files[0]));
         fileInput.addEventListener('change', (e) => loadFile(e.target.files[0]));
-        function loadFile(file) { if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { globalData = JSON.parse(e.target.result); document.getElementById('file-name').innerText = "✅ " + file.name; document.getElementById('drop-zone').style.borderColor = "#00e400"; renderMap(); } catch(err) { alert("Error JSON: " + err); } }; reader.readAsText(file); }
+
+        function loadFile(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    globalData = JSON.parse(e.target.result);
+                    document.getElementById('file-name').innerText = "✅ " + file.name;
+                    document.getElementById('drop-zone').style.borderColor = "#00e400";
+                    renderMap();
+                } catch(err) { alert("Error JSON: " + err); }
+            };
+            reader.readAsText(file);
+        }
     </script>
 </body>
 </html>
