@@ -20,22 +20,33 @@ SMABILITY_API_URL = os.environ.get('SMABILITY_API_URL', 'https://y4zwdmw7vf.exec
 
 s3_client = boto3.client('s3')
 
+# --- TABLAS NOM-172-SEMARNAT-2023 ---
+BPS_O3 = [(0,58,0,50), (59,92,51,100), (93,135,101,150), (136,175,151,200), (176,240,201,300)]
+BPS_PM10 = [(0,45,0,50), (46,60,51,100), (61,132,101,150), (133,213,151,200), (214,354,201,300)]
+
+def get_ias_score(c, pollutant):
+    breakpoints = BPS_O3 if pollutant == 'o3' else BPS_PM10
+    c = float(c)
+    for (c_lo, c_hi, i_lo, i_hi) in breakpoints:
+        if c <= c_hi:
+            return i_lo + ((c - c_lo) / (c_hi - c_lo)) * (i_hi - i_lo)
+    last = breakpoints[-1]
+    return last[2] + ((c - last[0]) / (last[1] - last[0])) * (last[3] - last[2])
+
 def load_models():
-    print("⬇️ Cargando modelos (O3 + PM10)...", flush=True)
+    print("⬇️ Cargando modelos...", flush=True)
     models = {}
     try:
         m_o3 = xgb.XGBRegressor()
         m_o3.load_model(MODEL_PATH_O3)
         models['o3'] = m_o3
-        
         if os.path.exists(MODEL_PATH_PM10):
             m_pm10 = xgb.XGBRegressor()
             m_pm10.load_model(MODEL_PATH_PM10)
             models['pm10'] = m_pm10
-        
         return models
     except Exception as e:
-        print(f"❌ Error cargando modelos: {e}", flush=True)
+        print(f"❌ Error modelos: {e}", flush=True)
         raise e
 
 def get_live_data():
@@ -48,11 +59,7 @@ def get_live_data():
         return []
 
 def process_stations_data(stations_list):
-    """
-    V21: Mantiene la lógica normativa (O3 1h, PM10 12h).
-    """
     parsed_data = []
-    
     for s in stations_list:
         try:
             if s.get('latitude') is None or s.get('longitude') is None: continue
@@ -63,15 +70,11 @@ def process_stations_data(stations_list):
             alt = float(s.get('altitude')) if s.get('altitude') is not None else np.nan
             
             pollutants = s.get('pollutants', {})
-            
-            # O3 (1h)
             o3_val = pollutants.get('o3', {}).get('avg_1h', {}).get('value')
             
-            # PM10 (12h con fallback a 1h)
             pm10_obj = pollutants.get('pm10', {})
             pm10_val = pm10_obj.get('avg_12h', {}).get('value')
-            if pm10_val is None:
-                pm10_val = pm10_obj.get('avg_1h', {}).get('value')
+            if pm10_val is None: pm10_val = pm10_obj.get('avg_1h', {}).get('value')
             
             meteo = s.get('meteorological', {})
             def get_val(key): return meteo.get(key, {}).get('avg_1h', {}).get('value')
@@ -90,13 +93,9 @@ def process_stations_data(stations_list):
                 'wsp': float(wsp) if wsp is not None else np.nan, 
                 'wdr': float(wdr) if wdr is not None else np.nan
             })
-        except Exception:
-            continue
-            
+        except Exception: continue
     df = pd.DataFrame(parsed_data)
-    v_o3 = df['o3_real'].count() if not df.empty else 0
-    v_pm10 = df['pm10_real'].count() if not df.empty else 0
-    print(f"📊 Datos Vivos: {len(df)} st. | O3: {v_o3} | PM10: {v_pm10}", flush=True)
+    print(f"📊 Datos: {len(df)} st. | O3: {df['o3_real'].count()}", flush=True)
     return df
 
 def inverse_distance_weighting(x, y, z, xi, yi, power=2):
@@ -121,7 +120,6 @@ def prepare_grid_features(stations_df):
 
     cdmx_tz = ZoneInfo("America/Mexico_City")
     now = datetime.now(cdmx_tz)
-    
     grid_df['hour_sin'] = np.sin(2 * np.pi * now.hour / 24)
     grid_df['hour_cos'] = np.cos(2 * np.pi * now.hour / 24)
     grid_df['month_sin'] = np.sin(2 * np.pi * now.month / 12)
@@ -133,12 +131,8 @@ def prepare_grid_features(stations_df):
     def interpolate_feature(col_name, default_val):
         valid = stations_df.dropna(subset=[col_name])
         if not valid.empty:
-            return inverse_distance_weighting(
-                valid['lat'].values, valid['lon'].values, valid[col_name].values,
-                grid_lats, grid_lons
-            )
-        else:
-            return np.full(len(grid_df), default_val)
+            return inverse_distance_weighting(valid['lat'].values, valid['lon'].values, valid[col_name].values, grid_lats, grid_lons)
+        else: return np.full(len(grid_df), default_val)
 
     grid_df['tmp'] = interpolate_feature('tmp', 20.0).round(1)
     grid_df['rh'] = interpolate_feature('rh', 40.0).round(1)
@@ -149,9 +143,8 @@ def prepare_grid_features(stations_df):
         wdr_rad = np.deg2rad(valid_wind['wdr'].values)
         u_comp = valid_wind['wsp'].values * np.cos(wdr_rad)
         v_comp = valid_wind['wsp'].values * np.sin(wdr_rad)
-        st_lats, st_lons = valid_wind['lat'].values, valid_wind['lon'].values
-        grid_u = inverse_distance_weighting(st_lats, st_lons, u_comp, grid_lats, grid_lons)
-        grid_v = inverse_distance_weighting(st_lats, st_lons, v_comp, grid_lats, grid_lons)
+        grid_u = inverse_distance_weighting(valid_wind['lat'].values, valid_wind['lon'].values, u_comp, grid_lats, grid_lons)
+        grid_v = inverse_distance_weighting(valid_wind['lat'].values, valid_wind['lon'].values, v_comp, grid_lats, grid_lons)
         grid_df['wsp'] = np.sqrt(grid_u**2 + grid_v**2).round(1)
         grid_df['wdr'] = (np.degrees(np.arctan2(grid_v, grid_u)) % 360).round(0)
     else:
@@ -161,104 +154,102 @@ def prepare_grid_features(stations_df):
     return grid_df
 
 def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col_name):
-    FEATURES = ['lat', 'lon', 'altitude', 'station_numeric', 
-                'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 
-                'tmp', 'rh', 'wsp', 'wdr']
-    
+    FEATURES = ['lat', 'lon', 'altitude', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp', 'wdr']
     raw_preds = model.predict(grid_df[FEATURES])
     raw_preds = np.maximum(raw_preds, 0)
     
     calibration_set = stations_df.dropna(subset=[real_col_name]).copy()
-    
     if not calibration_set.empty:
+        # Imputación
         source_tmp = stations_df.dropna(subset=['tmp'])
         source_rh = stations_df.dropna(subset=['rh'])
         source_alt = stations_df.dropna(subset=['alt'])
         target_lats = calibration_set['lat'].values
         target_lons = calibration_set['lon'].values
-        
         def impute(col, source_df):
             missing = calibration_set[col].isna()
             if missing.any() and not source_df.empty:
-                calibration_set.loc[missing, col] = inverse_distance_weighting(
-                    source_df['lat'].values, source_df['lon'].values, source_df[col].values,
-                    target_lats[missing], target_lons[missing]
-                )
-
-        impute('tmp', source_tmp)
-        impute('rh', source_rh)
-        impute('alt', source_alt)
+                calibration_set.loc[missing, col] = inverse_distance_weighting(source_df['lat'].values, source_df['lon'].values, source_df[col].values, target_lats[missing], target_lons[missing])
+        impute('tmp', source_tmp); impute('rh', source_rh); impute('alt', source_alt)
         
-        calibration_set['tmp'] = calibration_set['tmp'].fillna(20)
-        calibration_set['rh'] = calibration_set['rh'].fillna(40)
-        calibration_set['altitude'] = calibration_set['alt'].fillna(2240)
-        calibration_set['wsp'] = calibration_set['wsp'].fillna(0)
-        calibration_set['wdr'] = calibration_set['wdr'].fillna(0)
-        calibration_set['station_numeric'] = -1
-        for col in ['hour_sin', 'hour_cos', 'month_sin', 'month_cos']:
-            calibration_set[col] = grid_df[col].iloc[0]
+        calibration_set['tmp'] = calibration_set['tmp'].fillna(20); calibration_set['rh'] = calibration_set['rh'].fillna(40)
+        calibration_set['altitude'] = calibration_set['alt'].fillna(2240); calibration_set['wsp'] = calibration_set['wsp'].fillna(0); calibration_set['wdr'] = calibration_set['wdr'].fillna(0); calibration_set['station_numeric'] = -1
+        for col in ['hour_sin', 'hour_cos', 'month_sin', 'month_cos']: calibration_set[col] = grid_df[col].iloc[0]
 
         station_preds = model.predict(calibration_set[FEATURES])
         residuals = calibration_set[real_col_name].values - station_preds
         
-        # Logs de Auditoría
+        # LOGS AUDITORÍA
         cdmx_tz = ZoneInfo("America/Mexico_City")
         curr_time = datetime.now(cdmx_tz).strftime("%H:%M")
-        
-        print("\n" + "="*85, flush=True)
+        print("\n" + "="*95, flush=True)
         print(f"🔧 CALIBRACIÓN: {output_col_name.upper()} ({len(calibration_set)} estaciones)", flush=True)
-        print(f"{'#':<3} | {'HORA':<6} | {'ESTACIÓN':<18} | {'REAL':<6} | {'BASE':<6} | {'BIAS':<6} | {'FINAL':<6}", flush=True)
-        print("-" * 85, flush=True)
-        
+        print(f"{'#':<3} | {'HORA':<6} | {'ESTACIÓN':<18} | {'REAL':<6} | {'BASE':<6} | {'BIAS':<6} | {'FINAL':<6} | {'IAS':<4}", flush=True)
+        print("-" * 95, flush=True)
         for i, row in calibration_set.reset_index().iterrows():
-            st_name = row['name'][:18] 
-            real = row[real_col_name]
-            base = station_preds[i]
-            bias = residuals[i]
-            final = base + bias
-            print(f"{i+1:<3} | {curr_time:<6} | {st_name:<18} | {real:<6.1f} | {base:<6.1f} | {bias:<+6.1f} | {final:<6.1f}", flush=True)
-            
-        print("-" * 85, flush=True)
+            st_name = row['name'][:18]; real = row[real_col_name]; base = station_preds[i]; bias = residuals[i]; final = base + bias; ias_pt = get_ias_score(final, output_col_name)
+            print(f"{i+1:<3} | {curr_time:<6} | {st_name:<18} | {real:<6.1f} | {base:<6.1f} | {bias:<+6.1f} | {final:<6.1f} | {ias_pt:<4.0f}", flush=True)
+        print("-" * 95, flush=True)
         print(f"📉 BIAS PROMEDIO: {np.mean(residuals):+.2f}", flush=True)
-        print("="*85 + "\n", flush=True)
+        print("="*95 + "\n", flush=True)
 
-        grid_bias = inverse_distance_weighting(
-            calibration_set['lat'].values, calibration_set['lon'].values, residuals,
-            grid_df['lat'].values, grid_df['lon'].values
-        )
-        final_preds = raw_preds + grid_bias
-        return np.maximum(final_preds, 0).round(1)
-        
+        grid_bias = inverse_distance_weighting(calibration_set['lat'].values, calibration_set['lon'].values, residuals, grid_df['lat'].values, grid_df['lon'].values)
+        return np.maximum(raw_preds + grid_bias, 0).round(1)
     else:
         print(f"⚠️ Sin datos reales de {output_col_name}. Usando RAW.", flush=True)
         return raw_preds.round(1)
 
-def calculate_ias_row(row):
+def overwrite_with_real_data(grid_df, stations_df):
     """
-    Cálculo IAS 2024 con identificación del contaminante dominante.
-    Retorna: (Valor_IAS, "Dominante")
+    V24: Hard Snapping. Si una celda del grid está muy cerca de una estación,
+    sobreescribe sus valores con los datos reales de la estación.
+    Esto garantiza que Mapa == Realidad en los puntos de control.
     """
-    def get_ias(c, breakpoints):
-        for (c_lo, c_hi, i_lo, i_hi) in breakpoints:
-            if c <= c_hi:
-                return i_lo + ((c - c_lo) / (c_hi - c_lo)) * (i_hi - i_lo)
-        last = breakpoints[-1]
-        return last[2] + ((c - last[0]) / (last[1] - last[0])) * (last[3] - last[2])
-
-    bps_o3 = [(0,58,0,50), (59,92,51,100), (93,135,101,150), (136,175,151,200), (176,240,201,300)]
-    bps_pm10 = [(0,45,0,50), (46,60,51,100), (61,132,101,150), (133,213,151,200), (214,354,201,300)]
-
-    ias_o3 = get_ias(row['o3'], bps_o3)
-    ias_pm10 = get_ias(row['pm10'], bps_pm10)
+    print("📌 Aplicando Anclaje Duro (Hard Snapping)...", flush=True)
+    grid_df['station'] = None # Init
     
-    # Determinación del Dominante
-    if ias_pm10 >= ias_o3:
-        return round(ias_pm10), 'PM10'
-    else:
-        return round(ias_o3), 'O3'
+    if stations_df.empty: return grid_df
+    
+    grid_coords = grid_df[['lat', 'lon']].values
+    st_coords = stations_df[['lat', 'lon']].values
+    
+    # Umbral de distancia: 0.01 grados (~1.1km, el tamaño de la celda)
+    THRESHOLD = 0.01
+    
+    for i, row in stations_df.iterrows():
+        slat, slon = row['lat'], row['lon']
+        
+        # Buscar celda más cercana
+        dists = np.sqrt((grid_coords[:,0] - slat)**2 + (grid_coords[:,1] - slon)**2)
+        nearest_idx = np.argmin(dists)
+        
+        # Solo si está realmente cerca (dentro de la celda)
+        if dists[nearest_idx] < THRESHOLD:
+            # Sobreescribir O3
+            if not np.isnan(row['o3_real']):
+                grid_df.at[nearest_idx, 'o3'] = row['o3_real']
+            
+            # Sobreescribir PM10
+            if not np.isnan(row['pm10_real']):
+                grid_df.at[nearest_idx, 'pm10'] = row['pm10_real']
+            
+            # Sobreescribir Meteo (Para consistencia visual)
+            if not np.isnan(row['tmp']): grid_df.at[nearest_idx, 'tmp'] = row['tmp']
+            if not np.isnan(row['rh']): grid_df.at[nearest_idx, 'rh'] = row['rh']
+            if not np.isnan(row['wsp']): grid_df.at[nearest_idx, 'wsp'] = row['wsp']
+            
+            # Etiquetar
+            grid_df.at[nearest_idx, 'station'] = row['name']
+            
+    return grid_df
+
+def calculate_ias_row(row):
+    ias_o3 = get_ias_score(row['o3'], 'o3')
+    ias_pm10 = get_ias_score(row['pm10'], 'pm10')
+    return (round(ias_pm10), 'PM10') if ias_pm10 >= ias_o3 else (round(ias_o3), 'O3')
 
 def lambda_handler(event, context):
-    print("🚀 Iniciando Lambda V21 (Dominant Pollutant Tag)...", flush=True)
+    print("🚀 Iniciando Lambda V24 (Exact Match Fix)...", flush=True)
     try:
         models = load_models()
         raw_stations = get_live_data()
@@ -266,33 +257,29 @@ def lambda_handler(event, context):
         
         grid_df = prepare_grid_features(stations_df)
         
-        # Predicciones
+        # 1. Predicción + Calibración Suave
         grid_df['o3'] = predict_and_calibrate(models['o3'], grid_df, stations_df, 'o3_real', 'o3')
+        if 'pm10' in models: grid_df['pm10'] = predict_and_calibrate(models['pm10'], grid_df, stations_df, 'pm10_real', 'pm10')
+        else: grid_df['pm10'] = 0
         
-        if 'pm10' in models:
-            grid_df['pm10'] = predict_and_calibrate(models['pm10'], grid_df, stations_df, 'pm10_real', 'pm10')
-        else:
-            grid_df['pm10'] = 0
+        # 2. ANCLAJE DURO (Nuevo en V24)
+        # Esto asegura que los puntos con estación tengan el valor EXACTO del log
+        grid_df = overwrite_with_real_data(grid_df, stations_df)
             
-        print("🧮 Calculando IAS y Dominante...", flush=True)
-        # Aplicamos la función y expandimos el resultado en dos columnas
         ias_results = grid_df.apply(calculate_ias_row, axis=1, result_type='expand')
         grid_df['ias'] = ias_results[0]
         grid_df['dominant'] = ias_results[1]
         
-        # Reporte Rápido
         max_ias = grid_df['ias'].max()
         avg_ias = grid_df['ias'].mean()
-        # Contamos dominantes
         dom_counts = grid_df['dominant'].value_counts().to_dict()
         print(f"🚦 REPORTE IAS: Máx={max_ias:.0f} | Prom={avg_ias:.0f} | Dominantes: {dom_counts}", flush=True)
         
-        # Finalización
         cdmx_tz = ZoneInfo("America/Mexico_City")
         current_ts = datetime.now(cdmx_tz).strftime("%Y-%m-%d %H:%M:%S")
         grid_df['timestamp'] = current_ts
         
-        final_cols = ['timestamp', 'lat', 'lon', 'altitude', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'ias', 'dominant']
+        final_cols = ['timestamp', 'lat', 'lon', 'altitude', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'ias', 'dominant', 'station']
         final_df = grid_df[final_cols]
         json_output = final_df.to_json(orient='records')
         
@@ -303,7 +290,7 @@ def lambda_handler(event, context):
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=json_output, ContentType='application/json')
         s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=json_output, ContentType='application/json')
 
-        return {'statusCode': 200, 'body': json.dumps('Grid V21 OK')}
+        return {'statusCode': 200, 'body': json.dumps('Grid V24 OK')}
     except Exception as e:
         print(f"❌ Error Fatal: {str(e)}", flush=True)
         return {'statusCode': 500, 'body': json.dumps(f"Error: {str(e)}")}
