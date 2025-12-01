@@ -7,7 +7,6 @@ import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
-import time
 
 # --- CONFIGURACIÓN ---
 S3_BUCKET = os.environ.get('S3_BUCKET', 'smability-data-lake')
@@ -22,7 +21,7 @@ SMABILITY_API_URL = os.environ.get('SMABILITY_API_URL', 'https://y4zwdmw7vf.exec
 s3_client = boto3.client('s3')
 
 def load_models():
-    print("⬇️ Cargando modelos...", flush=True)
+    print("⬇️ Cargando modelos (O3 + PM10)...", flush=True)
     models = {}
     try:
         m_o3 = xgb.XGBRegressor()
@@ -49,7 +48,13 @@ def get_live_data():
         return []
 
 def process_stations_data(stations_list):
+    """
+    V20: Ajuste Normativo.
+    - O3: Usa avg_1h (Picos agudos).
+    - PM10: Usa avg_12h (Exposición acumulada NOM-172).
+    """
     parsed_data = []
+    
     for s in stations_list:
         try:
             if s.get('latitude') is None or s.get('longitude') is None: continue
@@ -60,8 +65,16 @@ def process_stations_data(stations_list):
             alt = float(s.get('altitude')) if s.get('altitude') is not None else np.nan
             
             pollutants = s.get('pollutants', {})
+            
+            # --- O3: Usamos 1 Hora (Estándar de alertamiento rápido) ---
             o3_val = pollutants.get('o3', {}).get('avg_1h', {}).get('value')
-            pm10_val = pollutants.get('pm10', {}).get('avg_1h', {}).get('value')
+            
+            # --- PM10: Usamos 12 Horas (Estándar NOM-172 para IAS) ---
+            # Si no existe el de 12h, intentamos fallback al de 1h (mejor algo que nada)
+            pm10_obj = pollutants.get('pm10', {})
+            pm10_val = pm10_obj.get('avg_12h', {}).get('value')
+            if pm10_val is None:
+                pm10_val = pm10_obj.get('avg_1h', {}).get('value')
             
             meteo = s.get('meteorological', {})
             def get_val(key): return meteo.get(key, {}).get('avg_1h', {}).get('value')
@@ -86,7 +99,7 @@ def process_stations_data(stations_list):
     df = pd.DataFrame(parsed_data)
     v_o3 = df['o3_real'].count() if not df.empty else 0
     v_pm10 = df['pm10_real'].count() if not df.empty else 0
-    print(f"📊 Datos Vivos: {len(df)} st. | O3: {v_o3} | PM10: {v_pm10}", flush=True)
+    print(f"📊 Datos Vivos (Normativos): {len(df)} st. | O3(1h): {v_o3} | PM10(12h): {v_pm10}", flush=True)
     return df
 
 def inverse_distance_weighting(x, y, z, xi, yi, power=2):
@@ -151,6 +164,12 @@ def prepare_grid_features(stations_df):
     return grid_df
 
 def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col_name):
+    """
+    Predice y calibra.
+    Nota: Si output_col_name es 'pm10', ahora estamos calibrando contra el promedio de 12h.
+    Esto significa que el mapa final de PM10 representará "El promedio de las últimas 12h",
+    lo cual es CORRECTO para el cálculo de IAS.
+    """
     FEATURES = ['lat', 'lon', 'altitude', 'station_numeric', 
                 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 
                 'tmp', 'rh', 'wsp', 'wdr']
@@ -191,7 +210,7 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
         station_preds = model.predict(calibration_set[FEATURES])
         residuals = calibration_set[real_col_name].values - station_preds
         
-        # --- LOGS FORZADOS V19 ---
+        # --- TABLA DE AUDITORÍA ---
         print("\n" + "="*85, flush=True)
         print(f"🔧 CALIBRACIÓN: {output_col_name.upper()} ({len(calibration_set)} estaciones)", flush=True)
         print(f"{'#':<3} | {'HORA':<6} | {'ESTACIÓN':<18} | {'REAL':<6} | {'BASE':<6} | {'BIAS':<6} | {'FINAL':<6}", flush=True)
@@ -206,7 +225,6 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
             base = station_preds[i]
             bias = residuals[i]
             final = base + bias
-            # flush=True asegura que cada línea se imprima al instante y no se corte
             print(f"{i+1:<3} | {curr_time:<6} | {st_name:<18} | {real:<6.1f} | {base:<6.1f} | {bias:<+6.1f} | {final:<6.1f}", flush=True)
             
         print("-" * 85, flush=True)
@@ -226,6 +244,7 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
         return raw_preds.round(1)
 
 def calculate_ias_row(row):
+    """Cálculo IAS 2024 (Con PM10 12h y O3 1h)."""
     def get_ias(c, breakpoints):
         for (c_lo, c_hi, i_lo, i_hi) in breakpoints:
             if c <= c_hi:
@@ -233,6 +252,8 @@ def calculate_ias_row(row):
         last = breakpoints[-1]
         return last[2] + ((c - last[0]) / (last[1] - last[0])) * (last[3] - last[2])
 
+    # NOM-172-SEMARNAT-2023 (Breakpoints vigentes 2024)
+    # PM10 usa promedio 12h (que es lo que ya tenemos en row['pm10'] gracias a la corrección)
     bps_o3 = [(0,58,0,50), (59,92,51,100), (93,135,101,150), (136,175,151,200), (176,240,201,300)]
     bps_pm10 = [(0,45,0,50), (46,60,51,100), (61,132,101,150), (133,213,151,200), (214,354,201,300)]
 
@@ -242,7 +263,7 @@ def calculate_ias_row(row):
     return round(max(ias_o3, ias_pm10))
 
 def lambda_handler(event, context):
-    print("🚀 Iniciando Lambda V19 (Logs Flush)...", flush=True)
+    print("🚀 Iniciando Lambda V20 (PM10 12h Compliance)...", flush=True)
     try:
         models = load_models()
         raw_stations = get_live_data()
@@ -253,11 +274,12 @@ def lambda_handler(event, context):
         grid_df['o3'] = predict_and_calibrate(models['o3'], grid_df, stations_df, 'o3_real', 'o3')
         
         if 'pm10' in models:
+            # Aquí 'pm10_real' ya contiene el promedio de 12 horas
             grid_df['pm10'] = predict_and_calibrate(models['pm10'], grid_df, stations_df, 'pm10_real', 'pm10')
         else:
             grid_df['pm10'] = 0
             
-        print("🧮 Calculando IAS...", flush=True)
+        print("🧮 Calculando IAS (NOM-2024)...", flush=True)
         grid_df['ias'] = grid_df.apply(calculate_ias_row, axis=1)
         
         max_ias = grid_df['ias'].max()
@@ -279,7 +301,7 @@ def lambda_handler(event, context):
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=json_output, ContentType='application/json')
         s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=json_output, ContentType='application/json')
 
-        return {'statusCode': 200, 'body': json.dumps('Grid V19 OK')}
+        return {'statusCode': 200, 'body': json.dumps('Grid V20 OK')}
     except Exception as e:
         print(f"❌ Error Fatal: {str(e)}", flush=True)
         return {'statusCode': 500, 'body': json.dumps(f"Error: {str(e)}")}
