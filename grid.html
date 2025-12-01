@@ -207,15 +207,9 @@
                     color: color, weight: 0, fillOpacity: 0.65, fillColor: color
                 });
 
-                // --- POPUP INTELIGENTE (Detecta Contaminante) ---
-                let dominantText = '';
-                // Si estamos viendo IAS o Aire, mostramos cuál es el problema
-                if (['ias','o3','pm10'].includes(currentMetric) && p.dominant) {
-                    dominantText = `<div style="margin-top:4px; font-weight:600; color:${p.dominant==='O3'?'#ef4444':'#a855f7'};">⚠️ Principal: ${p.dominant}</div>`;
-                }
-
+                // --- POPUP V12: Tag "Dominante" en línea, sin footer ---
                 rect.bindPopup(`
-                    <div style="font-family:'Inter'; color:#334155; min-width: 160px;">
+                    <div style="font-family:'Inter'; color:#334155; min-width: 165px;">
                         <div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">
                             🕒 ${p.timestamp || 'Live'}
                         </div>
@@ -223,16 +217,18 @@
                             Resultados Grid
                         </div>
                         <div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;">
+                            
                             <span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${(p.ias||0).toFixed(0)} pts</span>
-                            <span style="font-weight:600; color:#000;">🔴 O3:</span> <span>${p.o3.toFixed(1)} ppb</span>
-                            <span style="font-weight:600; color:#000;">🟤 PM10:</span> <span>${(p.pm10||0).toFixed(1)} µg</span>
+                            
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' (Dominante)' : ''}:</span> <span>${p.o3.toFixed(1)} ppb</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' (Dominante)' : ''}:</span> <span>${(p.pm10||0).toFixed(1)} µg</span>
+                            
                             <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;">
                             <span style="color:#475569;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span>
                             <span style="color:#475569;">💧 Hum:</span> <span>${p.rh?.toFixed(0)} %</span>
                             <span style="color:#475569;">💨 Viento:</span> <span>${p.wsp?.toFixed(1)} m/s</span>
                             <span style="color:#475569;">⛰️ Alt:</span> <span>${p.altitude?.toFixed(0)} m</span>
                         </div>
-                        ${dominantText}
                     </div>
                 `);
                 
