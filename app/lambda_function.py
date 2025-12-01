@@ -7,6 +7,7 @@ import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
+import time
 
 # --- CONFIGURACIÓN ---
 S3_BUCKET = os.environ.get('S3_BUCKET', 'smability-data-lake')
@@ -21,7 +22,7 @@ SMABILITY_API_URL = os.environ.get('SMABILITY_API_URL', 'https://y4zwdmw7vf.exec
 s3_client = boto3.client('s3')
 
 def load_models():
-    print("⬇️ Cargando modelos (O3 + PM10)...")
+    print("⬇️ Cargando modelos...", flush=True)
     models = {}
     try:
         m_o3 = xgb.XGBRegressor()
@@ -32,12 +33,10 @@ def load_models():
             m_pm10 = xgb.XGBRegressor()
             m_pm10.load_model(MODEL_PATH_PM10)
             models['pm10'] = m_pm10
-        else:
-            print("⚠️ Alerta: model_pm10.json no encontrado.")
-            
+        
         return models
     except Exception as e:
-        print(f"❌ Error cargando modelos: {e}")
+        print(f"❌ Error cargando modelos: {e}", flush=True)
         raise e
 
 def get_live_data():
@@ -46,12 +45,11 @@ def get_live_data():
         response.raise_for_status()
         return response.json().get('stations', [])
     except Exception as e:
-        print(f"❌ Error API: {e}")
+        print(f"❌ Error API: {e}", flush=True)
         return []
 
 def process_stations_data(stations_list):
     parsed_data = []
-    
     for s in stations_list:
         try:
             if s.get('latitude') is None or s.get('longitude') is None: continue
@@ -88,7 +86,7 @@ def process_stations_data(stations_list):
     df = pd.DataFrame(parsed_data)
     v_o3 = df['o3_real'].count() if not df.empty else 0
     v_pm10 = df['pm10_real'].count() if not df.empty else 0
-    print(f"📊 Datos Vivos: {len(df)} st. | O3: {v_o3} | PM10: {v_pm10}")
+    print(f"📊 Datos Vivos: {len(df)} st. | O3: {v_o3} | PM10: {v_pm10}", flush=True)
     return df
 
 def inverse_distance_weighting(x, y, z, xi, yi, power=2):
@@ -153,9 +151,6 @@ def prepare_grid_features(stations_df):
     return grid_df
 
 def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col_name):
-    """
-    V18: Predice, calibra e imprime TABLA DE AUDITORÍA.
-    """
     FEATURES = ['lat', 'lon', 'altitude', 'station_numeric', 
                 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 
                 'tmp', 'rh', 'wsp', 'wdr']
@@ -166,7 +161,6 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
     calibration_set = stations_df.dropna(subset=[real_col_name]).copy()
     
     if not calibration_set.empty:
-        # Imputación de clima
         source_tmp = stations_df.dropna(subset=['tmp'])
         source_rh = stations_df.dropna(subset=['rh'])
         source_alt = stations_df.dropna(subset=['alt'])
@@ -197,14 +191,14 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
         station_preds = model.predict(calibration_set[FEATURES])
         residuals = calibration_set[real_col_name].values - station_preds
         
-        # --- TABLA DE AUDITORÍA V18 ---
-        cdmx_tz = ZoneInfo("America/Mexico_City")
-        current_time = datetime.now(cdmx_tz).strftime("%H:%M")
+        # --- LOGS FORZADOS V19 ---
+        print("\n" + "="*85, flush=True)
+        print(f"🔧 CALIBRACIÓN: {output_col_name.upper()} ({len(calibration_set)} estaciones)", flush=True)
+        print(f"{'#':<3} | {'HORA':<6} | {'ESTACIÓN':<18} | {'REAL':<6} | {'BASE':<6} | {'BIAS':<6} | {'FINAL':<6}", flush=True)
+        print("-" * 85, flush=True)
         
-        print("\n" + "="*75)
-        print(f"🔧 CALIBRACIÓN: {output_col_name.upper()} ({len(calibration_set)} estaciones)")
-        print(f"{'HORA':<6} | {'ESTACIÓN':<18} | {'REAL':<6} | {'BASE':<6} | {'BIAS':<6} | {'FINAL':<6}")
-        print("-" * 75)
+        cdmx_tz = ZoneInfo("America/Mexico_City")
+        curr_time = datetime.now(cdmx_tz).strftime("%H:%M")
         
         for i, row in calibration_set.reset_index().iterrows():
             st_name = row['name'][:18] 
@@ -212,12 +206,12 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
             base = station_preds[i]
             bias = residuals[i]
             final = base + bias
+            # flush=True asegura que cada línea se imprima al instante y no se corte
+            print(f"{i+1:<3} | {curr_time:<6} | {st_name:<18} | {real:<6.1f} | {base:<6.1f} | {bias:<+6.1f} | {final:<6.1f}", flush=True)
             
-            print(f"{current_time:<6} | {st_name:<18} | {real:<6.1f} | {base:<6.1f} | {bias:<+6.1f} | {final:<6.1f}")
-            
-        print("-" * 75)
-        print(f"📉 BIAS PROMEDIO: {np.mean(residuals):+.2f}")
-        print("="*75 + "\n")
+        print("-" * 85, flush=True)
+        print(f"📉 BIAS PROMEDIO: {np.mean(residuals):+.2f}", flush=True)
+        print("="*85 + "\n", flush=True)
         # -----------------------------
 
         grid_bias = inverse_distance_weighting(
@@ -228,11 +222,10 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
         return np.maximum(final_preds, 0).round(1)
         
     else:
-        print(f"⚠️ Sin datos reales de {output_col_name}. Usando RAW.")
+        print(f"⚠️ Sin datos reales de {output_col_name}. Usando RAW.", flush=True)
         return raw_preds.round(1)
 
 def calculate_ias_row(row):
-    # NOM-172-SEMARNAT-2023 (Enero 2024)
     def get_ias(c, breakpoints):
         for (c_lo, c_hi, i_lo, i_hi) in breakpoints:
             if c <= c_hi:
@@ -249,7 +242,7 @@ def calculate_ias_row(row):
     return round(max(ias_o3, ias_pm10))
 
 def lambda_handler(event, context):
-    print("🚀 Iniciando Lambda V18 (Audit Logs + IAS Report)...")
+    print("🚀 Iniciando Lambda V19 (Logs Flush)...", flush=True)
     try:
         models = load_models()
         raw_stations = get_live_data()
@@ -257,24 +250,20 @@ def lambda_handler(event, context):
         
         grid_df = prepare_grid_features(stations_df)
         
-        # 1. Calibración O3
         grid_df['o3'] = predict_and_calibrate(models['o3'], grid_df, stations_df, 'o3_real', 'o3')
         
-        # 2. Calibración PM10
         if 'pm10' in models:
             grid_df['pm10'] = predict_and_calibrate(models['pm10'], grid_df, stations_df, 'pm10_real', 'pm10')
         else:
             grid_df['pm10'] = 0
             
-        # 3. IAS
-        print("🧮 Calculando IAS (NOM-2024)...")
+        print("🧮 Calculando IAS...", flush=True)
         grid_df['ias'] = grid_df.apply(calculate_ias_row, axis=1)
         
-        # Reporte IAS
         max_ias = grid_df['ias'].max()
         avg_ias = grid_df['ias'].mean()
         cat = "Buena" if max_ias<=50 else "Aceptable" if max_ias<=100 else "Mala" if max_ias<=150 else "Muy Mala"
-        print(f"🚦 REPORTE IAS CIUDAD: Máximo={max_ias:.0f} ({cat}) | Promedio={avg_ias:.0f}")
+        print(f"🚦 REPORTE IAS CIUDAD: Máximo={max_ias:.0f} ({cat}) | Promedio={avg_ias:.0f}", flush=True)
         
         cdmx_tz = ZoneInfo("America/Mexico_City")
         current_ts = datetime.now(cdmx_tz).strftime("%Y-%m-%d %H:%M:%S")
@@ -286,11 +275,11 @@ def lambda_handler(event, context):
         timestamp_file = datetime.now(cdmx_tz).strftime("%Y-%m-%d_%H-%M")
         history_key = f"live_grid/grid_{timestamp_file}.json"
         
-        print(f"💾 Guardando: {history_key}")
+        print(f"💾 Guardando: {history_key}", flush=True)
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=json_output, ContentType='application/json')
         s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=json_output, ContentType='application/json')
 
-        return {'statusCode': 200, 'body': json.dumps('Grid V18 OK')}
+        return {'statusCode': 200, 'body': json.dumps('Grid V19 OK')}
     except Exception as e:
-        print(f"❌ Error Fatal: {str(e)}")
+        print(f"❌ Error Fatal: {str(e)}", flush=True)
         return {'statusCode': 500, 'body': json.dumps(f"Error: {str(e)}")}
