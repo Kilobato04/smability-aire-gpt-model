@@ -49,9 +49,7 @@ def get_live_data():
 
 def process_stations_data(stations_list):
     """
-    V20: Ajuste Normativo.
-    - O3: Usa avg_1h (Picos agudos).
-    - PM10: Usa avg_12h (Exposición acumulada NOM-172).
+    V21: Mantiene la lógica normativa (O3 1h, PM10 12h).
     """
     parsed_data = []
     
@@ -66,11 +64,10 @@ def process_stations_data(stations_list):
             
             pollutants = s.get('pollutants', {})
             
-            # --- O3: Usamos 1 Hora (Estándar de alertamiento rápido) ---
+            # O3 (1h)
             o3_val = pollutants.get('o3', {}).get('avg_1h', {}).get('value')
             
-            # --- PM10: Usamos 12 Horas (Estándar NOM-172 para IAS) ---
-            # Si no existe el de 12h, intentamos fallback al de 1h (mejor algo que nada)
+            # PM10 (12h con fallback a 1h)
             pm10_obj = pollutants.get('pm10', {})
             pm10_val = pm10_obj.get('avg_12h', {}).get('value')
             if pm10_val is None:
@@ -99,7 +96,7 @@ def process_stations_data(stations_list):
     df = pd.DataFrame(parsed_data)
     v_o3 = df['o3_real'].count() if not df.empty else 0
     v_pm10 = df['pm10_real'].count() if not df.empty else 0
-    print(f"📊 Datos Vivos (Normativos): {len(df)} st. | O3(1h): {v_o3} | PM10(12h): {v_pm10}", flush=True)
+    print(f"📊 Datos Vivos: {len(df)} st. | O3: {v_o3} | PM10: {v_pm10}", flush=True)
     return df
 
 def inverse_distance_weighting(x, y, z, xi, yi, power=2):
@@ -164,12 +161,6 @@ def prepare_grid_features(stations_df):
     return grid_df
 
 def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col_name):
-    """
-    Predice y calibra.
-    Nota: Si output_col_name es 'pm10', ahora estamos calibrando contra el promedio de 12h.
-    Esto significa que el mapa final de PM10 representará "El promedio de las últimas 12h",
-    lo cual es CORRECTO para el cálculo de IAS.
-    """
     FEATURES = ['lat', 'lon', 'altitude', 'station_numeric', 
                 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 
                 'tmp', 'rh', 'wsp', 'wdr']
@@ -210,14 +201,14 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
         station_preds = model.predict(calibration_set[FEATURES])
         residuals = calibration_set[real_col_name].values - station_preds
         
-        # --- TABLA DE AUDITORÍA ---
+        # Logs de Auditoría
+        cdmx_tz = ZoneInfo("America/Mexico_City")
+        curr_time = datetime.now(cdmx_tz).strftime("%H:%M")
+        
         print("\n" + "="*85, flush=True)
         print(f"🔧 CALIBRACIÓN: {output_col_name.upper()} ({len(calibration_set)} estaciones)", flush=True)
         print(f"{'#':<3} | {'HORA':<6} | {'ESTACIÓN':<18} | {'REAL':<6} | {'BASE':<6} | {'BIAS':<6} | {'FINAL':<6}", flush=True)
         print("-" * 85, flush=True)
-        
-        cdmx_tz = ZoneInfo("America/Mexico_City")
-        curr_time = datetime.now(cdmx_tz).strftime("%H:%M")
         
         for i, row in calibration_set.reset_index().iterrows():
             st_name = row['name'][:18] 
@@ -230,7 +221,6 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
         print("-" * 85, flush=True)
         print(f"📉 BIAS PROMEDIO: {np.mean(residuals):+.2f}", flush=True)
         print("="*85 + "\n", flush=True)
-        # -----------------------------
 
         grid_bias = inverse_distance_weighting(
             calibration_set['lat'].values, calibration_set['lon'].values, residuals,
@@ -244,7 +234,10 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
         return raw_preds.round(1)
 
 def calculate_ias_row(row):
-    """Cálculo IAS 2024 (Con PM10 12h y O3 1h)."""
+    """
+    Cálculo IAS 2024 con identificación del contaminante dominante.
+    Retorna: (Valor_IAS, "Dominante")
+    """
     def get_ias(c, breakpoints):
         for (c_lo, c_hi, i_lo, i_hi) in breakpoints:
             if c <= c_hi:
@@ -252,18 +245,20 @@ def calculate_ias_row(row):
         last = breakpoints[-1]
         return last[2] + ((c - last[0]) / (last[1] - last[0])) * (last[3] - last[2])
 
-    # NOM-172-SEMARNAT-2023 (Breakpoints vigentes 2024)
-    # PM10 usa promedio 12h (que es lo que ya tenemos en row['pm10'] gracias a la corrección)
     bps_o3 = [(0,58,0,50), (59,92,51,100), (93,135,101,150), (136,175,151,200), (176,240,201,300)]
     bps_pm10 = [(0,45,0,50), (46,60,51,100), (61,132,101,150), (133,213,151,200), (214,354,201,300)]
 
     ias_o3 = get_ias(row['o3'], bps_o3)
     ias_pm10 = get_ias(row['pm10'], bps_pm10)
     
-    return round(max(ias_o3, ias_pm10))
+    # Determinación del Dominante
+    if ias_pm10 >= ias_o3:
+        return round(ias_pm10), 'PM10'
+    else:
+        return round(ias_o3), 'O3'
 
 def lambda_handler(event, context):
-    print("🚀 Iniciando Lambda V20 (PM10 12h Compliance)...", flush=True)
+    print("🚀 Iniciando Lambda V21 (Dominant Pollutant Tag)...", flush=True)
     try:
         models = load_models()
         raw_stations = get_live_data()
@@ -271,27 +266,34 @@ def lambda_handler(event, context):
         
         grid_df = prepare_grid_features(stations_df)
         
+        # Predicciones
         grid_df['o3'] = predict_and_calibrate(models['o3'], grid_df, stations_df, 'o3_real', 'o3')
         
         if 'pm10' in models:
-            # Aquí 'pm10_real' ya contiene el promedio de 12 horas
             grid_df['pm10'] = predict_and_calibrate(models['pm10'], grid_df, stations_df, 'pm10_real', 'pm10')
         else:
             grid_df['pm10'] = 0
             
-        print("🧮 Calculando IAS (NOM-2024)...", flush=True)
-        grid_df['ias'] = grid_df.apply(calculate_ias_row, axis=1)
+        print("🧮 Calculando IAS y Dominante...", flush=True)
+        # Aplicamos la función y expandimos el resultado en dos columnas
+        ias_results = grid_df.apply(calculate_ias_row, axis=1, result_type='expand')
+        grid_df['ias'] = ias_results[0]
+        grid_df['dominant'] = ias_results[1]
         
+        # Reporte Rápido
         max_ias = grid_df['ias'].max()
         avg_ias = grid_df['ias'].mean()
-        cat = "Buena" if max_ias<=50 else "Aceptable" if max_ias<=100 else "Mala" if max_ias<=150 else "Muy Mala"
-        print(f"🚦 REPORTE IAS CIUDAD: Máximo={max_ias:.0f} ({cat}) | Promedio={avg_ias:.0f}", flush=True)
+        # Contamos dominantes
+        dom_counts = grid_df['dominant'].value_counts().to_dict()
+        print(f"🚦 REPORTE IAS: Máx={max_ias:.0f} | Prom={avg_ias:.0f} | Dominantes: {dom_counts}", flush=True)
         
+        # Finalización
         cdmx_tz = ZoneInfo("America/Mexico_City")
         current_ts = datetime.now(cdmx_tz).strftime("%Y-%m-%d %H:%M:%S")
         grid_df['timestamp'] = current_ts
         
-        final_df = grid_df[['timestamp', 'lat', 'lon', 'altitude', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'ias']]
+        final_cols = ['timestamp', 'lat', 'lon', 'altitude', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'ias', 'dominant']
+        final_df = grid_df[final_cols]
         json_output = final_df.to_json(orient='records')
         
         timestamp_file = datetime.now(cdmx_tz).strftime("%Y-%m-%d_%H-%M")
@@ -301,7 +303,7 @@ def lambda_handler(event, context):
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=json_output, ContentType='application/json')
         s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=json_output, ContentType='application/json')
 
-        return {'statusCode': 200, 'body': json.dumps('Grid V20 OK')}
+        return {'statusCode': 200, 'body': json.dumps('Grid V21 OK')}
     except Exception as e:
         print(f"❌ Error Fatal: {str(e)}", flush=True)
         return {'statusCode': 500, 'body': json.dumps(f"Error: {str(e)}")}
