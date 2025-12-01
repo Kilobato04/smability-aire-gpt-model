@@ -118,48 +118,18 @@
             attribution: 'Smability AI', maxZoom: 19
         }).addTo(map);
 
-        // CONFIGURACIÓN DE ESCALAS (Ajustadas a NOM-172-2024 y Topografía CDMX)
+        // CONFIGURACIÓN DE ESCALAS
         const CONFIG = {
-            ias: {
-                name: 'Índice Aire y Salud', unit: 'Puntos', min: 0, max: 200,
-                stops: [0, 50, 100, 150, 200],
-                colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97']
-            },
-            o3: {
-                name: 'Ozono (O3)', unit: 'ppb', min: 0, max: 200,
-                stops: [0, 50, 100, 150, 200],
-                colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97']
-            },
-            pm10: {
-                name: 'Partículas PM10', unit: 'µg/m³', min: 0, max: 215,
-                stops: [0, 45, 75, 130, 215],
-                colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97']
-            },
-            tmp: {
-                name: 'Temperatura', unit: '°C', min: 0, max: 35,
-                stops: [0, 10, 20, 30, 35],
-                colors: ['#0000ff', '#00ffff', '#ffff00', '#ff0000', '#800000']
-            },
-            rh: {
-                name: 'Humedad', unit: '%', min: 0, max: 100,
-                stops: [0, 25, 50, 75, 100],
-                colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b']
-            },
-            wsp: {
-                name: 'Viento', unit: 'm/s', min: 0, max: 15,
-                stops: [0, 3, 6, 9, 15],
-                colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c']
-            },
-            alt: {
-                name: 'Altitud', unit: 'm', min: 2200, max: 3200,
-                stops: [2200, 2450, 2700, 2950, 3200],
-                colors: ['#4caf50', '#8bc34a', '#ffeb3b', '#ff9800', '#795548']
-            }
+            ias: { name: 'Índice Aire y Salud', unit: 'Puntos', min: 0, max: 200, stops: [0, 50, 100, 150, 200], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97'] },
+            o3: { name: 'Ozono (O3)', unit: 'ppb', min: 0, max: 200, stops: [0, 50, 100, 150, 200], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97'] },
+            pm10: { name: 'Partículas PM10', unit: 'µg/m³', min: 0, max: 215, stops: [0, 45, 75, 130, 215], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97'] },
+            tmp: { name: 'Temperatura', unit: '°C', min: 0, max: 35, stops: [0, 10, 20, 30, 35], colors: ['#0000ff', '#00ffff', '#ffff00', '#ff0000', '#800000'] },
+            rh: { name: 'Humedad', unit: '%', min: 0, max: 100, stops: [0, 25, 50, 75, 100], colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b'] },
+            wsp: { name: 'Viento', unit: 'm/s', min: 0, max: 15, stops: [0, 3, 6, 9, 15], colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c'] },
+            alt: { name: 'Altitud', unit: 'm', min: 2200, max: 3200, stops: [2200, 2450, 2700, 2950, 3200], colors: ['#4caf50', '#8bc34a', '#ffeb3b', '#ff9800', '#795548'] }
         };
 
-        let globalData = null;
-        let currentMetric = 'o3';
-        let geoLayer = null;
+        let globalData = null; let currentMetric = 'o3'; let geoLayer = null;
 
         function getColor(val, metric) {
             const conf = CONFIG[metric];
@@ -201,27 +171,37 @@
                 validCount++;
 
                 const color = getColor(val, currentMetric);
-                
                 const bounds = [[p.lat - RECT_SIZE, p.lon - RECT_SIZE], [p.lat + RECT_SIZE, p.lon + RECT_SIZE]];
+                
+                // --- LÓGICA DE ESTACIONES ---
+                // Si el punto tiene nombre de estación, lo dibujamos diferente
+                const isStation = p.station ? true : false;
+                const strokeColor = isStation ? '#ffffff' : color; // Borde blanco si es estación
+                const weight = isStation ? 2 : 0;                 // Borde grueso si es estación
+                
                 const rect = L.rectangle(bounds, {
-                    color: color, weight: 0, fillOpacity: 0.65, fillColor: color
+                    color: strokeColor, weight: weight, fillOpacity: 0.65, fillColor: color
                 });
 
-                // --- POPUP V12: Tag "Dominante" en línea, sin footer ---
+                // --- HEADER DEL POPUP ---
+                let headerHTML = `<div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">🕒 ${p.timestamp || 'Live'}</div>`;
+                
+                if (isStation) {
+                    headerHTML += `<div style="background:#38bdf8; color:#0f172a; padding:4px 8px; border-radius:4px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:12px;">📡 Estación: ${p.station}</div>`;
+                } else {
+                    headerHTML += `<div style="font-weight:bold; border-bottom:2px solid ${color}; margin-bottom:8px; padding-bottom:4px; font-size:14px; color:#0f172a;">Resultados Grid</div>`;
+                }
+
+                // --- CONTENIDO DEL POPUP ---
                 rect.bindPopup(`
                     <div style="font-family:'Inter'; color:#334155; min-width: 165px;">
-                        <div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">
-                            🕒 ${p.timestamp || 'Live'}
-                        </div>
-                        <div style="font-weight:bold; border-bottom:2px solid ${color}; margin-bottom:8px; padding-bottom:4px; font-size:14px; color:#0f172a;">
-                            Resultados Grid
-                        </div>
+                        ${headerHTML}
                         <div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;">
                             
                             <span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${(p.ias||0).toFixed(0)} pts</span>
                             
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' (Dominante)' : ''}:</span> <span>${p.o3.toFixed(1)} ppb</span>
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' (Dominante)' : ''}:</span> <span>${(p.pm10||0).toFixed(1)} µg</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dominante)</b>' : ''}:</span> <span>${p.o3.toFixed(1)} ppb</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dominante)</b>' : ''}:</span> <span>${(p.pm10||0).toFixed(1)} µg</span>
                             
                             <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;">
                             <span style="color:#475569;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span>
@@ -232,8 +212,9 @@
                     </div>
                 `);
                 
-                rect.on('mouseover', function(){ this.setStyle({ fillOpacity: 0.9, weight: 1, color: '#fff' })});
-                rect.on('mouseout', function(){ this.setStyle({ fillOpacity: 0.65, weight: 0 })});
+                // Highlight al pasar el mouse
+                rect.on('mouseover', function(){ this.setStyle({ fillOpacity: 0.9, weight: isStation?3:1, color: '#fff' })});
+                rect.on('mouseout', function(){ this.setStyle({ fillOpacity: 0.65, weight: weight, color: strokeColor })});
 
                 rectangles.push(rect);
             });
