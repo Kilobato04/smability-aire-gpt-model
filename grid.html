@@ -12,7 +12,7 @@
         body { margin: 0; padding: 0; background: #0f172a; font-family: 'Inter', sans-serif; color: #e2e8f0; overflow: hidden; }
         #map { height: 100vh; width: 100%; background: #0f172a; }
         
-        /* --- PANEL LATERAL --- */
+        /* PANEL LATERAL */
         .sidebar {
             position: absolute;
             top: 20px;
@@ -38,7 +38,7 @@
         h1 { margin: 0; font-size: 18px; font-weight: 600; color: #38bdf8; letter-spacing: -0.5px; }
         .subtitle { font-size: 11px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
 
-        /* Selector de Variables */
+        /* CONTROL DE VARIABLES */
         .controls { padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         
         .btn-var {
@@ -48,13 +48,13 @@
             padding: 10px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             text-align: center;
             transition: all 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 5px;
         }
         .btn-var:hover { background: rgba(255,255,255,0.1); }
         .btn-var.active {
@@ -63,8 +63,10 @@
             color: #fff;
             font-weight: 600;
         }
+        /* Destacar botones de aire */
+        .btn-air { border-color: rgba(56, 189, 248, 0.4); }
 
-        /* Zona de Carga */
+        /* ZONA DE CARGA */
         .upload-area {
             margin: 0 15px;
             border: 2px dashed #475569;
@@ -77,33 +79,28 @@
         .upload-area:hover { border-color: #94a3b8; background: rgba(255,255,255,0.02); }
         .upload-txt { font-size: 11px; color: #64748b; }
 
-        /* Leyenda Dinámica */
+        /* LEYENDA */
         .legend-panel { padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); }
         .legend-title { font-size: 12px; color: #e2e8f0; margin-bottom: 10px; display: flex; justify-content: space-between; }
         .legend-bar { height: 12px; border-radius: 6px; position: relative; margin-bottom: 8px; }
         .legend-labels { display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; font-family: 'Roboto Mono'; }
 
-        /* Stats Rápidos */
+        /* ESTADÍSTICAS */
         .stats-row { display: flex; justify-content: space-between; margin-top: 15px; }
         .stat-item { text-align: center; }
         .stat-val { display: block; font-size: 16px; font-weight: 600; color: #fff; font-family: 'Roboto Mono'; }
         .stat-lbl { font-size: 9px; color: #64748b; text-transform: uppercase; }
 
-        /* --- POPUPS MEJORADOS (Fondo Blanco) --- */
+        /* POPUPS */
         .leaflet-popup-content-wrapper {
-            background: #ffffff !important; /* Fondo Blanco */
-            color: #1e293b !important;      /* Texto Oscuro */
+            background: #ffffff !important;
+            color: #1e293b !important;
             border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             border: none;
         }
-        .leaflet-popup-tip {
-            background: #ffffff !important; /* Punta Blanca */
-        }
-        .leaflet-popup-content {
-            margin: 10px 12px;
-            line-height: 1.5;
-        }
+        .leaflet-popup-tip { background: #ffffff !important; }
+        .leaflet-popup-content { margin: 10px 12px; line-height: 1.5; }
 
     </style>
 </head>
@@ -112,7 +109,7 @@
     <div class="sidebar">
         <div class="header">
             <h1>Smability AI</h1>
-            <div class="subtitle">Modelo de Calidad del Aire V9</div>
+            <div class="subtitle">Modelo V16 (O3 + PM10 + IAS)</div>
         </div>
 
         <div class="upload-area" id="drop-zone" onclick="document.getElementById('fileInput').click()">
@@ -122,7 +119,10 @@
         </div>
 
         <div class="controls">
-            <div class="btn-var active" onclick="setMode('o3', this)">🔴 Ozono</div>
+            <div class="btn-var btn-air" onclick="setMode('ias', this)">🚦 IAS (Salud)</div>
+            <div class="btn-var active btn-air" onclick="setMode('o3', this)">🔴 Ozono</div>
+            <div class="btn-var btn-air" onclick="setMode('pm10', this)">🟤 PM10</div>
+            
             <div class="btn-var" onclick="setMode('tmp', this)">🌡️ Temp</div>
             <div class="btn-var" onclick="setMode('rh', this)">💧 Humedad</div>
             <div class="btn-var" onclick="setMode('wsp', this)">💨 Viento</div>
@@ -136,8 +136,7 @@
             </div>
             <div class="legend-bar" id="color-bar"></div>
             <div class="legend-labels" id="legend-ticks">
-                <span>0</span><span>50</span><span>100</span><span>150</span><span>200</span>
-            </div>
+                </div>
 
             <div class="stats-row">
                 <div class="stat-item">
@@ -167,11 +166,23 @@
             attribution: 'Smability AI', maxZoom: 19
         }).addTo(map);
 
-        // CONFIGURACIÓN DE ESCALAS (Ajustadas a CDMX)
+        // --- CONFIGURACIÓN MAESTRA DE CAPAS ---
         const CONFIG = {
-            o3: {
-                name: 'Ozono', unit: 'ppb', min: 0, max: 200,
+            ias: {
+                name: 'Índice Aire y Salud', unit: 'Puntos', min: 0, max: 200,
                 stops: [0, 50, 100, 150, 200],
+                // NOM-172: Verde, Amarillo, Naranja, Rojo, Morado
+                colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97']
+            },
+            o3: {
+                name: 'Ozono (O3)', unit: 'ppb', min: 0, max: 200,
+                stops: [0, 50, 100, 150, 200],
+                colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97']
+            },
+            pm10: {
+                name: 'Partículas PM10', unit: 'µg/m³', min: 0, max: 215,
+                // Breakpoints visuales aproximados a la NOM-2024
+                stops: [0, 45, 75, 130, 215],
                 colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97']
             },
             tmp: {
@@ -185,8 +196,8 @@
                 colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b']
             },
             wsp: {
-                name: 'Velocidad Viento', unit: 'm/s', min: 0, max: 20,
-                stops: [0, 5, 10, 15, 20],
+                name: 'Viento', unit: 'm/s', min: 0, max: 15,
+                stops: [0, 3, 6, 9, 15],
                 colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c']
             },
             alt: {
@@ -226,17 +237,15 @@
             const RECT_SIZE = 0.01 / 2;
 
             const rectangles = [];
-            let sum = 0, min = Infinity, max = -Infinity;
-            let validCount = 0;
+            let sum = 0, min = Infinity, max = -Infinity, validCount = 0;
 
             globalData.forEach(p => {
-                let val = 0;
-                if (currentMetric === 'o3') val = p.o3;
-                else if (currentMetric === 'tmp') val = p.tmp;
-                else if (currentMetric === 'rh') val = p.rh;
-                else if (currentMetric === 'wsp') val = p.wsp;
-                else if (currentMetric === 'alt') val = p.altitude;
-
+                // Selector Dinámico
+                let val = p[currentMetric]; // Ahora usamos la clave directa del JSON
+                
+                // Mapeo si la clave no coincide exacto (aunque en V16 ya coinciden)
+                if (currentMetric === 'alt') val = p.altitude;
+                
                 if (val === undefined || val === null) return;
 
                 sum += val;
@@ -245,28 +254,30 @@
                 validCount++;
 
                 const color = getColor(val, currentMetric);
-                
                 const bounds = [[p.lat - RECT_SIZE, p.lon - RECT_SIZE], [p.lat + RECT_SIZE, p.lon + RECT_SIZE]];
+                
                 const rect = L.rectangle(bounds, {
                     color: color, weight: 0, fillOpacity: 0.65, fillColor: color
                 });
 
-                // --- POPUP REIMAGINADO (Blanco y legible) ---
-                // Aquí agregamos el timestamp en la parte superior
+                // --- POPUP DETALLADO V10 ---
                 rect.bindPopup(`
-                    <div style="font-family:'Inter'; color:#334155; min-width: 140px;">
-                        <div style="font-size:10px; color:#94a3b8; text-align:right; margin-bottom:4px;">
-                            ${p.timestamp || 'Ahora'}
+                    <div style="font-family:'Inter'; color:#334155; min-width: 150px;">
+                        <div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">
+                            🕒 ${p.timestamp || 'Live'}
                         </div>
                         <div style="font-weight:bold; border-bottom:2px solid ${color}; margin-bottom:8px; padding-bottom:4px; font-size:14px; color:#0f172a;">
-                            Datos Locales
+                            Resultados Grid
                         </div>
-                        <div style="display:grid; grid-template-columns: 1fr auto; gap: 4px; font-size:12px;">
+                        <div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;">
+                            <span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${(p.ias||0).toFixed(0)} pts</span>
                             <span style="font-weight:600; color:#000;">🔴 O3:</span> <span>${p.o3.toFixed(1)} ppb</span>
-                            <span style="font-weight:600; color:#000;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span>
-                            <span style="font-weight:600; color:#000;">💧 Hum:</span> <span>${p.rh?.toFixed(0)} %</span>
-                            <span style="font-weight:600; color:#000;">💨 Viento:</span> <span>${p.wsp?.toFixed(1)} m/s</span>
-                            <span style="font-weight:600; color:#000;">⛰️ Alt:</span> <span>${p.altitude?.toFixed(0)} m</span>
+                            <span style="font-weight:600; color:#000;">🟤 PM10:</span> <span>${(p.pm10||0).toFixed(1)} µg</span>
+                            <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;">
+                            <span style="color:#475569;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span>
+                            <span style="color:#475569;">💧 Hum:</span> <span>${p.rh?.toFixed(0)} %</span>
+                            <span style="color:#475569;">💨 Viento:</span> <span>${p.wsp?.toFixed(1)} m/s</span>
+                            <span style="color:#475569;">⛰️ Alt:</span> <span>${p.altitude?.toFixed(0)} m</span>
                         </div>
                     </div>
                 `);
@@ -284,10 +295,8 @@
         function updateLegend(conf, min, max, avg) {
             document.getElementById('legend-name').innerText = conf.name;
             document.getElementById('legend-unit').innerText = conf.unit;
-            const gradient = `linear-gradient(to right, ${conf.colors.join(', ')})`;
-            document.getElementById('color-bar').style.background = gradient;
-            const ticksHTML = conf.stops.map(s => `<span>${s}</span>`).join('');
-            document.getElementById('legend-ticks').innerHTML = ticksHTML;
+            document.getElementById('color-bar').style.background = `linear-gradient(to right, ${conf.colors.join(', ')})`;
+            document.getElementById('legend-ticks').innerHTML = conf.stops.map(s => `<span>${s}</span>`).join('');
             document.getElementById('stat-min').innerText = min.toFixed(1);
             document.getElementById('stat-max').innerText = max.toFixed(1);
             document.getElementById('stat-avg').innerText = avg.toFixed(1);
@@ -318,6 +327,7 @@
                     globalData = JSON.parse(e.target.result);
                     document.getElementById('file-name').innerText = "✅ " + file.name;
                     document.getElementById('drop-zone').style.borderColor = "#00e400";
+                    // Forzar vista inicial IAS o mantener O3
                     renderMap();
                 } catch(err) { alert("Error JSON: " + err); }
             };
