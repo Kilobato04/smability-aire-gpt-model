@@ -5,7 +5,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/lambda_function.py ${LAMBDA_TASK_ROOT}
 COPY app/grid_base.csv ${LAMBDA_TASK_ROOT}
-# Importante: GeoJSON de topografía
 COPY malla_valle_mexico_final.geojson ${LAMBDA_TASK_ROOT}
 
 COPY training/raw_data/dataset_aire_zmcdmx.zip ${LAMBDA_TASK_ROOT}/training/raw_data/
