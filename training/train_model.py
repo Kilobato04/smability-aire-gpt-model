@@ -27,7 +27,6 @@ def load_and_merge_data():
     full_df = pd.concat(df_list, ignore_index=True)
     if 'station_id' in full_df.columns: full_df['station_id'] = full_df['station_id'].astype(str)
 
-    print("🔄 Pivoteando tabla maestra...")
     pivot_df = full_df.pivot_table(
         index=['date', 'hour', 'station_id'], 
         columns='parameter', 
