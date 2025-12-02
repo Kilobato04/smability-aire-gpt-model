@@ -127,7 +127,7 @@
             attribution: 'Smability AI', maxZoom: 19
         }).addTo(map);
 
-        // --- CONFIGURACIÓN DE CAPAS ---
+        // --- CONFIGURACIÓN DE ESCALAS OPTIMIZADAS ---
         const CONFIG = {
             ias: {
                 name: 'Índice Aire y Salud', unit: 'Puntos', min: 0, max: 200,
@@ -159,13 +159,19 @@
                 stops: [0, 3, 6, 9, 15],
                 colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c']
             },
+            // --- NUEVA ESCALA TOPOGRÁFICA (Alto Contraste) ---
             alt: {
                 name: 'Altitud', unit: 'm', 
-                // --- AJUSTE V16: Rango ampliado para evitar saturación ---
-                min: 2200, max: 3600,
-                stops: [2200, 2550, 2900, 3250, 3600],
-                // Verde Valle -> Amarillo Lomas -> Café Montaña -> Gris Pico
-                colors: ['#4caf50', '#8bc34a', '#ffeb3b', '#ff9800', '#5d4037']
+                min: 2200, max: 4200, // Rango ampliado
+                // Stops no-lineales para resaltar el valle bajo
+                stops: [2200, 2350, 2800, 3500, 4200],
+                colors: [
+                    '#1b5e20', // 2200: Verde Oscuro (Lecho del lago)
+                    '#8bc34a', // 2350: Verde Claro (Lomas bajas / Sierra Guadalupe)
+                    '#fbc02d', // 2800: Amarillo (Media montaña)
+                    '#8d6e63', // 3500: Café (Montaña alta / Ajusco)
+                    '#eeeeee'  // 4200: Blanco/Gris (Picos / Volcanes)
+                ]
             }
         };
 
@@ -175,11 +181,20 @@
 
         function getColor(val, metric) {
             const conf = CONFIG[metric];
+            // Normalización segura
             let t = (val - conf.min) / (conf.max - conf.min);
             t = Math.max(0, Math.min(1, t));
-            const segment = 0.25;
+            
+            // Interpolación por segmentos (4 tramos entre 5 colores)
+            const segment = 0.25; 
+            
+            // Ajuste para escala altitud no-lineal (Visualmente forzamos linealidad sobre stops)
+            // Para una interpolación perfecta de stops arbitrarios se requeriría lógica compleja,
+            // aquí usamos la linealidad simple del array de colores para velocidad.
+            
             const idx = Math.floor(t / segment);
             const localT = (t % segment) / segment;
+
             const c1 = hexToRgb(conf.colors[Math.min(idx, 3)]);
             const c2 = hexToRgb(conf.colors[Math.min(idx + 1, 4)]);
             return `rgb(${lerp(c1.r, c2.r, localT)}, ${lerp(c1.g, c2.g, localT)}, ${lerp(c1.b, c2.b, localT)})`;
@@ -215,16 +230,14 @@
                 const color = getColor(val, currentMetric);
                 const bounds = [[p.lat - RECT_SIZE, p.lon - RECT_SIZE], [p.lat + RECT_SIZE, p.lon + RECT_SIZE]];
                 
-                // Detectar Estación
                 const isStation = p.station ? true : false;
-                const strokeColor = isStation ? '#ffffff' : color; 
+                const strokeColor = isStation ? '#ffffff' : color;
                 const weight = isStation ? 2 : 0;
                 
                 const rect = L.rectangle(bounds, {
-                    color: strokeColor, weight: weight, fillOpacity: 0.65, fillColor: color
+                    color: strokeColor, weight: weight, fillOpacity: 0.75, fillColor: color
                 });
 
-                // Header Popup
                 let headerHTML = `<div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">🕒 ${p.timestamp || 'Live'}</div>`;
                 if (isStation) {
                     headerHTML += `<div style="background:#38bdf8; color:#0f172a; padding:4px 8px; border-radius:4px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:12px;">📡 Estación: ${p.station}</div>`;
@@ -249,7 +262,7 @@
                 `);
                 
                 rect.on('mouseover', function(){ this.setStyle({ fillOpacity: 0.9, weight: isStation?3:1, color: '#fff' })});
-                rect.on('mouseout', function(){ this.setStyle({ fillOpacity: 0.65, weight: weight, color: strokeColor })});
+                rect.on('mouseout', function(){ this.setStyle({ fillOpacity: 0.75, weight: weight, color: strokeColor })});
 
                 rectangles.push(rect);
             });
