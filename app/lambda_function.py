@@ -252,3 +252,44 @@ def calculate_ias_row(row):
 
 def lambda_handler(event, context):
     print("🚀 Iniciando Lambda Smability V2.0 (Production)...", flush=True)
+    try:
+        models = load_models()
+        raw_stations = get_live_data()
+        stations_df = process_stations_data(raw_stations)
+        
+        grid_df = prepare_grid_features(stations_df)
+        
+        grid_df['o3'] = predict_and_calibrate(models['o3'], grid_df, stations_df, 'o3_real', 'o3')
+        if 'pm10' in models: grid_df['pm10'] = predict_and_calibrate(models['pm10'], grid_df, stations_df, 'pm10_real', 'pm10')
+        else: grid_df['pm10'] = 0
+        
+        grid_df = overwrite_with_real_data(grid_df, stations_df)
+            
+        ias_results = grid_df.apply(calculate_ias_row, axis=1, result_type='expand')
+        grid_df['ias'] = ias_results[0]
+        grid_df['dominant'] = ias_results[1]
+        
+        max_ias = grid_df['ias'].max()
+        avg_ias = grid_df['ias'].mean()
+        dom_counts = grid_df['dominant'].value_counts().to_dict()
+        print(f"🚦 REPORTE IAS: Máx={max_ias:.0f} | Prom={avg_ias:.0f} | Dominantes: {dom_counts}", flush=True)
+        
+        cdmx_tz = ZoneInfo("America/Mexico_City")
+        current_ts = datetime.now(cdmx_tz).strftime("%Y-%m-%d %H:%M:%S")
+        grid_df['timestamp'] = current_ts
+        
+        final_cols = ['timestamp', 'lat', 'lon', 'altitude', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'ias', 'dominant', 'station']
+        final_df = grid_df[final_cols]
+        json_output = final_df.to_json(orient='records')
+        
+        timestamp_file = datetime.now(cdmx_tz).strftime("%Y-%m-%d_%H-%M")
+        history_key = f"live_grid/grid_{timestamp_file}.json"
+        
+        print(f"💾 Guardando: {history_key}", flush=True)
+        s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=json_output, ContentType='application/json')
+        s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=json_output, ContentType='application/json')
+
+        return {'statusCode': 200, 'body': json.dumps('Grid Generated Successfully')}
+    except Exception as e:
+        print(f"❌ Error Fatal: {str(e)}", flush=True)
+        return {'statusCode': 500, 'body': json.dumps(f"Error: {str(e)}")}
