@@ -15,7 +15,7 @@ S3_GRID_OUTPUT_KEY = os.environ.get('S3_GRID_OUTPUT_KEY', 'live_grid/latest_grid
 MODEL_PATH_O3 = os.path.join(os.environ.get('LAMBDA_TASK_ROOT', '/var/task'), 'model_o3.json')
 MODEL_PATH_PM10 = os.path.join(os.environ.get('LAMBDA_TASK_ROOT', '/var/task'), 'model_pm10.json')
 
-# Malla Topográfica INEGI (Alta Resolución)
+# Malla Topográfica (GeoJSON)
 STATIC_GRID_PATH = os.path.join(os.environ.get('LAMBDA_TASK_ROOT', '/var/task'), 'malla_valle_mexico_final.geojson')
 
 GRID_BASE_PATH = '/tmp/grid_base_prod_v1.csv'
@@ -23,7 +23,7 @@ SMABILITY_API_URL = os.environ.get('SMABILITY_API_URL', 'https://y4zwdmw7vf.exec
 
 s3_client = boto3.client('s3')
 
-# --- TABLAS NOM-172-SEMARNAT-2023 (Vigente 2024) ---
+# --- TABLAS NOM-172-SEMARNAT-2023 ---
 BPS_O3 = [(0,58,0,50), (59,92,51,100), (93,135,101,150), (136,175,151,200), (176,240,201,300)]
 BPS_PM10 = [(0,45,0,50), (46,60,51,100), (61,132,101,150), (133,213,151,200), (214,354,201,300)]
 
@@ -35,6 +35,13 @@ def get_ias_score(c, pollutant):
             return i_lo + ((c - c_lo) / (c_hi - c_lo)) * (i_hi - i_lo)
     last = breakpoints[-1]
     return last[2] + ((c - last[0]) / (last[1] - last[0])) * (last[3] - last[2])
+
+def get_risk_level(ias):
+    if ias <= 50: return "Bajo"
+    elif ias <= 100: return "Moderado"
+    elif ias <= 150: return "Alto"
+    elif ias <= 200: return "Muy Alto"
+    else: return "Extremadamente Alto"
 
 def load_models():
     print("⬇️ Cargando modelos...", flush=True)
@@ -72,9 +79,9 @@ def process_stations_data(stations_list):
             alt = float(s.get('altitude')) if s.get('altitude') is not None else np.nan
             
             pollutants = s.get('pollutants', {})
-            # O3: 1 hora (Agudo)
             o3_val = pollutants.get('o3', {}).get('avg_1h', {}).get('value')
-            # PM10: 12 horas (Crónico/Normativo), fallback a 1h
+            
+            # PM10: Prioridad 12h (Norma), Fallback 1h
             pm10_obj = pollutants.get('pm10', {})
             pm10_val = pm10_obj.get('avg_12h', {}).get('value')
             if pm10_val is None: pm10_val = pm10_obj.get('avg_1h', {}).get('value')
@@ -107,7 +114,7 @@ def inverse_distance_weighting(x, y, z, xi, yi, power=2):
     return np.sum(weights * z[None, :], axis=1) / np.sum(weights, axis=1)
 
 def prepare_grid_features(stations_df):
-    # --- LÍMITES DE NEGOCIO (V28) ---
+    # Límites Negocio (AIFA + Chalco)
     LAT_MIN, LAT_MAX = 19.15, 19.777
     LON_MIN, LON_MAX = -99.39, -98.8624
     RESOLUTION = 0.01
@@ -120,9 +127,9 @@ def prepare_grid_features(stations_df):
         grid_points = [{'lat': lat, 'lon': lon} for lat in lats for lon in lons]
         grid_df = pd.DataFrame(grid_points)
         
-        # --- INYECCIÓN TOPOGRÁFICA (V29 - GeoJSON) ---
+        # Inyección Topográfica GeoJSON
         if os.path.exists(STATIC_GRID_PATH):
-            print("⛰️ Inyectando altitud INEGI...", flush=True)
+            print("⛰️ Inyectando altitud GeoJSON...", flush=True)
             try:
                 with open(STATIC_GRID_PATH, 'r') as f:
                     data = json.load(f)
@@ -132,18 +139,16 @@ def prepare_grid_features(stations_df):
                         elev = feature['properties'].get('elevation', 2240)
                         topo_data.append({'lat': lat, 'lon': lon, 'elevation': elev})
                     topo_df = pd.DataFrame(topo_data)
-                    
-                    # Mapeo inteligente (Resampling)
+                    # Resampling al grid
                     grid_df['altitude'] = inverse_distance_weighting(
                         topo_df['lat'].values, topo_df['lon'].values, topo_df['elevation'].values,
                         grid_df['lat'].values, grid_df['lon'].values
                     ).round(0)
             except Exception as e:
-                print(f"⚠️ Error malla INEGI: {e}", flush=True)
+                print(f"⚠️ Error GeoJSON: {e}", flush=True)
                 grid_df['altitude'] = 2240.0
         else:
             grid_df['altitude'] = 2240.0
-            
         grid_df.to_csv(GRID_BASE_PATH, index=False)
 
     cdmx_tz = ZoneInfo("America/Mexico_City")
@@ -184,11 +189,10 @@ def prepare_grid_features(stations_df):
     return grid_df
 
 def overwrite_with_real_data(grid_df, stations_df):
-    """V24: Hard Snapping para consistencia mapa-log."""
     grid_df['station'] = None
     if stations_df.empty: return grid_df
     grid_coords = grid_df[['lat', 'lon']].values
-    THRESHOLD = 0.01 # ~1km
+    THRESHOLD = 0.01
     for i, row in stations_df.iterrows():
         slat, slon = row['lat'], row['lon']
         dists = np.sqrt((grid_coords[:,0] - slat)**2 + (grid_coords[:,1] - slon)**2)
@@ -209,7 +213,6 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
     
     calibration_set = stations_df.dropna(subset=[real_col_name]).copy()
     if not calibration_set.empty:
-        # Imputación de datos faltantes para calibración
         source_tmp = stations_df.dropna(subset=['tmp']); source_rh = stations_df.dropna(subset=['rh']); source_alt = stations_df.dropna(subset=['alt'])
         target_lats = calibration_set['lat'].values; target_lons = calibration_set['lon'].values
         def impute(col, source_df):
@@ -217,15 +220,13 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
             if missing.any() and not source_df.empty:
                 calibration_set.loc[missing, col] = inverse_distance_weighting(source_df['lat'].values, source_df['lon'].values, source_df[col].values, target_lats[missing], target_lons[missing])
         impute('tmp', source_tmp); impute('rh', source_rh); impute('alt', source_alt)
-        
-        calibration_set['tmp'] = calibration_set['tmp'].fillna(20); calibration_set['rh'] = calibration_set['rh'].fillna(40); calibration_set['altitude'] = calibration_set['alt'].fillna(2240)
-        calibration_set['wsp'] = calibration_set['wsp'].fillna(0); calibration_set['wdr'] = calibration_set['wdr'].fillna(0); calibration_set['station_numeric'] = -1
+        calibration_set['tmp'] = calibration_set['tmp'].fillna(20); calibration_set['rh'] = calibration_set['rh'].fillna(40); calibration_set['altitude'] = calibration_set['alt'].fillna(2240); calibration_set['wsp'] = calibration_set['wsp'].fillna(0); calibration_set['wdr'] = calibration_set['wdr'].fillna(0); calibration_set['station_numeric'] = -1
         for col in ['hour_sin', 'hour_cos', 'month_sin', 'month_cos']: calibration_set[col] = grid_df[col].iloc[0]
 
         station_preds = model.predict(calibration_set[FEATURES])
         residuals = calibration_set[real_col_name].values - station_preds
         
-        # Logs de Auditoría
+        # LOGS
         cdmx_tz = ZoneInfo("America/Mexico_City")
         curr_time = datetime.now(cdmx_tz).strftime("%H:%M")
         print("\n" + "="*95, flush=True)
@@ -251,7 +252,7 @@ def calculate_ias_row(row):
     return (round(ias_pm10), 'PM10') if ias_pm10 >= ias_o3 else (round(ias_o3), 'O3')
 
 def lambda_handler(event, context):
-    print("🚀 Iniciando Lambda Smability V2.0 (Production)...", flush=True)
+    print("🚀 Iniciando Lambda Smability V31 (Prod)...", flush=True)
     try:
         models = load_models()
         raw_stations = get_live_data()
@@ -269,6 +270,9 @@ def lambda_handler(event, context):
         grid_df['ias'] = ias_results[0]
         grid_df['dominant'] = ias_results[1]
         
+        # RIESGO
+        grid_df['risk'] = grid_df['ias'].apply(get_risk_level)
+        
         max_ias = grid_df['ias'].max()
         avg_ias = grid_df['ias'].mean()
         dom_counts = grid_df['dominant'].value_counts().to_dict()
@@ -278,7 +282,7 @@ def lambda_handler(event, context):
         current_ts = datetime.now(cdmx_tz).strftime("%Y-%m-%d %H:%M:%S")
         grid_df['timestamp'] = current_ts
         
-        final_cols = ['timestamp', 'lat', 'lon', 'altitude', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'ias', 'dominant', 'station']
+        final_cols = ['timestamp', 'lat', 'lon', 'altitude', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'ias', 'dominant', 'station', 'risk']
         final_df = grid_df[final_cols]
         json_output = final_df.to_json(orient='records')
         
@@ -289,7 +293,7 @@ def lambda_handler(event, context):
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=json_output, ContentType='application/json')
         s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=json_output, ContentType='application/json')
 
-        return {'statusCode': 200, 'body': json.dumps('Grid Generated Successfully')}
+        return {'statusCode': 200, 'body': json.dumps('Grid V31 OK')}
     except Exception as e:
         print(f"❌ Error Fatal: {str(e)}", flush=True)
         return {'statusCode': 500, 'body': json.dumps(f"Error: {str(e)}")}
