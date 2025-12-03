@@ -36,18 +36,19 @@
 </head>
 <body>
     <div class="sidebar">
-        <div class="header"><h1>Smability AI</h1><div class="subtitle">Modelo V16 (O3 + PM10 + IAS)</div></div>
+        <div class="header"><h1>Smability AI</h1><div class="subtitle">Modelo V32 (Triple Target)</div></div>
         <div class="upload-area" id="drop-zone" onclick="document.getElementById('fileInput').click()">
             <div style="font-size: 20px; margin-bottom: 5px;">📂</div><div class="upload-txt" id="file-name">Arrastra latest_grid.json</div><input type="file" id="fileInput" accept=".json" style="display: none;" />
         </div>
         <div class="controls">
-            <div class="btn-var btn-air" onclick="setMode('ias', this)">🚦 IAS (Salud)</div>
-            <div class="btn-var active btn-air" onclick="setMode('o3', this)">🔴 Ozono</div>
+            <div class="btn-var btn-air" onclick="setMode('ias', this)">🚦 IAS</div>
+            <div class="btn-var active btn-air" onclick="setMode('o3', this)">🔴 O3</div>
             <div class="btn-var btn-air" onclick="setMode('pm10', this)">🟤 PM10</div>
+            <div class="btn-var btn-air" onclick="setMode('pm25', this)">🟣 PM2.5</div>
             <div class="btn-var" onclick="setMode('tmp', this)">🌡️ Temp</div>
-            <div class="btn-var" onclick="setMode('rh', this)">💧 Humedad</div>
+            <div class="btn-var" onclick="setMode('rh', this)">💧 Hum</div>
             <div class="btn-var" onclick="setMode('wsp', this)">💨 Viento</div>
-            <div class="btn-var" style="grid-column: span 2;" onclick="setMode('alt', this)">⛰️ Altitud</div>
+            <div class="btn-var" onclick="setMode('alt', this)">⛰️ Alt</div>
         </div>
         <div class="legend-panel">
             <div class="legend-title"><span id="legend-name">Ozono (O3)</span><span id="legend-unit" style="color: #64748b;">ppb</span></div>
@@ -71,6 +72,7 @@
             ias: { name: 'Índice Aire y Salud', unit: 'Puntos', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             o3: { name: 'Ozono (O3)', unit: 'ppb', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 250], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             pm10: { name: 'Partículas PM10', unit: 'µg/m³', min: 0, max: 215, stops: [0, 45, 75, 130, 215, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
+            pm25: { name: 'Partículas PM2.5', unit: 'µg/m³', min: 0, max: 150, stops: [0, 25, 45, 80, 147, 200], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             tmp: { name: 'Temperatura', unit: '°C', min: 0, max: 35, stops: [0, 10, 20, 30, 35], colors: ['#0000ff', '#00ffff', '#ffff00', '#ff0000', '#800000'] },
             rh: { name: 'Humedad', unit: '%', min: 0, max: 100, stops: [0, 25, 50, 75, 100], colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b'] },
             wsp: { name: 'Viento', unit: 'm/s', min: 0, max: 15, stops: [0, 3, 6, 9, 15], colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c'] },
@@ -80,8 +82,11 @@
 
         function getColor(val, metric) {
             const conf = CONFIG[metric]; let t = (val - conf.min) / (conf.max - conf.min); t = Math.max(0, Math.min(1, t));
-            const segment = 0.25; const idx = Math.floor(t / segment); const localT = (t % segment) / segment;
-            const c1 = hexToRgb(conf.colors[Math.min(idx, 3)]); const c2 = hexToRgb(conf.colors[Math.min(idx + 1, 4)]);
+            const segment = 1 / (conf.colors.length - 1);
+            const idx = Math.floor(t / segment);
+            const localT = (t % segment) / segment;
+            const c1 = hexToRgb(conf.colors[Math.min(idx, conf.colors.length-1)]); 
+            const c2 = hexToRgb(conf.colors[Math.min(idx + 1, conf.colors.length-1)]);
             return `rgb(${lerp(c1.r, c2.r, localT)}, ${lerp(c1.g, c2.g, localT)}, ${lerp(c1.b, c2.b, localT)})`;
         }
         function hexToRgb(hex) { const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0}; }
@@ -109,13 +114,16 @@
                 const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
 
                 rect.bindPopup(`
-                    <div style="font-family:'Inter'; color:#334155; min-width: 165px;">
+                    <div style="font-family:'Inter'; color:#334155; min-width: 175px;">
                         ${headerHTML}
                         <div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;">
                             <span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${(p.ias||0).toFixed(0)} pts</span>
                             <span style="font-weight:600; color:#000;">☢️ Riesgo:</span> <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
+                            
                             <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> <span>${p.o3.toFixed(1)} ppb</span>
                             <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm10||0).toFixed(1)} µg</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟣 PM2.5${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm25||0).toFixed(1)} µg</span>
+                            
                             <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;">
                             <span style="color:#475569;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span>
                             <span style="color:#475569;">💧 Hum:</span> <span>${p.rh?.toFixed(0)} %</span>
