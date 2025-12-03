@@ -9,7 +9,9 @@ from sklearn.metrics import mean_squared_error
 # --- CONFIGURACIÓN ---
 RAW_DATA_DIR = '/tmp/dataset_final'
 STATIONS_FILE = os.path.join(os.path.dirname(__file__), 'raw_data/stationssimat.csv')
-TARGETS_TO_TRAIN = ['o3', 'pm10']
+
+# AHORA ENTRENAMOS LOS 3 GRANDES
+TARGETS_TO_TRAIN = ['o3', 'pm10', 'pm25']
 
 def load_and_merge_data():
     print(f"🔄 Buscando archivos CSV en: {RAW_DATA_DIR}")
@@ -27,6 +29,7 @@ def load_and_merge_data():
     full_df = pd.concat(df_list, ignore_index=True)
     if 'station_id' in full_df.columns: full_df['station_id'] = full_df['station_id'].astype(str)
 
+    print("🔄 Pivoteando tabla maestra...")
     pivot_df = full_df.pivot_table(
         index=['date', 'hour', 'station_id'], 
         columns='parameter', 
@@ -82,7 +85,9 @@ def train():
             
             df_target, target_col = feature_engineering(master_df, target)
             
-            if df_target is None or len(df_target) < 100: continue
+            if df_target is None or len(df_target) < 100: 
+                print(f"⚠️ Pocos datos para {target}. Saltando.")
+                continue
 
             POSSIBLE_FEATURES = ['lat', 'lon', 'altitude', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp', 'wdr']
             FEATURES = [f for f in POSSIBLE_FEATURES if f in df_target.columns]
@@ -95,7 +100,7 @@ def train():
             model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
             
             rmse = np.sqrt(mean_squared_error(y_test, model.predict(X_test)))
-            print(f"✅ RMSE: {rmse:.2f}")
+            print(f"✅ RMSE {target.upper()}: {rmse:.2f}")
             
             output_filename = f"model_{target}.json"
             model.save_model(output_filename)
