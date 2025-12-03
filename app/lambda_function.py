@@ -14,21 +14,24 @@ S3_GRID_OUTPUT_KEY = os.environ.get('S3_GRID_OUTPUT_KEY', 'live_grid/latest_grid
 
 MODEL_PATH_O3 = os.path.join(os.environ.get('LAMBDA_TASK_ROOT', '/var/task'), 'model_o3.json')
 MODEL_PATH_PM10 = os.path.join(os.environ.get('LAMBDA_TASK_ROOT', '/var/task'), 'model_pm10.json')
+MODEL_PATH_PM25 = os.path.join(os.environ.get('LAMBDA_TASK_ROOT', '/var/task'), 'model_pm25.json')
 
-# Malla Topográfica (GeoJSON)
 STATIC_GRID_PATH = os.path.join(os.environ.get('LAMBDA_TASK_ROOT', '/var/task'), 'malla_valle_mexico_final.geojson')
-
-GRID_BASE_PATH = '/tmp/grid_base_prod_v1.csv'
+GRID_BASE_PATH = '/tmp/grid_base_prod_v2.csv'
 SMABILITY_API_URL = os.environ.get('SMABILITY_API_URL', 'https://y4zwdmw7vf.execute-api.us-east-1.amazonaws.com/prod/api/air-quality/current?type=reference,smaa')
 
 s3_client = boto3.client('s3')
 
-# --- TABLAS NOM-172-SEMARNAT-2023 ---
+# --- TABLAS NOM-172-SEMARNAT-2023 (Vigente 2024) ---
 BPS_O3 = [(0,58,0,50), (59,92,51,100), (93,135,101,150), (136,175,151,200), (176,240,201,300)]
 BPS_PM10 = [(0,45,0,50), (46,60,51,100), (61,132,101,150), (133,213,151,200), (214,354,201,300)]
+BPS_PM25 = [(0,25,0,50), (26,45,51,100), (46,79,101,150), (80,147,151,200), (148,250,201,300)] # Estrictos
 
 def get_ias_score(c, pollutant):
-    breakpoints = BPS_O3 if pollutant == 'o3' else BPS_PM10
+    if pollutant == 'o3': breakpoints = BPS_O3
+    elif pollutant == 'pm10': breakpoints = BPS_PM10
+    else: breakpoints = BPS_PM25 # pm25
+    
     c = float(c)
     for (c_lo, c_hi, i_lo, i_hi) in breakpoints:
         if c <= c_hi:
@@ -44,19 +47,28 @@ def get_risk_level(ias):
     else: return "Extremadamente Alto"
 
 def load_models():
-    print("⬇️ Cargando modelos...", flush=True)
+    print("⬇️ Cargando modelos (O3, PM10, PM2.5)...", flush=True)
     models = {}
     try:
         m_o3 = xgb.XGBRegressor()
         m_o3.load_model(MODEL_PATH_O3)
         models['o3'] = m_o3
+        
         if os.path.exists(MODEL_PATH_PM10):
             m_pm10 = xgb.XGBRegressor()
             m_pm10.load_model(MODEL_PATH_PM10)
             models['pm10'] = m_pm10
+            
+        if os.path.exists(MODEL_PATH_PM25):
+            m_pm25 = xgb.XGBRegressor()
+            m_pm25.load_model(MODEL_PATH_PM25)
+            models['pm25'] = m_pm25
+        else:
+            print("⚠️ Alerta: model_pm25.json no encontrado.")
+            
         return models
     except Exception as e:
-        print(f"❌ Error modelos: {e}", flush=True)
+        print(f"❌ Error cargando modelos: {e}", flush=True)
         raise e
 
 def get_live_data():
@@ -79,12 +91,19 @@ def process_stations_data(stations_list):
             alt = float(s.get('altitude')) if s.get('altitude') is not None else np.nan
             
             pollutants = s.get('pollutants', {})
+            
+            # O3: 1 hora
             o3_val = pollutants.get('o3', {}).get('avg_1h', {}).get('value')
             
-            # PM10: Prioridad 12h (Norma), Fallback 1h
+            # PM10: 12h con fallback
             pm10_obj = pollutants.get('pm10', {})
             pm10_val = pm10_obj.get('avg_12h', {}).get('value')
             if pm10_val is None: pm10_val = pm10_obj.get('avg_1h', {}).get('value')
+
+            # PM2.5: 12h con fallback (Igual que PM10)
+            pm25_obj = pollutants.get('pm25', {})
+            pm25_val = pm25_obj.get('avg_12h', {}).get('value')
+            if pm25_val is None: pm25_val = pm25_obj.get('avg_1h', {}).get('value')
             
             meteo = s.get('meteorological', {})
             def get_val(key): return meteo.get(key, {}).get('avg_1h', {}).get('value')
@@ -97,6 +116,7 @@ def process_stations_data(stations_list):
                 'name': st_name, 'lat': lat, 'lon': lon, 'alt': alt,
                 'o3_real': float(o3_val) if o3_val is not None else np.nan,
                 'pm10_real': float(pm10_val) if pm10_val is not None else np.nan,
+                'pm25_real': float(pm25_val) if pm25_val is not None else np.nan,
                 'tmp': float(temp) if temp is not None else np.nan, 
                 'rh': float(rh) if rh is not None else np.nan, 
                 'wsp': float(wsp) if wsp is not None else np.nan, 
@@ -104,7 +124,7 @@ def process_stations_data(stations_list):
             })
         except Exception: continue
     df = pd.DataFrame(parsed_data)
-    print(f"📊 Datos: {len(df)} st. | O3: {df['o3_real'].count()} | PM10: {df['pm10_real'].count()}", flush=True)
+    print(f"📊 Datos: {len(df)} st. | O3: {df['o3_real'].count()} | PM10: {df['pm10_real'].count()} | PM2.5: {df['pm25_real'].count()}", flush=True)
     return df
 
 def inverse_distance_weighting(x, y, z, xi, yi, power=2):
@@ -114,7 +134,7 @@ def inverse_distance_weighting(x, y, z, xi, yi, power=2):
     return np.sum(weights * z[None, :], axis=1) / np.sum(weights, axis=1)
 
 def prepare_grid_features(stations_df):
-    # Límites Negocio (AIFA + Chalco)
+    # Límites V28
     LAT_MIN, LAT_MAX = 19.15, 19.777
     LON_MIN, LON_MAX = -99.39, -98.8624
     RESOLUTION = 0.01
@@ -127,7 +147,6 @@ def prepare_grid_features(stations_df):
         grid_points = [{'lat': lat, 'lon': lon} for lat in lats for lon in lons]
         grid_df = pd.DataFrame(grid_points)
         
-        # Inyección Topográfica GeoJSON
         if os.path.exists(STATIC_GRID_PATH):
             print("⛰️ Inyectando altitud GeoJSON...", flush=True)
             try:
@@ -139,7 +158,6 @@ def prepare_grid_features(stations_df):
                         elev = feature['properties'].get('elevation', 2240)
                         topo_data.append({'lat': lat, 'lon': lon, 'elevation': elev})
                     topo_df = pd.DataFrame(topo_data)
-                    # Resampling al grid
                     grid_df['altitude'] = inverse_distance_weighting(
                         topo_df['lat'].values, topo_df['lon'].values, topo_df['elevation'].values,
                         grid_df['lat'].values, grid_df['lon'].values
@@ -200,6 +218,7 @@ def overwrite_with_real_data(grid_df, stations_df):
         if dists[nearest_idx] < THRESHOLD:
             if not np.isnan(row['o3_real']): grid_df.at[nearest_idx, 'o3'] = row['o3_real']
             if not np.isnan(row['pm10_real']): grid_df.at[nearest_idx, 'pm10'] = row['pm10_real']
+            if not np.isnan(row['pm25_real']): grid_df.at[nearest_idx, 'pm25'] = row['pm25_real'] # Nuevo
             if not np.isnan(row['tmp']): grid_df.at[nearest_idx, 'tmp'] = row['tmp']
             if not np.isnan(row['rh']): grid_df.at[nearest_idx, 'rh'] = row['rh']
             if not np.isnan(row['wsp']): grid_df.at[nearest_idx, 'wsp'] = row['wsp']
@@ -226,7 +245,6 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
         station_preds = model.predict(calibration_set[FEATURES])
         residuals = calibration_set[real_col_name].values - station_preds
         
-        # LOGS
         cdmx_tz = ZoneInfo("America/Mexico_City")
         curr_time = datetime.now(cdmx_tz).strftime("%H:%M")
         print("\n" + "="*95, flush=True)
@@ -249,10 +267,18 @@ def predict_and_calibrate(model, grid_df, stations_df, real_col_name, output_col
 def calculate_ias_row(row):
     ias_o3 = get_ias_score(row['o3'], 'o3')
     ias_pm10 = get_ias_score(row['pm10'], 'pm10')
-    return (round(ias_pm10), 'PM10') if ias_pm10 >= ias_o3 else (round(ias_o3), 'O3')
+    ias_pm25 = get_ias_score(row['pm25'], 'pm25') # Nuevo
+    
+    # Ganador
+    if ias_pm25 >= ias_o3 and ias_pm25 >= ias_pm10:
+        return round(ias_pm25), 'PM2.5'
+    elif ias_pm10 >= ias_o3:
+        return round(ias_pm10), 'PM10'
+    else:
+        return round(ias_o3), 'O3'
 
 def lambda_handler(event, context):
-    print("🚀 Iniciando Lambda Smability V31 (Prod)...", flush=True)
+    print("🚀 Iniciando Lambda V32 (Full Triple Model)...", flush=True)
     try:
         models = load_models()
         raw_stations = get_live_data()
@@ -260,17 +286,22 @@ def lambda_handler(event, context):
         
         grid_df = prepare_grid_features(stations_df)
         
+        # 1. O3
         grid_df['o3'] = predict_and_calibrate(models['o3'], grid_df, stations_df, 'o3_real', 'o3')
+        
+        # 2. PM10
         if 'pm10' in models: grid_df['pm10'] = predict_and_calibrate(models['pm10'], grid_df, stations_df, 'pm10_real', 'pm10')
         else: grid_df['pm10'] = 0
+        
+        # 3. PM2.5 (Nuevo)
+        if 'pm25' in models: grid_df['pm25'] = predict_and_calibrate(models['pm25'], grid_df, stations_df, 'pm25_real', 'pm25')
+        else: grid_df['pm25'] = 0
         
         grid_df = overwrite_with_real_data(grid_df, stations_df)
             
         ias_results = grid_df.apply(calculate_ias_row, axis=1, result_type='expand')
         grid_df['ias'] = ias_results[0]
         grid_df['dominant'] = ias_results[1]
-        
-        # RIESGO
         grid_df['risk'] = grid_df['ias'].apply(get_risk_level)
         
         max_ias = grid_df['ias'].max()
@@ -282,7 +313,7 @@ def lambda_handler(event, context):
         current_ts = datetime.now(cdmx_tz).strftime("%Y-%m-%d %H:%M:%S")
         grid_df['timestamp'] = current_ts
         
-        final_cols = ['timestamp', 'lat', 'lon', 'altitude', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'ias', 'dominant', 'station', 'risk']
+        final_cols = ['timestamp', 'lat', 'lon', 'altitude', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'pm25', 'ias', 'dominant', 'station', 'risk']
         final_df = grid_df[final_cols]
         json_output = final_df.to_json(orient='records')
         
@@ -293,7 +324,7 @@ def lambda_handler(event, context):
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=json_output, ContentType='application/json')
         s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=json_output, ContentType='application/json')
 
-        return {'statusCode': 200, 'body': json.dumps('Grid V31 OK')}
+        return {'statusCode': 200, 'body': json.dumps('Grid V32 OK')}
     except Exception as e:
         print(f"❌ Error Fatal: {str(e)}", flush=True)
         return {'statusCode': 500, 'body': json.dumps(f"Error: {str(e)}")}
