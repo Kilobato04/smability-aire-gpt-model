@@ -1,12 +1,19 @@
 FROM public.ecr.aws/lambda/python:3.11
 
+RUN pip install --no-cache-dir --upgrade pip
 COPY requirements.txt ${LAMBDA_TASK_ROOT}
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --only-binary=:all: -r requirements.txt
 
+# Código App
 COPY app/lambda_function.py ${LAMBDA_TASK_ROOT}
+COPY app/lambda_api_light.py ${LAMBDA_TASK_ROOT}
+COPY app/lambda_chatbot.py ${LAMBDA_TASK_ROOT}
+
+# Recursos
 COPY app/grid_base.csv ${LAMBDA_TASK_ROOT}
 COPY malla_valle_mexico_final.geojson ${LAMBDA_TASK_ROOT}
 
+# Entrenamiento
 COPY training/raw_data/dataset_aire_zmcdmx.zip ${LAMBDA_TASK_ROOT}/training/raw_data/
 COPY training/raw_data/stationssimat.csv ${LAMBDA_TASK_ROOT}/training/raw_data/
 COPY training/train_model.py ${LAMBDA_TASK_ROOT}/training/
