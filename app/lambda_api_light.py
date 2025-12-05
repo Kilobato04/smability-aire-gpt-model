@@ -10,20 +10,20 @@ S3_BUCKET = os.environ.get('S3_BUCKET', 'smability-data-lake')
 GRID_KEY = 'live_grid/latest_grid.json'
 s3 = boto3.client('s3')
 
-CACHED_GRID = None
-
 def get_grid_data():
-    global CACHED_GRID
-    print("📥 Descargando Grid desde S3 (Cold Start)...")
+    """Descarga siempre la versión más reciente del Grid desde S3."""
+    print("📥 Descargando Grid fresco desde S3...")
     try:
         obj = s3.get_object(Bucket=S3_BUCKET, Key=GRID_KEY)
         data = json.loads(obj['Body'].read())
-        CACHED_GRID = pd.DataFrame(data)
-        print(f"✅ Grid cargado: {len(CACHED_GRID)} puntos.")
-        return True
+        df = pd.DataFrame(data)
+        if df.empty:
+            print("⚠️ El Grid descargado está vacío.")
+            return None
+        return df
     except Exception as e:
         print(f"❌ Error S3: {e}")
-        return False
+        return None
 
 def haversine_vectorized(lon1, lat1, df):
     lon1, lat1 = np.radians(lon1), np.radians(lat1)
@@ -36,7 +36,6 @@ def haversine_vectorized(lon1, lat1, df):
     return km
 
 def lambda_handler(event, context):
-    global CACHED_GRID
     try:
         params = event.get('queryStringParameters', {})
         if not params or 'lat' not in params or 'lon' not in params:
@@ -45,14 +44,16 @@ def lambda_handler(event, context):
         user_lat = float(params['lat'])
         user_lon = float(params['lon'])
         
-        if CACHED_GRID is None:
-            success = get_grid_data()
-            if not success: return {'statusCode': 503, 'body': json.dumps({'error': 'Grid no disponible'})}
+        # --- SIEMPRE OBTENER DATOS FRESCOS ---
+        grid_df = get_grid_data()
+        
+        if grid_df is None: 
+            return {'statusCode': 503, 'body': json.dumps({'error': 'Grid no disponible o error de conexión'})}
             
-        distances = haversine_vectorized(user_lon, user_lat, CACHED_GRID)
+        distances = haversine_vectorized(user_lon, user_lat, grid_df)
         min_idx = np.argmin(distances)
         nearest_dist = distances[min_idx]
-        point = CACHED_GRID.iloc[min_idx].to_dict()
+        point = grid_df.iloc[min_idx].to_dict()
         
         status = "success"
         msg = "Cobertura OK"
@@ -87,5 +88,5 @@ def lambda_handler(event, context):
         }
         return {'statusCode': 200, 'headers': {'Content-Type': 'application/json'}, 'body': json.dumps(response)}
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error Lambda Light: {str(e)}")
         return {'statusCode': 500, 'body': json.dumps({'error': str(e)})}
