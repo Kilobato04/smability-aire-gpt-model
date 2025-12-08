@@ -5,10 +5,11 @@ import requests
 import boto3
 import unicodedata
 from datetime import datetime
+from decimal import Decimal
 from openai import OpenAI
 import lambda_api_light 
+import bot_content 
 
-# --- CONFIGURACIÓN ---
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 DYNAMODB_TABLE = 'SmabilityUsers'
@@ -22,94 +23,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
 
-# --- TOOLS ---
-tools_schema = [
-    {
-        "type": "function",
-        "function": {
-            "name": "consultar_calidad_aire",
-            "description": "Consulta datos EXACTOS (IAS, O3, PM10, PM25) para coordenadas dadas.",
-            "parameters": {
-                "type": "object",
-                "properties": {"lat": {"type": "number"}, "lon": {"type": "number"}},
-                "required": ["lat", "lon"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "guardar_ubicacion",
-            "description": "Guarda ubicación en DB.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "nombre": {"type": "string"}, "lat": {"type": "number"}, "lon": {"type": "number"}
-                },
-                "required": ["nombre", "lat", "lon"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "renombrar_ubicacion",
-            "description": "Renombra ubicación existente.",
-            "parameters": {
-                "type": "object",
-                "properties": {"nombre_actual": {"type": "string"}, "nombre_nuevo": {"type": "string"}},
-                "required": ["nombre_actual", "nombre_nuevo"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "borrar_ubicacion",
-            "description": "Elimina ubicación.",
-            "parameters": {
-                "type": "object",
-                "properties": {"nombre": {"type": "string"}},
-                "required": ["nombre"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "configurar_alerta_ias",
-            "description": "Configura alerta IAS.",
-            "parameters": {
-                "type": "object",
-                "properties": {"nombre_ubicacion": {"type": "string"}, "umbral_ias": {"type": "integer"}},
-                "required": ["nombre_ubicacion", "umbral_ias"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "configurar_recordatorio",
-            "description": "Configura recordatorio (HH:MM).",
-            "parameters": {
-                "type": "object",
-                "properties": {"nombre_ubicacion": {"type": "string"}, "hora": {"type": "string"}},
-                "required": ["nombre_ubicacion", "hora"]
-            }
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "consultar_mis_datos",
-            "description": "Consulta perfil.",
-            "parameters": {"type": "object", "properties": {}}
-        }
-    }
-]
-
-# --- FUNCIONES DB ---
-
+# --- AUXILIARES ---
 def clean_key(text):
     try:
         nfd_form = unicodedata.normalize('NFD', text)
@@ -117,126 +31,158 @@ def clean_key(text):
     except: pass
     return "".join(e for e in text if e.isalnum() or e.isspace()).strip().lower().replace(" ", "_")
 
+def find_real_key(user_profile, search_name):
+    locs = user_profile.get('locations', {})
+    target_clean = clean_key(search_name)
+    if target_clean in locs: return target_clean
+    for key in locs.keys():
+        if clean_key(key) == target_clean: return key 
+    for key, val in locs.items():
+        if clean_key(val.get('display_name', '')) == target_clean: return key
+    return None
+
 def get_user_profile(user_id):
-    try:
-        return table.get_item(Key={'user_id': str(user_id)}).get('Item', {})
+    try: return table.get_item(Key={'user_id': str(user_id)}).get('Item', {})
     except: return {}
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal): return float(obj)
+        return super(DecimalEncoder, self).default(obj)
+
+def log_debug_data(user_id, first_name, user_profile):
+    try:
+        debug_data = {
+            "USER_ID": user_id,
+            "USER_NAME": first_name,
+            "1_LOCATIONS": user_profile.get('locations', {}),
+            "2_VEHICLE": user_profile.get('vehicle', {}),
+            "3_HEALTH": user_profile.get('health_profile', {}),
+            "4_COMMUTE": user_profile.get('commute', {}),
+            "5_FLOOD": user_profile.get('flood_risk', {}),
+            "6_ALERTS": user_profile.get('alerts', {})
+        }
+        print(f"📝 [USER_FULL_DATA]: {json.dumps(debug_data, cls=DecimalEncoder)}")
+    except: pass
 
 def save_user_interaction(user_id, first_name):
     try:
         table.update_item(
             Key={'user_id': str(user_id)},
-            UpdateExpression="""
-                SET first_name = :n, 
-                    last_interaction = :t, 
-                    locations = if_not_exists(locations, :empty_map), 
-                    alerts = if_not_exists(alerts, :empty_alerts)
-            """,
-            ExpressionAttributeValues={
-                ':n': first_name, ':t': datetime.now().isoformat(),
-                ':empty_map': {}, ':empty_alerts': {'threshold': {}, 'schedule': {}}
-            }
+            UpdateExpression="SET first_name=:n, last_interaction=:t, locations=if_not_exists(locations,:e), alerts=if_not_exists(alerts,:e), vehicle=if_not_exists(vehicle,:e), health_profile=if_not_exists(health_profile,:e), commute=if_not_exists(commute,:e), flood_risk=if_not_exists(flood_risk,:e)",
+            ExpressionAttributeValues={':n': first_name, ':t': datetime.now().isoformat(), ':e': {}}
         )
     except: pass
 
+# --- TOOLS ---
 def save_location(user_id, raw_name, lat, lon):
     try:
         safe_name = clean_key(raw_name)
         if not safe_name: return "❌ Nombre inválido."
-        table.update_item(
-            Key={'user_id': str(user_id)},
-            UpdateExpression="set locations.#loc = :val",
-            ExpressionAttributeNames={'#loc': safe_name},
-            ExpressionAttributeValues={
-                ':val': {'lat': str(lat), 'lon': str(lon), 'display_name': raw_name, 'active': True}
-            }
-        )
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set locations.#loc = :val", ExpressionAttributeNames={'#loc': safe_name}, ExpressionAttributeValues={':val': {'lat': str(lat), 'lon': str(lon), 'display_name': raw_name, 'active': True}})
         return f"✅ Ubicación guardada: **{raw_name}**."
     except Exception as e: return f"❌ Error: {str(e)}"
 
+def save_vehicle(user_id, placa, holograma):
+    try:
+        ultimo_digito = str(placa)[-1]
+        periodo = bot_content.INFO_VEHICULAR['calendario'].get(ultimo_digito, "Desconocido")
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set vehicle = :v", ExpressionAttributeValues={':v': {'plate_last_digit': ultimo_digito, 'hologram': str(holograma)}})
+        return f"🚗 Auto guardado (Placa ...{ultimo_digito}). Verificas en: **{periodo}**."
+    except Exception as e: return f"❌ Error: {str(e)}"
+
+def save_health_profile(user_id, tipo, vulnerable):
+    try:
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set health_profile = :h", ExpressionAttributeValues={':h': {'condition': tipo, 'is_vulnerable': vulnerable}})
+        return f"🩺 Salud registrada ({tipo}). Ajustaré recomendaciones."
+    except Exception as e: return f"❌ Error: {str(e)}"
+
+def save_commute_data(user_id, tipo, horas):
+    try:
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set commute = :c", ExpressionAttributeValues={':c': {'transport_type': tipo, 'daily_hours': float(horas)}})
+        return f"🚌 Transporte guardado: **{horas}h/día** en {tipo}."
+    except Exception as e: return f"❌ Error transporte: {str(e)}"
+
+def save_flood_risk(user_id, nombre_ubicacion, nivel, cm_aprox=0):
+    try:
+        user = get_user_profile(user_id)
+        real_key = find_real_key(user, nombre_ubicacion)
+        if not real_key: return f"⚠️ No encuentro '{nombre_ubicacion}'."
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set flood_risk.#loc = :val", ExpressionAttributeNames={'#loc': real_key}, ExpressionAttributeValues={':val': {'level': int(nivel), 'description': f"Nivel {nivel}", 'active': True}})
+        return f"🌧️ Inundación registrada en **{nombre_ubicacion}**."
+    except Exception as e: return f"❌ Error inundación: {str(e)}"
+
 def rename_location(user_id, old_name, new_name):
     try:
-        safe_old = clean_key(old_name)
-        safe_new = clean_key(new_name)
         user = get_user_profile(user_id)
-        locs = user.get('locations', {})
-        
-        if safe_old not in locs:
-            found = False
-            for k in locs.keys():
-                if clean_key(k) == safe_old: 
-                    safe_old = k; found = True; break
-            if not found: return f"⚠️ No encuentro '{old_name}'."
-            
-        old_data = locs[safe_old]
-        table.update_item(
-            Key={'user_id': str(user_id)},
-            UpdateExpression="set locations.#new = :val",
-            ExpressionAttributeNames={'#new': safe_new},
-            ExpressionAttributeValues={
-                ':val': {'lat': old_data['lat'], 'lon': old_data['lon'], 'display_name': new_name, 'active': True}
-            }
-        )
-        table.update_item(
-            Key={'user_id': str(user_id)},
-            UpdateExpression="REMOVE locations.#old",
-            ExpressionAttributeNames={'#old': safe_old}
-        )
-        return f"✅ Renombrado exitoso: **{old_name}** ahora es **{new_name}**."
-    except Exception as e: return f"❌ Error: {str(e)}"
+        real_old_key = find_real_key(user, old_name)
+        if not real_old_key: return f"⚠️ No encuentro '{old_name}'."
+        old_data = user['locations'][real_old_key]
+        safe_new_key = clean_key(new_name)
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set locations.#new = :val", ExpressionAttributeNames={'#new': safe_new_key}, ExpressionAttributeValues={':val': {'lat': old_data['lat'], 'lon': old_data['lon'], 'display_name': new_name, 'active': True}})
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE locations.#old", ExpressionAttributeNames={'#old': real_old_key})
+        return f"✅ Renombrado: **{old_name}** -> **{new_name}**."
+    except: return "Error renombrando."
 
 def delete_location(user_id, raw_name):
     try:
-        safe_name = clean_key(raw_name)
-        table.update_item(
-            Key={'user_id': str(user_id)},
-            UpdateExpression="REMOVE locations.#loc, alerts.threshold.#loc, alerts.schedule.#loc",
-            ExpressionAttributeNames={'#loc': safe_name}
-        )
+        user = get_user_profile(user_id)
+        real_key = find_real_key(user, raw_name)
+        if not real_key: return f"⚠️ No encuentro '{raw_name}'."
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE locations.#loc, alerts.threshold.#loc, alerts.schedule.#loc", ExpressionAttributeNames={'#loc': real_key})
         return f"🗑️ Eliminado: **{raw_name}**."
-    except Exception as e: return f"❌ Error: {str(e)}"
+    except: return "Error borrando."
 
 def set_alert_ias(user_id, raw_name, umbral):
     try:
-        safe_name = clean_key(raw_name)
         user = get_user_profile(user_id)
-        if safe_name not in user.get('locations', {}): return f"⚠️ No encuentro '{raw_name}'."
-        table.update_item(
-            Key={'user_id': str(user_id)},
-            UpdateExpression="set alerts.threshold.#loc = :val",
-            ExpressionAttributeNames={'#loc': safe_name},
-            ExpressionAttributeValues={':val': {'umbral': int(umbral), 'active': True}}
-        )
-        return f"🔔 Alerta activa: **{raw_name}** > **{umbral} IAS**."
-    except Exception as e: return f"❌ Error: {str(e)}"
+        real_key = find_real_key(user, raw_name)
+        if not real_key: return f"⚠️ No encuentro '{raw_name}'."
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set alerts.threshold.#loc = :val", ExpressionAttributeNames={'#loc': real_key}, ExpressionAttributeValues={':val': {'umbral': int(umbral), 'active': True}})
+        return f"🔔 Alerta activa: **{raw_name}** > {umbral} IAS."
+    except: return "Error alerta."
 
 def set_alert_time(user_id, raw_name, hora):
     try:
         h = int(hora.split(':')[0])
-        if h < HORA_INICIO or h >= HORA_FIN: return f"⚠️ Horario descanso ({HORA_INICIO}-{HORA_FIN}). Cambia la hora."
-        safe_name = clean_key(raw_name)
+        if h < HORA_INICIO or h >= HORA_FIN: return "⚠️ Horario no válido."
         user = get_user_profile(user_id)
-        if safe_name not in user.get('locations', {}): return f"⚠️ No encuentro '{raw_name}'."
-        table.update_item(
-            Key={'user_id': str(user_id)},
-            UpdateExpression="set alerts.schedule.#loc = :val",
-            ExpressionAttributeNames={'#loc': safe_name},
-            ExpressionAttributeValues={':val': {'time': hora, 'active': True}}
-        )
-        return f"⏰ Recordatorio: **{raw_name}** a las **{hora}**."
-    except Exception as e: return f"❌ Error: {str(e)}"
+        real_key = find_real_key(user, raw_name)
+        if not real_key: return f"⚠️ No encuentro '{raw_name}'."
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set alerts.schedule.#loc = :val", ExpressionAttributeNames={'#loc': real_key}, ExpressionAttributeValues={':val': {'time': hora, 'active': True}})
+        return f"⏰ Recordatorio: **{raw_name}** a las {hora}."
+    except: return "Error recordatorio."
 
 def get_my_config_str(user_id):
     try:
         data = get_user_profile(user_id)
+        msg = "📂 **EXPEDIENTE SMABILITY**\\n"
         locs = data.get('locations', {})
-        if not locs: return "📭 No tienes ubicaciones guardadas."
-        msg = "📂 **Mis Ubicaciones:**\\n"
-        for k,v in locs.items(): msg += f"- 📍 {v.get('display_name', k)}\\n"
+        if locs:
+            msg += "\\n📍 **Ubicaciones:**\\n"
+            for k,v in locs.items(): msg += f"- {v.get('display_name', k)}\\n"
+        veh = data.get('vehicle', {})
+        if veh: msg += f"\\n🚗 **Auto:** ...{veh.get('plate_last_digit')}\\n"
+        salud = data.get('health_profile', {})
+        if salud: msg += f"\\n🩺 **Salud:** {salud.get('condition')}\\n"
+        commute = data.get('commute', {})
+        if commute: msg += f"\\n🚌 **Transporte:** {commute.get('daily_hours')}h ({commute.get('transport_type')})\\n"
+        flood = data.get('flood_risk', {})
+        if flood:
+            msg += "\\n🌧️ **Inundación:**\\n"
+            for k,v in flood.items(): msg += f"- {k}: {v.get('description')}\\n"
+        
+        # MOSTRAR ALERTAS EN EL REPORTE
+        alerts = data.get('alerts', {})
+        thr = alerts.get('threshold', {})
+        sch = alerts.get('schedule', {})
+        if thr or sch:
+            msg += "\\n🔔 **Alertas:**\\n"
+            for k,v in thr.items(): msg += f"- IAS > {v['umbral']} en {k}\\n"
+            for k,v in sch.items(): msg += f"- {v['time']} en {k}\\n"
+            
         return msg
-    except: return "Error."
-
-# --- HANDLER ---
+    except Exception as e: return f"Error perfil: {str(e)}"
 
 def send_telegram_message(chat_id, text):
     requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
@@ -250,101 +196,58 @@ def lambda_handler(event, context):
         user_id = msg['from']['id']
         first_name = msg['from'].get('first_name', 'Usuario')
         
-        # 1. Init DB
         save_user_interaction(user_id, first_name)
-        
-        # 2. Obtener Contexto (Ubicaciones Guardadas)
         user_profile = get_user_profile(user_id)
+        log_debug_data(user_id, first_name, user_profile)
+        
         locations_map = user_profile.get('locations', {})
+        vehicle_data = user_profile.get('vehicle', {})
+        health_data = user_profile.get('health_profile', {})
+        commute_data = user_profile.get('commute', {})
+        flood_data = user_profile.get('flood_risk', {})
         
-        # Generar string de contexto para GPT
-        locations_context_str = "SIN UBICACIONES GUARDADAS."
-        if locations_map:
-            locations_context_str = "UBICACIONES DEL USUARIO (Usar para consultas):\\n"
-            for k, v in locations_map.items():
-                name = v.get('display_name', k)
-                locations_context_str += f"- {name}: Lat {v['lat']}, Lon {v['lon']}\\n"
-
         has_home = 'casa' in locations_map
+        has_work = 'trabajo' in locations_map
         
+        memoria_str = "SIN DATOS."
+        if locations_map:
+            memoria_str = "📍 LUGARES:\\n"
+            for k, v in locations_map.items(): 
+                riesgo = flood_data.get(k, {}).get('description', '')
+                memoria_str += f"- {v.get('display_name', k)}: {v['lat']}, {v['lon']} {f'(Lluvia: {riesgo})' if riesgo else ''}\\n"
+        
+        info_estatica = f"CDMX: Multa Verif: {bot_content.INFO_VEHICULAR['multa_extemporanea']}"
+
         user_content = ""
         system_instruction_extra = ""
 
         if 'location' in msg:
             lat, lon = msg['location']['latitude'], msg['location']['longitude']
-            user_content = f"COORDENADAS ENVIADAS: {lat}, {lon}."
-            
-            # --- ONBOARDING EDUCATIVO ---
+            user_content = f"COORDENADAS: {lat}, {lon}."
             if not has_home:
-                system_instruction_extra = """
-                📢 **MODO ONBOARDING (Usuario Nuevo):**
-                1. Llama a `guardar_ubicacion` AUTOMÁTICAMENTE con nombre "Casa".
-                2. CONFIRMA: "✅ He guardado esta ubicación como tu **Casa**."
-                3. EDUCA sobre alertas con ejemplos claros: 
-                   - "Ej: 'Recuérdame la calidad del aire a las 7:30am'"
-                   - "Ej: 'Avísame si el IAS en Casa supera los 100'"
-                4. Da el reporte de aire.
-                """
+                system_instruction_extra = "MODO ONBOARDING CASA: Guarda como 'Casa'. Confirma."
+            elif not has_work:
+                system_instruction_extra = "MODO ONBOARDING TRABAJO: Guarda como 'Trabajo'. Confirma."
             else:
-                system_instruction_extra = "Usuario ya tiene Casa. Da reporte. Si pide guardar otra cosa, hazlo."
+                system_instruction_extra = "Perfil base listo. Da reporte de aire."
 
         elif 'text' in msg:
             user_content = msg['text']
             if user_content.strip() == "/start":
-                welcome = (
-                    f"👋 **¡Hola {first_name}! Soy AIreGPT.**\\n\\n"
-                    "Tu asistente personal de calidad del aire en la CDMX.\\n\\n"
-                    "1. 📎 **Envíame tu Ubicación** (Clip -> Ubicación).\\n"
-                    "2. La guardaré como **Casa** 🏠.\\n"
-                    "3. Luego podrás pedirme:\\n"
-                    "   ⏰ _'Recuérdame el aire a las 7:30am'_\\n"
-                    "   🔔 _'Avísame si Casa sube de 100 IAS'_"
-                )
+                welcome = bot_content.get_welcome_message(first_name)
                 send_telegram_message(chat_id, welcome)
+                return {'statusCode': 200, 'body': 'OK'}
+            elif user_content.strip() == "/version":
+                send_telegram_message(chat_id, f"🤖 **{bot_content.BOT_VERSION}**")
                 return {'statusCode': 200, 'body': 'OK'}
         else: return {'statusCode': 200, 'body': 'OK'}
 
-        # --- PROMPT V14: GOLDEN MASTER ---
         gpt_messages = [
-            {"role": "system", "content": f"""
-                Eres AIreGPT (NOM-172). Asistente experto, amable y empático.
-                
-                CONTEXTO DE MEMORIA:
-                {locations_context_str}
-                
-                {system_instruction_extra}
-
-                ALCANCE GEOGRÁFICO:
-                - Solo Valle de México. Si la tool dice "Fuera de cobertura", discúlpate y di que aún no tienes datos de esa zona. NO INVENTES DATOS.
-
-                PRINCIPIOS:
-                1. **VERDAD NUMÉRICA:** Copia y pega EXACTAMENTE los valores de la tool.
-                2. **CONSISTENCIA:** Si el usuario renombra, los datos de aire deben ser idénticos.
-                3. **FEEDBACK:** Si guardas/renombras, inicia confirmando: "✅ [Acción realizada]...".
-
-                REGLA DE COLORES (CÍRCULOS):
-                🟢(0-50), 🟡(51-75), 🟠(76-100), 🔴(101-150), 🟣(>150).
-
-                FORMATO REPORTE:
-                [Frase humana y empática sobre el clima/riesgo]
-                
-                [CÍRCULO] **Riesgo:** [Nivel] ([Valor] pts IAS)
-                ⚠️ **Principal Amenaza:** [Contaminante]
-                
-                🩺 **Recomendación:** [Consejo humano]
-
-                📊 **Datos:**
-                🌡️ [T]°C | 💧 [H]% | 💨 [V]m/s
-                🔴 O3: [V] ppb | 🟣 PM2.5: [V] µg | 🟤 PM10: [V] µg
-                
-                🕒 _Reporte [Hora]_
-                📍 Fuente: AIreGPT.ai
-                ℹ️ *Datos actualizados al min 20.*
-            """},
+            {"role": "system", "content": bot_content.get_system_prompt(memoria_str, info_estatica, system_instruction_extra)},
             {"role": "user", "content": user_content}
         ]
 
-        response = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_messages, tools=tools_schema, tool_choice="auto")
+        response = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_messages, tools=bot_content.TOOLS_SCHEMA, tool_choice="auto")
         ai_msg = response.choices[0].message
         final_text = ai_msg.content
 
@@ -354,22 +257,20 @@ def lambda_handler(event, context):
                 fn = tool_call.function.name
                 args = json.loads(tool_call.function.arguments)
                 res = ""
-                
+                # Router
                 if fn == "consultar_calidad_aire":
                     mock = {'queryStringParameters': {'lat': str(args['lat']), 'lon': str(args['lon'])}}
                     res = lambda_api_light.lambda_handler(mock, None)['body']
-                elif fn == "guardar_ubicacion":
-                    res = save_location(user_id, args['nombre'], args['lat'], args['lon'])
-                elif fn == "renombrar_ubicacion":
-                    res = rename_location(user_id, args['nombre_actual'], args['nombre_nuevo'])
-                elif fn == "borrar_ubicacion":
-                    res = delete_location(user_id, args['nombre'])
-                elif fn == "configurar_alerta_ias":
-                    res = set_alert_ias(user_id, args['nombre_ubicacion'], args['umbral_ias'])
-                elif fn == "configurar_recordatorio":
-                    res = set_alert_time(user_id, args['nombre_ubicacion'], args['hora'])
-                elif fn == "consultar_mis_datos":
-                    res = get_my_config_str(user_id)
+                elif fn == "guardar_ubicacion": res = save_location(user_id, args['nombre'], args['lat'], args['lon'])
+                elif fn == "guardar_vehiculo": res = save_vehicle(user_id, args['terminacion_placa'], args['holograma'])
+                elif fn == "guardar_perfil_salud": res = save_health_profile(user_id, args['tipo_padecimiento'], args['es_vulnerable'])
+                elif fn == "guardar_transporte": res = save_commute_data(user_id, args['tipo_transporte'], args['horas_diarias'])
+                elif fn == "guardar_riesgo_inundacion": res = save_flood_risk(user_id, args['nombre_ubicacion'], args['nivel_riesgo'], args['descripcion'])
+                elif fn == "renombrar_ubicacion": res = rename_location(user_id, args['nombre_actual'], args['nombre_nuevo'])
+                elif fn == "borrar_ubicacion": res = delete_location(user_id, args['nombre'])
+                elif fn == "configurar_alerta_ias": res = set_alert_ias(user_id, args['nombre_ubicacion'], args['umbral_ias'])
+                elif fn == "configurar_recordatorio": res = set_alert_time(user_id, args['nombre_ubicacion'], args['hora'])
+                elif fn == "consultar_mis_datos": res = get_my_config_str(user_id)
                 
                 gpt_messages.append({"role": "tool", "tool_call_id": tool_call.id, "name": fn, "content": str(res)})
 
