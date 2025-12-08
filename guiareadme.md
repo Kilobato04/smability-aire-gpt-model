@@ -20,16 +20,11 @@ cd smability-aire-gpt-model
 ```
 
 ## 3. Borrar todos los zips y scripts viejos
+```bash
 rm -f *.zip *.sh
-
-# Borrar carpetas de caché
 rm -rf __pycache__ app/__pycache__
-
-# Borrar datos de entrenamiento temporales (si quedaron)
 rm -rf training/raw_data
-
-echo "🧹 ¡Limpieza completada! Tienes espacio libre."
-
+```
 ## 4. Activación del Entorno (Solo para Pruebas Locales)
 
 Si necesitas ejecutar scripts de Python directamente en la consola (no para Docker build), recuerda activar el entorno virtual:
