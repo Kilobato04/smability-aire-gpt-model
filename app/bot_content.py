@@ -1,13 +1,3 @@
-#!/bin/bash
-
-echo "🔧 Aplicando Update V28 (Onboarding Rico + Fix Transporte/Alertas)..."
-
-# ====================================================
-# PASO 1: Actualizar Contenidos (Textos y Reglas)
-# ====================================================
-echo "📝 Actualizando app/bot_content.py..."
-cat <<EOF > app/bot_content.py
-# --- CONFIGURACIÓN V28 ---
 BOT_VERSION = "v0.2.8 (Full Fix)"
 
 INFO_VEHICULAR = {
@@ -159,4 +149,3 @@ def get_system_prompt(memoria_str, info_estatica, system_instruction_extra):
     ℹ️ *Datos al min 20.*
     🤖 *{BOT_VERSION}*
     """
-EOF
