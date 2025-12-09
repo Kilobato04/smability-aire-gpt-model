@@ -1,4 +1,5 @@
-BOT_VERSION = "v0.2.8 (Full Fix)"
+# --- CONFIGURACIÓN V0.2.11 ---
+BOT_VERSION = "v0.2.11 (Fix Logic)"
 
 INFO_VEHICULAR = {
     "costo_verificacion": "677.00 MXN",
@@ -48,16 +49,23 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "guardar_transporte",
-            "description": "Guarda tiempo transporte.",
-            "parameters": {"type": "object", "properties": {"tipo_transporte": {"type": "string"}, "horas_diarias": {"type": "number"}}, "required": ["tipo_transporte", "horas_diarias"]}
+            "description": "Guarda tiempo de traslado total.",
+            "parameters": {
+                "type": "object", 
+                "properties": {
+                    "tipo_transporte": {"type": "string", "description": "Si no especifica, pon 'Transporte Público'"}, 
+                    "horas_diarias": {"type": "number", "description": "Total horas ida y vuelta (ej. 2.5)"}
+                }, 
+                "required": ["tipo_transporte", "horas_diarias"]
+            }
         }
     },
     {
         "type": "function",
         "function": {
             "name": "guardar_riesgo_inundacion",
-            "description": "Guarda riesgo inundación.",
-            "parameters": {"type": "object", "properties": {"nombre_ubicacion": {"type": "string"}, "nivel_riesgo": {"type": "integer"}, "descripcion": {"type": "string"}}, "required": ["nombre_ubicacion", "nivel_riesgo", "descripcion"]}
+            "description": "Guarda riesgo inundación (CM).",
+            "parameters": {"type": "object", "properties": {"nombre_ubicacion": {"type": "string"}, "cm_aprox": {"type": "integer"}, "descripcion": {"type": "string"}}, "required": ["nombre_ubicacion", "cm_aprox", "descripcion"]}
         }
     },
     {
@@ -79,8 +87,16 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
+            "name": "borrar_perfil_completo",
+            "description": "Resetea todo el perfil.",
+            "parameters": {"type": "object", "properties": {"confirmacion": {"type": "string"}}, "required": ["confirmacion"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "configurar_alerta_ias",
-            "description": "Configura alerta por nivel de contaminación (Umbral).",
+            "description": "Configura alerta por umbral de contaminación.",
             "parameters": {"type": "object", "properties": {"nombre_ubicacion": {"type": "string"}, "umbral_ias": {"type": "integer"}}, "required": ["nombre_ubicacion", "umbral_ias"]}
         }
     },
@@ -96,13 +112,13 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "consultar_mis_datos",
-            "description": "Consulta perfil.",
+            "description": "Consulta perfil completo.",
             "parameters": {"type": "object", "properties": {}}
         }
     }
 ]
 
-# 3. TEXTOS DE ONBOARDING RICO (10 PUNTOS RESTAURADOS)
+# 3. ONBOARDING RICO (10 PUNTOS)
 def get_welcome_message(first_name):
     return (
         f"👋 **¡Hola {first_name}! Soy AIreGPT.**\\n\\n"
@@ -120,7 +136,7 @@ def get_welcome_message(first_name):
         "🚀 **¡Empecemos! Envíame tu ubicación actual (📎 Clip) para guardarla como Casa.**"
     )
 
-# 4. SYSTEM PROMPT (Con reglas de Transporte y Alertas)
+# 4. SYSTEM PROMPT (Con reglas Fuertes de Transporte y Alertas)
 def get_system_prompt(memoria_str, info_estatica, system_instruction_extra):
     return f"""
     Eres AIreGPT (NOM-172). Asistente experto.
@@ -132,12 +148,12 @@ def get_system_prompt(memoria_str, info_estatica, system_instruction_extra):
     {system_instruction_extra}
 
     REGLAS DE INTERPRETACIÓN:
-    1. **TRANSPORTE:** Si el usuario dice "Hago 2 horas de camino" y no especifica cómo, ASUME "Transporte Público" y usa `guardar_transporte`.
-    2. **ALERTAS (UMBRAL):** Si dice "Avísame si sube de 100", usa `configurar_alerta_ias`.
-    3. **RECORDATORIOS (HORA):** Si dice "Dime el aire a las 7am", usa `configurar_recordatorio`.
-    4. **SALUD:** Une múltiples condiciones en un solo texto.
-    5. **VERDAD:** Números EXACTOS.
-    6. **COLORES:** 🟢(0-50), 🟡(51-75), 🟠(76-100), 🔴(101-150), 🟣(>150).
+    1. **TRANSPORTE:** Si el usuario dice "Hago 2 horas de camino" y no especifica cómo, ASUME `tipo_transporte="Transporte Público"` automáticamente y llama a `guardar_transporte`.
+    2. **ALERTAS:** - Si dice "Avísame cuando el aire esté mal" o "Arriba de 100", USA `configurar_alerta_ias`.
+       - Si dice "Recuérdame a las 7am", USA `configurar_recordatorio`.
+    3. **INUNDACIÓN:** Guarda en CM (Ej. 10, 30).
+    4. **SALUD:** Une múltiples condiciones en un texto.
+    5. **COLORES:** 🟢(0-50), 🟡(51-75), 🟠(76-100), 🔴(101-150), 🟣(>150).
 
     REPORTE:
     [Frase humana]
