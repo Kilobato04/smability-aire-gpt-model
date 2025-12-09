@@ -19,7 +19,7 @@ HORA_FIN = 23
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+client = OpenAI(api_key=OPENAI_API_KEY, timeout=20.0)
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
 
@@ -55,14 +55,9 @@ def log_debug_data(user_id, first_name, user_profile):
         debug_data = {
             "USER_ID": user_id,
             "USER_NAME": first_name,
-            "1_LOCATIONS": user_profile.get('locations', {}),
-            "2_VEHICLE": user_profile.get('vehicle', {}),
-            "3_HEALTH": user_profile.get('health_profile', {}),
-            "4_COMMUTE": user_profile.get('commute', {}),
-            "5_FLOOD": user_profile.get('flood_risk', {}),
-            "6_ALERTS": user_profile.get('alerts', {})
+            "DATA": user_profile
         }
-        print(f"📝 [USER_FULL_DATA]: {json.dumps(debug_data, cls=DecimalEncoder)}")
+        print(f"📝 [FULL_DEBUG]: {json.dumps(debug_data, cls=DecimalEncoder)}")
     except: pass
 
 def save_user_interaction(user_id, first_name):
@@ -99,17 +94,21 @@ def save_health_profile(user_id, tipo, vulnerable):
 
 def save_commute_data(user_id, tipo, horas):
     try:
-        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set commute = :c", ExpressionAttributeValues={':c': {'transport_type': tipo, 'daily_hours': float(horas)}})
-        return f"🚌 Transporte guardado: **{horas}h/día** en {tipo}."
+        # Default a Público si viene vacío o ambiguo, y asegurar float
+        h_val = float(horas)
+        t_tipo = tipo if tipo and tipo.lower() != "string" else "Transporte Público"
+        
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set commute = :c", ExpressionAttributeValues={':c': {'transport_type': t_tipo, 'daily_hours': Decimal(str(h_val))}})
+        return f"🚌 Transporte guardado: **{h_val}h/día** en {t_tipo}."
     except Exception as e: return f"❌ Error transporte: {str(e)}"
 
-def save_flood_risk(user_id, nombre_ubicacion, nivel, cm_aprox=0):
+def save_flood_risk(user_id, nombre_ubicacion, cm_aprox, descripcion):
     try:
         user = get_user_profile(user_id)
         real_key = find_real_key(user, nombre_ubicacion)
         if not real_key: return f"⚠️ No encuentro '{nombre_ubicacion}'."
-        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set flood_risk.#loc = :val", ExpressionAttributeNames={'#loc': real_key}, ExpressionAttributeValues={':val': {'level': int(nivel), 'description': f"Nivel {nivel}", 'active': True}})
-        return f"🌧️ Inundación registrada en **{nombre_ubicacion}**."
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set flood_risk.#loc = :val", ExpressionAttributeNames={'#loc': real_key}, ExpressionAttributeValues={':val': {'cm': int(cm_aprox), 'description': descripcion, 'active': True}})
+        return f"🌧️ Encharcamiento de **{cm_aprox} cm** registrado en **{nombre_ubicacion}**."
     except Exception as e: return f"❌ Error inundación: {str(e)}"
 
 def rename_location(user_id, old_name, new_name):
@@ -133,25 +132,31 @@ def delete_location(user_id, raw_name):
         return f"🗑️ Eliminado: **{raw_name}**."
     except: return "Error borrando."
 
-def set_alert_ias(user_id, raw_name, umbral):
+def delete_full_profile(user_id):
+    try:
+        table.delete_item(Key={'user_id': str(user_id)})
+        return "☢️ **PERFIL BORRADO**. Envíame tu ubicación para empezar de cero."
+    except: return "Error reset."
+
+def set_alert_ias(user_id, nombre_ubicacion, umbral_ias):
     try:
         user = get_user_profile(user_id)
-        real_key = find_real_key(user, raw_name)
-        if not real_key: return f"⚠️ No encuentro '{raw_name}'."
-        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set alerts.threshold.#loc = :val", ExpressionAttributeNames={'#loc': real_key}, ExpressionAttributeValues={':val': {'umbral': int(umbral), 'active': True}})
-        return f"🔔 Alerta activa: **{raw_name}** > {umbral} IAS."
-    except: return "Error alerta."
+        real_key = find_real_key(user, nombre_ubicacion)
+        if not real_key: return f"⚠️ No encuentro '{nombre_ubicacion}'."
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set alerts.threshold.#loc = :val", ExpressionAttributeNames={'#loc': real_key}, ExpressionAttributeValues={':val': {'umbral': int(umbral_ias), 'active': True}})
+        return f"🔔 Alerta activa: **{nombre_ubicacion}** > {umbral_ias} IAS."
+    except Exception as e: return f"Error alerta: {str(e)}"
 
-def set_alert_time(user_id, raw_name, hora):
+def set_alert_time(user_id, nombre_ubicacion, hora):
     try:
         h = int(hora.split(':')[0])
         if h < HORA_INICIO or h >= HORA_FIN: return "⚠️ Horario no válido."
         user = get_user_profile(user_id)
-        real_key = find_real_key(user, raw_name)
-        if not real_key: return f"⚠️ No encuentro '{raw_name}'."
+        real_key = find_real_key(user, nombre_ubicacion)
+        if not real_key: return f"⚠️ No encuentro '{nombre_ubicacion}'."
         table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set alerts.schedule.#loc = :val", ExpressionAttributeNames={'#loc': real_key}, ExpressionAttributeValues={':val': {'time': hora, 'active': True}})
-        return f"⏰ Recordatorio: **{raw_name}** a las {hora}."
-    except: return "Error recordatorio."
+        return f"⏰ Recordatorio: **{nombre_ubicacion}** a las {hora}."
+    except Exception as e: return f"Error recordatorio: {str(e)}"
 
 def get_my_config_str(user_id):
     try:
@@ -162,7 +167,7 @@ def get_my_config_str(user_id):
             msg += "\\n📍 **Ubicaciones:**\\n"
             for k,v in locs.items(): msg += f"- {v.get('display_name', k)}\\n"
         veh = data.get('vehicle', {})
-        if veh: msg += f"\\n🚗 **Auto:** ...{veh.get('plate_last_digit')}\\n"
+        if veh: msg += f"\\n🚗 **Auto:** ...{veh.get('plate_last_digit')} (Holo {veh.get('hologram')})\\n"
         salud = data.get('health_profile', {})
         if salud: msg += f"\\n🩺 **Salud:** {salud.get('condition')}\\n"
         commute = data.get('commute', {})
@@ -170,16 +175,15 @@ def get_my_config_str(user_id):
         flood = data.get('flood_risk', {})
         if flood:
             msg += "\\n🌧️ **Inundación:**\\n"
-            for k,v in flood.items(): msg += f"- {k}: {v.get('description')}\\n"
+            for k,v in flood.items(): msg += f"- {k}: {v.get('cm')} cm\\n"
         
-        # MOSTRAR ALERTAS EN EL REPORTE
         alerts = data.get('alerts', {})
         thr = alerts.get('threshold', {})
         sch = alerts.get('schedule', {})
         if thr or sch:
             msg += "\\n🔔 **Alertas:**\\n"
-            for k,v in thr.items(): msg += f"- IAS > {v['umbral']} en {k}\\n"
-            for k,v in sch.items(): msg += f"- {v['time']} en {k}\\n"
+            for k,v in thr.items(): msg += f"- IAS > {v.get('umbral')} en {k}\\n"
+            for k,v in sch.items(): msg += f"- {v.get('time')} en {k}\\n"
             
         return msg
     except Exception as e: return f"Error perfil: {str(e)}"
@@ -213,8 +217,8 @@ def lambda_handler(event, context):
         if locations_map:
             memoria_str = "📍 LUGARES:\\n"
             for k, v in locations_map.items(): 
-                riesgo = flood_data.get(k, {}).get('description', '')
-                memoria_str += f"- {v.get('display_name', k)}: {v['lat']}, {v['lon']} {f'(Lluvia: {riesgo})' if riesgo else ''}\\n"
+                riesgo = flood_data.get(k, {}).get('cm', 0)
+                memoria_str += f"- {v.get('display_name', k)}: {v['lat']}, {v['lon']} {f'(Agua: {riesgo}cm)' if riesgo else ''}\\n"
         
         info_estatica = f"CDMX: Multa Verif: {bot_content.INFO_VEHICULAR['multa_extemporanea']}"
 
@@ -247,9 +251,13 @@ def lambda_handler(event, context):
             {"role": "user", "content": user_content}
         ]
 
-        response = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_messages, tools=bot_content.TOOLS_SCHEMA, tool_choice="auto")
-        ai_msg = response.choices[0].message
-        final_text = ai_msg.content
+        try:
+            response = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_messages, tools=bot_content.TOOLS_SCHEMA, tool_choice="auto")
+            ai_msg = response.choices[0].message
+            final_text = ai_msg.content
+        except Exception as api_err:
+            logger.error(f"OpenAI Error: {api_err}")
+            return {'statusCode': 200, 'body': 'Timeout Handled'}
 
         if ai_msg.tool_calls:
             gpt_messages.append(ai_msg)
@@ -265,9 +273,10 @@ def lambda_handler(event, context):
                 elif fn == "guardar_vehiculo": res = save_vehicle(user_id, args['terminacion_placa'], args['holograma'])
                 elif fn == "guardar_perfil_salud": res = save_health_profile(user_id, args['tipo_padecimiento'], args['es_vulnerable'])
                 elif fn == "guardar_transporte": res = save_commute_data(user_id, args['tipo_transporte'], args['horas_diarias'])
-                elif fn == "guardar_riesgo_inundacion": res = save_flood_risk(user_id, args['nombre_ubicacion'], args['nivel_riesgo'], args['descripcion'])
+                elif fn == "guardar_riesgo_inundacion": res = save_flood_risk(user_id, args['nombre_ubicacion'], args['cm_aprox'], args['descripcion'])
                 elif fn == "renombrar_ubicacion": res = rename_location(user_id, args['nombre_actual'], args['nombre_nuevo'])
                 elif fn == "borrar_ubicacion": res = delete_location(user_id, args['nombre'])
+                elif fn == "borrar_perfil_completo": res = delete_full_profile(user_id)
                 elif fn == "configurar_alerta_ias": res = set_alert_ias(user_id, args['nombre_ubicacion'], args['umbral_ias'])
                 elif fn == "configurar_recordatorio": res = set_alert_time(user_id, args['nombre_ubicacion'], args['hora'])
                 elif fn == "consultar_mis_datos": res = get_my_config_str(user_id)
