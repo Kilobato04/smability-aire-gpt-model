@@ -37,7 +37,8 @@ cd smability-aire-gpt-model && source env_temp/bin/activate
 deactivate
 ```
 ```bash
-# Para guardar versions:
+# Para guardar versions/revisar carpetas:
 nano deploy_fix_v28.sh
 bash deploy_fix_v28.sh
+ls -lh training/raw_data/
 ```
