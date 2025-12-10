@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smability Live Dashboard</title>
+    <title>Smability Dashboard - CDMX</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
@@ -12,7 +12,6 @@
         body { margin: 0; padding: 0; background: #0f172a; font-family: 'Inter', sans-serif; color: #e2e8f0; overflow: hidden; }
         #map { height: 100vh; width: 100%; background: #0f172a; }
         
-        /* SIDEBAR */
         .sidebar {
             position: absolute; top: 20px; left: 20px; z-index: 1000;
             background: rgba(15, 23, 42, 0.90); width: 300px;
@@ -25,17 +24,14 @@
         h1 { margin: 0; font-size: 18px; font-weight: 600; color: #38bdf8; letter-spacing: -0.5px; }
         .subtitle { font-size: 11px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
         
-        /* STATUS BAR */
         .status-bar {
             padding: 10px 20px; font-size: 11px; color: #fff;
             border-bottom: 1px solid rgba(255,255,255,0.1);
             display: flex; justify-content: space-between; align-items: center;
         }
         .live-dot { height: 8px; width: 8px; background-color: #22c55e; border-radius: 50%; display: inline-block; margin-right: 5px; box-shadow: 0 0 5px #22c55e; animation: pulse 2s infinite; }
-        
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-        /* CONTROLES */
         .controls { padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .btn-var {
             background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1;
@@ -46,19 +42,16 @@
         .btn-var.active { background: rgba(56, 189, 248, 0.2); border-color: #38bdf8; color: #fff; font-weight: 600; }
         .btn-air { border-color: rgba(56, 189, 248, 0.4); }
 
-        /* LEYENDA */
         .legend-panel { padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); }
         .legend-title { font-size: 12px; color: #e2e8f0; margin-bottom: 10px; display: flex; justify-content: space-between; }
         .legend-bar { height: 12px; border-radius: 6px; position: relative; margin-bottom: 8px; }
         .legend-labels { display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; font-family: 'Roboto Mono'; }
 
-        /* ESTADÍSTICAS */
         .stats-row { display: flex; justify-content: space-between; margin-top: 15px; }
         .stat-item { text-align: center; }
         .stat-val { display: block; font-size: 16px; font-weight: 600; color: #fff; font-family: 'Roboto Mono'; }
         .stat-lbl { font-size: 9px; color: #64748b; text-transform: uppercase; }
 
-        /* POPUPS */
         .leaflet-popup-content-wrapper { background: #ffffff !important; color: #1e293b !important; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: none; }
         .leaflet-popup-tip { background: #ffffff !important; }
         .leaflet-popup-content { margin: 10px 12px; line-height: 1.5; }
@@ -117,66 +110,47 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // CONFIGURACIÓN API
         const API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/?mode=map";
 
-        const map = L.map('map', { zoomControl: false }).setView([19.4326, -99.1332], 10);
+        // CONFIGURACIÓN DEL MAPA: preferCanvas: true es la CLAVE para evitar el lag
+        const map = L.map('map', { 
+            zoomControl: false,
+            preferCanvas: true 
+        }).setView([19.4326, -99.1332], 10);
+        
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             attribution: 'Smability AI', maxZoom: 19
         }).addTo(map);
 
-        // --- CONFIGURACIÓN DE ESCALAS AJUSTADAS ---
         const CONFIG = {
             ias: { name: 'Índice Aire y Salud', unit: 'Pts', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             o3: { name: 'Ozono (O3)', unit: 'ppb', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 250], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             pm10: { name: 'Partículas PM10', unit: 'µg/m³', min: 0, max: 215, stops: [0, 45, 75, 130, 215, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             pm25: { name: 'Partículas PM2.5', unit: 'µg/m³', min: 0, max: 150, stops: [0, 25, 45, 80, 147, 200], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
-            
             tmp: { name: 'Temperatura', unit: '°C', min: 0, max: 35, stops: [0, 10, 20, 30, 35], colors: ['#0000ff', '#00ffff', '#ffff00', '#ff0000', '#800000'] },
             rh: { name: 'Humedad', unit: '%', min: 0, max: 100, stops: [0, 25, 50, 75, 100], colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b'] },
             wsp: { name: 'Viento', unit: 'm/s', min: 0, max: 15, stops: [0, 3, 6, 9, 15], colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c'] },
-            
-            // --- ALTITUD (Ajuste Fino Valle de México) ---
-            // Se resaltan las variaciones en el piso del valle (2230-2280)
-            alt: { 
-                name: 'Altitud', unit: 'm', 
-                min: 2230, max: 4000, 
-                stops: [2230, 2260, 2400, 2900, 3500, 4000], 
-                colors: ['#0d47a1', '#1b5e20', '#8bc34a', '#fbc02d', '#795548', '#eeeeee'] 
-                // Azul profundo (Lagos) -> Verde (Valle) -> Claro (Lomas) -> Amarillo -> Café -> Nieve
-            },
-
-            // --- EDIFICIOS (Rango Extendido) ---
-            building_vol: { 
-                name: 'Volumen Construido', unit: 'm³', 
-                min: 0, max: 1200000, 
-                stops: [0, 10000, 100000, 400000, 800000, 1200000], 
-                colors: ['#111111', '#2c2c2c', '#666666', '#ef4444', '#f59e0b', '#ffffff'] 
-                // Negro (Nada) -> Gris -> Rojo (Denso) -> Amarillo -> Blanco (Rascacielos)
-            }
+            alt: { name: 'Altitud', unit: 'm', min: 2230, max: 4000, stops: [2230, 2260, 2400, 2900, 3500, 4000], colors: ['#0d47a1', '#1b5e20', '#8bc34a', '#fbc02d', '#795548', '#eeeeee'] },
+            building_vol: { name: 'Volumen Construido', unit: 'm³', min: 0, max: 1200000, stops: [0, 10000, 100000, 400000, 800000, 1200000], colors: ['#111111', '#2c2c2c', '#666666', '#ef4444', '#f59e0b', '#ffffff'] }
         };
 
         let globalData = null;
         let currentMetric = 'o3';
         let geoLayer = null;
 
-        // INICIAR CARGA AUTOMÁTICA
         fetch(API_URL)
             .then(response => response.json())
             .then(data => {
                 globalData = data;
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('main-content').style.display = 'block';
-                
-                // Extraer hora del primer registro
                 if(data.length > 0 && data[0].timestamp) {
                     const dateObj = new Date(data[0].timestamp);
                     const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                     document.getElementById('update-time').innerText = "Act: " + timeStr;
                 }
-
                 renderMap();
             })
             .catch(err => {
@@ -185,11 +159,8 @@
 
         function getColor(val, metric) {
             const conf = CONFIG[metric];
-            // Clamp value
             let v = Math.max(conf.min, Math.min(val, conf.max));
             const stops = conf.stops;
-            
-            // Interpolación manual entre stops
             for (let i = 0; i < stops.length - 1; i++) {
                 if (v >= stops[i] && v <= stops[i+1]) {
                     const t = (v - stops[i]) / (stops[i+1] - stops[i]);
@@ -215,54 +186,48 @@
             const RECT_SIZE = 0.01 / 2;
 
             const rectangles = [];
-            let sum = 0, min = Infinity, max = -Infinity, validCount = 0;
-
+            
+            // Optimization: Usamos un array simple para agregar capas al Canvas
             globalData.forEach(p => {
                 let val = p[currentMetric];
-                
-                // Mapeos especiales
                 if (currentMetric === 'alt') val = p.altitude;
                 if (currentMetric === 'building_vol') val = p.building_vol;
                 
                 if (val === undefined || val === null) return;
 
-                sum += val;
-                if (val < min) min = val;
-                if (val > max) max = val;
-                validCount++;
-
                 const color = getColor(val, currentMetric);
                 const bounds = [[p.lat - RECT_SIZE, p.lon - RECT_SIZE], [p.lat + RECT_SIZE, p.lon + RECT_SIZE]];
                 
                 const isStation = p.station ? true : false;
-                const strokeColor = isStation ? '#ffffff' : color; 
+                const strokeColor = isStation ? '#ffffff' : color;
+                
+                // Con Canvas, quitamos bordes a las celdas normales para rendimiento
+                // Solo las estaciones llevan borde grueso
                 const weight = isStation ? 2 : 0;
                 
                 const rect = L.rectangle(bounds, {
-                    color: strokeColor, weight: weight, fillOpacity: 0.75, fillColor: color
+                    color: strokeColor, weight: weight, fillOpacity: 0.75, fillColor: color,
+                    interactive: true // Necesario para el popup
                 });
 
                 const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
                 const loc_text = (p.mun && p.mun !== 'N/A') ? `📍 ${p.mun}, ${p.edo}` : `📍 Coordenadas: ${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`;
 
+                let headerHTML = `<div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">🕒 ${p.timestamp || 'Live'}</div>`;
+                if (isStation) {
+                    headerHTML += `<div style="background:#38bdf8; color:#0f172a; padding:4px 8px; border-radius:4px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:12px;">📡 Estación: ${p.station}</div>`;
+                }
+
                 rect.bindPopup(`
                     <div style="font-family:'Inter'; color:#334155; min-width: 175px;">
-                        <div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">🕒 ${p.timestamp || 'Live'}</div>
-                        
-                        <div style="margin-bottom:8px; font-size:11px; font-weight:600; color:#3b82f6; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">
-                            ${loc_text}
-                        </div>
-                        
-                        ${isStation ? `<div style="background:#38bdf8; color:#0f172a; padding:2px; border-radius:3px; margin-bottom:5px; text-align:center; font-weight:bold; font-size:10px;">📡 Estación: ${p.station}</div>` : ''}
-
+                        ${headerHTML}
+                        <div style="margin-bottom:8px; font-size:11px; font-weight:600; color:#3b82f6; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">${loc_text}</div>
                         <div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;">
                             <span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${(p.ias||0).toFixed(0)} pts</span>
                             <span style="font-weight:600; color:#000;">☢️ Riesgo:</span> <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
-                            
                             <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> <span>${p.o3.toFixed(1)} ppb</span>
                             <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm10||0).toFixed(1)} µg</span>
                             <span style="font-weight:600; color:#000; white-space:nowrap;">🟣 PM2.5${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm25||0).toFixed(1)} µg</span>
-                            
                             <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;">
                             <span style="color:#475569;">🏙️ Vol:</span> <span>${(p.building_vol/1000).toFixed(0)}k m³</span>
                             <span style="color:#475569;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span>
@@ -272,32 +237,34 @@
                 `);
                 
                 rect.on('mouseover', function(){ this.setStyle({ fillOpacity: 0.9, weight: isStation?3:1, color: '#fff' })});
-                rect.on('mouseout', function(){ this.setStyle({ fillOpacity: 0.65, weight: weight, color: strokeColor })});
+                rect.on('mouseout', function(){ this.setStyle({ fillOpacity: 0.75, weight: weight, color: strokeColor })});
 
                 rectangles.push(rect);
             });
 
             geoLayer = L.layerGroup(rectangles).addTo(map);
-            updateLegend(conf, min, max, sum/validCount);
+            
+            // Stats
+            const vals = globalData.map(p => {
+                let v = p[currentMetric];
+                if (currentMetric === 'alt') v = p.altitude;
+                if (currentMetric === 'building_vol') v = p.building_vol;
+                return v || 0;
+            });
+            updateLegend(conf, Math.min(...vals), Math.max(...vals), vals.reduce((a,b)=>a+b,0)/vals.length);
         }
 
         function updateLegend(conf, min, max, avg) {
             document.getElementById('legend-name').innerText = conf.name;
             document.getElementById('legend-unit').innerText = conf.unit;
-            
-            const stops = conf.stops;
-            const colors = conf.colors;
-            
             let gradStr = 'linear-gradient(to right';
-            for(let i=0; i<stops.length; i++) {
-                // Posición porcentual relativa al rango total
-                let pct = ((stops[i] - conf.min) / (conf.max - conf.min)) * 100;
-                gradStr += `, ${colors[i]} ${pct}%`;
+            for(let i=0; i<conf.stops.length; i++) {
+                let pct = ((conf.stops[i] - conf.min) / (conf.max - conf.min)) * 100;
+                gradStr += `, ${conf.colors[i]} ${pct}%`;
             }
             gradStr += ')';
-            
             document.getElementById('color-bar').style.background = gradStr;
-            document.getElementById('legend-ticks').innerHTML = stops.map(s => `<span>${s}</span>`).join('');
+            document.getElementById('legend-ticks').innerHTML = conf.stops.map(s => `<span>${s}</span>`).join('');
             document.getElementById('stat-min').innerText = min.toFixed(1);
             document.getElementById('stat-max').innerText = max.toFixed(1);
             document.getElementById('stat-avg').innerText = avg.toFixed(1);
