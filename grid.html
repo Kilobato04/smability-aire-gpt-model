@@ -2,105 +2,147 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smability Dashboard - CDMX</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smability Live Dashboard</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     
     <style>
         body { margin: 0; padding: 0; background: #0f172a; font-family: 'Inter', sans-serif; color: #e2e8f0; overflow: hidden; }
-        #map { height: 100vh; width: 100%; background: #0f172a; }
+        #map { height: 100vh; width: 100%; background: #0f172a; z-index: 1; }
         
+        /* --- SIDEBAR RESPONSIVE --- */
         .sidebar {
-            position: absolute; top: 20px; left: 20px; z-index: 1000;
-            background: rgba(15, 23, 42, 0.90); width: 300px;
+            position: absolute; top: 10px; left: 10px; z-index: 2000;
+            background: rgba(15, 23, 42, 0.95); width: 300px;
             border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.2);
             box-shadow: 0 10px 30px rgba(0,0,0,0.6); backdrop-filter: blur(10px);
-            display: flex; flex-direction: column; overflow: hidden; max-height: calc(100vh - 40px);
+            display: flex; flex-direction: column; overflow: hidden;
+            transition: transform 0.3s ease, height 0.3s ease;
+            max-height: 90vh;
         }
 
-        .header { padding: 20px 20px 10px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: linear-gradient(to right, rgba(56,189,248,0.1), transparent); }
-        h1 { margin: 0; font-size: 18px; font-weight: 600; color: #38bdf8; letter-spacing: -0.5px; }
-        .subtitle { font-size: 11px; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        /* Estado Colapsado */
+        .sidebar.collapsed {
+            height: 60px; overflow: hidden;
+        }
         
-        .status-bar {
-            padding: 10px 20px; font-size: 11px; color: #fff;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+        /* Header con Botón Toggle */
+        .header { 
+            padding: 15px; 
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
+            background: linear-gradient(to right, rgba(56,189,248,0.1), transparent);
             display: flex; justify-content: space-between; align-items: center;
         }
-        .live-dot { height: 8px; width: 8px; background-color: #22c55e; border-radius: 50%; display: inline-block; margin-right: 5px; box-shadow: 0 0 5px #22c55e; animation: pulse 2s infinite; }
+        .title-group h1 { margin: 0; font-size: 16px; font-weight: 600; color: #38bdf8; }
+        .title-group .subtitle { font-size: 10px; color: #94a3b8; margin-top: 2px; text-transform: uppercase; }
+        
+        .toggle-btn {
+            background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;
+            padding: 5px; border-radius: 4px; transition: background 0.2s;
+        }
+        .toggle-btn:hover { background: rgba(255,255,255,0.1); }
+
+        /* STATUS BAR */
+        .status-bar {
+            padding: 8px 15px; font-size: 10px; color: #fff;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(0,0,0,0.2);
+        }
+        .live-dot { height: 6px; width: 6px; background-color: #22c55e; border-radius: 50%; display: inline-block; margin-right: 5px; box-shadow: 0 0 5px #22c55e; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
+        /* CONTENIDO SCROLLABLE */
+        .scroll-content { overflow-y: auto; flex: 1; padding-bottom: 10px; }
+
+        /* CONTROLES */
         .controls { padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .btn-var {
             background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1;
-            padding: 10px; border-radius: 8px; cursor: pointer; font-size: 11px; text-align: center;
-            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 5px;
+            padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; text-align: center;
+            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 4px;
         }
         .btn-var:hover { background: rgba(255,255,255,0.1); }
         .btn-var.active { background: rgba(56, 189, 248, 0.2); border-color: #38bdf8; color: #fff; font-weight: 600; }
         .btn-air { border-color: rgba(56, 189, 248, 0.4); }
 
-        .legend-panel { padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); }
-        .legend-title { font-size: 12px; color: #e2e8f0; margin-bottom: 10px; display: flex; justify-content: space-between; }
-        .legend-bar { height: 12px; border-radius: 6px; position: relative; margin-bottom: 8px; }
-        .legend-labels { display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; font-family: 'Roboto Mono'; }
+        /* LEYENDA */
+        .legend-panel { padding: 0 15px 15px 15px; }
+        .legend-title { font-size: 11px; color: #e2e8f0; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .legend-bar { height: 10px; border-radius: 5px; position: relative; margin-bottom: 6px; }
+        .legend-labels { display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8; font-family: 'Roboto Mono'; }
 
-        .stats-row { display: flex; justify-content: space-between; margin-top: 15px; }
+        .stats-row { display: flex; justify-content: space-between; margin-top: 12px; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; }
         .stat-item { text-align: center; }
-        .stat-val { display: block; font-size: 16px; font-weight: 600; color: #fff; font-family: 'Roboto Mono'; }
-        .stat-lbl { font-size: 9px; color: #64748b; text-transform: uppercase; }
+        .stat-val { display: block; font-size: 14px; font-weight: 600; color: #fff; font-family: 'Roboto Mono'; }
+        .stat-lbl { font-size: 8px; color: #64748b; text-transform: uppercase; }
 
+        /* RESPONSIVE MOBILE */
+        @media (max-width: 600px) {
+            .sidebar { width: calc(100% - 20px); max-height: 60vh; }
+            .sidebar.collapsed { width: 50px; height: 50px; border-radius: 25px; overflow: hidden; }
+            .sidebar.collapsed .header { padding: 0; justify-content: center; height: 100%; }
+            .sidebar.collapsed .title-group { display: none; }
+            .sidebar.collapsed .toggle-btn { font-size: 24px; }
+        }
+
+        /* POPUPS */
         .leaflet-popup-content-wrapper { background: #ffffff !important; color: #1e293b !important; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: none; }
         .leaflet-popup-tip { background: #ffffff !important; }
         .leaflet-popup-content { margin: 10px 12px; line-height: 1.5; }
         
-        #loading { text-align:center; padding:20px; color:#94a3b8; font-style:italic; }
+        #loading { text-align:center; padding:20px; color:#94a3b8; font-style:italic; font-size: 12px; }
 
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="header">
-            <h1>Smability AI</h1>
-            <div class="subtitle">Monitor del Valle de México</div>
+            <div class="title-group">
+                <h1>Smability AI</h1>
+                <div class="subtitle">Monitor V36 Live</div>
+            </div>
+            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
         </div>
         
-        <div class="status-bar">
-            <span><span class="live-dot"></span>LIVE API</span>
-            <span id="update-time">Cargando...</span>
-        </div>
-
-        <div id="loading">Conectando a AWS Lambda...</div>
-
-        <div id="main-content" style="display:none;">
-            <div class="controls">
-                <div class="btn-var btn-air" onclick="setMode('ias', this)">🚦 IAS</div>
-                <div class="btn-var active btn-air" onclick="setMode('o3', this)">🔴 O3</div>
-                <div class="btn-var btn-air" onclick="setMode('pm10', this)">🟤 PM10</div>
-                <div class="btn-var btn-air" onclick="setMode('pm25', this)">🟣 PM2.5</div>
-                
-                <div class="btn-var" onclick="setMode('tmp', this)">🌡️ Temp</div>
-                <div class="btn-var" onclick="setMode('rh', this)">💧 Hum</div>
-                <div class="btn-var" onclick="setMode('wsp', this)">💨 Viento</div>
-                <div class="btn-var" style="grid-column: span 1;" onclick="setMode('alt', this)">⛰️ Alt</div>
-                <div class="btn-var" style="grid-column: span 1;" onclick="setMode('building_vol', this)">🏙️ Urbano</div>
+        <div class="scroll-content">
+            <div class="status-bar">
+                <span><span class="live-dot"></span><span id="connection-status">CONECTANDO...</span></span>
+                <span id="update-time">--:--</span>
             </div>
 
-            <div class="legend-panel">
-                <div class="legend-title">
-                    <span id="legend-name">Ozono (O3)</span>
-                    <span id="legend-unit" style="color: #64748b;">ppb</span>
-                </div>
-                <div class="legend-bar" id="color-bar"></div>
-                <div class="legend-labels" id="legend-ticks"></div>
+            <div id="loading">Conectando a AWS Lambda...</div>
 
-                <div class="stats-row">
-                    <div class="stat-item"><span class="stat-val" id="stat-min">--</span><span class="stat-lbl">Mín</span></div>
-                    <div class="stat-item"><span class="stat-val" id="stat-avg">--</span><span class="stat-lbl">Prom</span></div>
-                    <div class="stat-item"><span class="stat-val" id="stat-max">--</span><span class="stat-lbl">Máx</span></div>
+            <div id="main-content" style="display:none;">
+                <div class="controls">
+                    <div class="btn-var btn-air" onclick="setMode('ias', this)">🚦 IAS</div>
+                    <div class="btn-var active btn-air" onclick="setMode('o3', this)">🔴 O3</div>
+                    <div class="btn-var btn-air" onclick="setMode('pm10', this)">🟤 PM10</div>
+                    <div class="btn-var btn-air" onclick="setMode('pm25', this)">🟣 PM2.5</div>
+                    
+                    <div class="btn-var" onclick="setMode('tmp', this)">🌡️ Temp</div>
+                    <div class="btn-var" onclick="setMode('rh', this)">💧 Hum</div>
+                    <div class="btn-var" onclick="setMode('wsp', this)">💨 Viento</div>
+                    <div class="btn-var" style="grid-column: span 1;" onclick="setMode('alt', this)">⛰️ Alt</div>
+                    <div class="btn-var" style="grid-column: span 1;" onclick="setMode('building_vol', this)">🏙️ Urbano</div>
+                </div>
+
+                <div class="legend-panel">
+                    <div class="legend-title">
+                        <span id="legend-name">Ozono (O3)</span>
+                        <span id="legend-unit" style="color: #64748b;">ppb</span>
+                    </div>
+                    <div class="legend-bar" id="color-bar"></div>
+                    <div class="legend-labels" id="legend-ticks"></div>
+
+                    <div class="stats-row">
+                        <div class="stat-item"><span class="stat-val" id="stat-min">--</span><span class="stat-lbl">Mín</span></div>
+                        <div class="stat-item"><span class="stat-val" id="stat-avg">--</span><span class="stat-lbl">Prom</span></div>
+                        <div class="stat-item"><span class="stat-val" id="stat-max">--</span><span class="stat-lbl">Máx</span></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -112,12 +154,7 @@
     <script>
         const API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/?mode=map";
 
-        // CONFIGURACIÓN DEL MAPA: preferCanvas: true es la CLAVE para evitar el lag
-        const map = L.map('map', { 
-            zoomControl: false,
-            preferCanvas: true 
-        }).setView([19.4326, -99.1332], 10);
-        
+        const map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([19.4326, -99.1332], 10);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -140,23 +177,57 @@
         let currentMetric = 'o3';
         let geoLayer = null;
 
-        fetch(API_URL)
-            .then(response => response.json())
-            .then(data => {
-                globalData = data;
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('main-content').style.display = 'block';
-                if(data.length > 0 && data[0].timestamp) {
-                    const dateObj = new Date(data[0].timestamp);
-                    const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    document.getElementById('update-time').innerText = "Act: " + timeStr;
-                }
-                renderMap();
-            })
-            .catch(err => {
-                document.getElementById('loading').innerHTML = `<span style="color:red">Error API: ${err.message}</span>`;
-            });
+        // --- SISTEMA DE AUTO-REFRESH (:20 min) ---
+        function loadData() {
+            console.log("🔄 Actualizando datos...");
+            document.getElementById('connection-status').innerText = "ACTUALIZANDO...";
+            document.getElementById('connection-status').style.color = "#fbbf24"; // Amarillo
+            
+            fetch(API_URL)
+                .then(response => response.json())
+                .then(data => {
+                    globalData = data;
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('main-content').style.display = 'block';
+                    document.getElementById('connection-status').innerText = "EN VIVO";
+                    document.getElementById('connection-status').style.color = "#22c55e"; // Verde
 
+                    if(data.length > 0 && data[0].timestamp) {
+                        const dateObj = new Date(data[0].timestamp);
+                        const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        document.getElementById('update-time').innerText = "Corte: " + timeStr;
+                    }
+                    renderMap();
+                })
+                .catch(err => {
+                    document.getElementById('connection-status').innerText = "ERROR";
+                    document.getElementById('connection-status').style.color = "#ef4444";
+                    console.error("Error API:", err);
+                });
+        }
+
+        // Timer Inteligente
+        setInterval(() => {
+            const now = new Date();
+            const minutes = now.getMinutes();
+            // Si es el minuto 20, 21 o 22 (margen de seguridad)
+            if (minutes >= 20 && minutes <= 22) {
+                // Solo si no hemos actualizado en los últimos 5 mins para no spammear
+                // (Lógica simplificada para demo: refresh cada 5 mins si estamos en la ventana)
+                console.log(`⏰ Hora de actualización detectada (${now.toLocaleTimeString()}). Verificando API...`);
+                loadData();
+            }
+        }, 60000 * 5); // Check cada 5 minutos
+
+        // Carga Inicial
+        loadData();
+
+        // UI Logic
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        }
+
+        // --- RENDERIZADO (IGUAL QUE V26) ---
         function getColor(val, metric) {
             const conf = CONFIG[metric];
             let v = Math.max(conf.min, Math.min(val, conf.max));
@@ -172,86 +243,50 @@
             return conf.colors[0];
         }
 
-        function hexToRgb(hex) {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0};
-        }
+        function hexToRgb(hex) { const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0}; }
         function lerp(start, end, t) { return Math.round(start + (end - start) * t); }
 
         function renderMap() {
             if (!globalData) return;
             if (geoLayer) map.removeLayer(geoLayer);
+            const conf = CONFIG[currentMetric]; const RECT_SIZE = 0.01 / 2;
+            const rectangles = []; 
+            let sum = 0, min = Infinity, max = -Infinity, validCount = 0;
+            const vals = [];
 
-            const conf = CONFIG[currentMetric];
-            const RECT_SIZE = 0.01 / 2;
-
-            const rectangles = [];
-            
-            // Optimization: Usamos un array simple para agregar capas al Canvas
             globalData.forEach(p => {
                 let val = p[currentMetric];
                 if (currentMetric === 'alt') val = p.altitude;
                 if (currentMetric === 'building_vol') val = p.building_vol;
                 
                 if (val === undefined || val === null) return;
+                vals.push(val);
 
                 const color = getColor(val, currentMetric);
                 const bounds = [[p.lat - RECT_SIZE, p.lon - RECT_SIZE], [p.lat + RECT_SIZE, p.lon + RECT_SIZE]];
                 
                 const isStation = p.station ? true : false;
-                const strokeColor = isStation ? '#ffffff' : color;
+                const strokeColor = isStation ? '#ffffff' : color; const weight = isStation ? 2 : 0;
                 
-                // Con Canvas, quitamos bordes a las celdas normales para rendimiento
-                // Solo las estaciones llevan borde grueso
-                const weight = isStation ? 2 : 0;
-                
-                const rect = L.rectangle(bounds, {
-                    color: strokeColor, weight: weight, fillOpacity: 0.75, fillColor: color,
-                    interactive: true // Necesario para el popup
-                });
+                const rect = L.rectangle(bounds, { color: strokeColor, weight: weight, fillOpacity: 0.75, fillColor: color });
 
                 const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
                 const loc_text = (p.mun && p.mun !== 'N/A') ? `📍 ${p.mun}, ${p.edo}` : `📍 Coordenadas: ${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`;
-
                 let headerHTML = `<div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">🕒 ${p.timestamp || 'Live'}</div>`;
-                if (isStation) {
-                    headerHTML += `<div style="background:#38bdf8; color:#0f172a; padding:4px 8px; border-radius:4px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:12px;">📡 Estación: ${p.station}</div>`;
-                }
+                if (isStation) { headerHTML += `<div style="background:#38bdf8; color:#0f172a; padding:4px 8px; border-radius:4px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:12px;">📡 Estación: ${p.station}</div>`; }
 
-                rect.bindPopup(`
-                    <div style="font-family:'Inter'; color:#334155; min-width: 175px;">
-                        ${headerHTML}
-                        <div style="margin-bottom:8px; font-size:11px; font-weight:600; color:#3b82f6; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">${loc_text}</div>
-                        <div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;">
-                            <span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${(p.ias||0).toFixed(0)} pts</span>
-                            <span style="font-weight:600; color:#000;">☢️ Riesgo:</span> <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> <span>${p.o3.toFixed(1)} ppb</span>
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm10||0).toFixed(1)} µg</span>
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟣 PM2.5${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm25||0).toFixed(1)} µg</span>
-                            <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;">
-                            <span style="color:#475569;">🏙️ Vol:</span> <span>${(p.building_vol/1000).toFixed(0)}k m³</span>
-                            <span style="color:#475569;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span>
-                            <span style="color:#475569;">⛰️ Alt:</span> <span>${p.altitude?.toFixed(0)} m</span>
-                        </div>
-                    </div>
-                `);
+                rect.bindPopup(`<div style="font-family:'Inter'; color:#334155; min-width: 175px;">${headerHTML}<div style="margin-bottom:8px; font-size:11px; font-weight:600; color:#3b82f6; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">${loc_text}</div><div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;"><span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${(p.ias||0).toFixed(0)} pts</span><span style="font-weight:600; color:#000;">☢️ Riesgo:</span> <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span><span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> <span>${p.o3.toFixed(1)} ppb</span><span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm10||0).toFixed(1)} µg</span><span style="font-weight:600; color:#000; white-space:nowrap;">🟣 PM2.5${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm25||0).toFixed(1)} µg</span><hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;"><span style="color:#475569;">🏙️ Vol:</span> <span>${(p.building_vol/1000).toFixed(0)}k m³</span><span style="color:#475569;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span><span style="color:#475569;">⛰️ Alt:</span> <span>${p.altitude?.toFixed(0)} m</span></div></div>`);
                 
                 rect.on('mouseover', function(){ this.setStyle({ fillOpacity: 0.9, weight: isStation?3:1, color: '#fff' })});
                 rect.on('mouseout', function(){ this.setStyle({ fillOpacity: 0.75, weight: weight, color: strokeColor })});
-
                 rectangles.push(rect);
             });
-
             geoLayer = L.layerGroup(rectangles).addTo(map);
             
-            // Stats
-            const vals = globalData.map(p => {
-                let v = p[currentMetric];
-                if (currentMetric === 'alt') v = p.altitude;
-                if (currentMetric === 'building_vol') v = p.building_vol;
-                return v || 0;
-            });
-            updateLegend(conf, Math.min(...vals), Math.max(...vals), vals.reduce((a,b)=>a+b,0)/vals.length);
+            // Stats Dinámicos
+            if (vals.length > 0) {
+                updateLegend(conf, Math.min(...vals), Math.max(...vals), vals.reduce((a,b)=>a+b,0)/vals.length);
+            }
         }
 
         function updateLegend(conf, min, max, avg) {
