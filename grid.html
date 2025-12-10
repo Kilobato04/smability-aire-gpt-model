@@ -12,7 +12,7 @@
         body { margin: 0; padding: 0; background: #0f172a; font-family: 'Inter', sans-serif; color: #e2e8f0; overflow: hidden; }
         #map { height: 100vh; width: 100%; background: #0f172a; z-index: 1; }
         
-        /* --- SIDEBAR RESPONSIVE --- */
+        /* SIDEBAR */
         .sidebar {
             position: absolute; top: 10px; left: 10px; z-index: 2000;
             background: rgba(15, 23, 42, 0.95); width: 300px;
@@ -23,12 +23,8 @@
             max-height: 90vh;
         }
 
-        /* Estado Colapsado */
-        .sidebar.collapsed {
-            height: 60px; overflow: hidden;
-        }
+        .sidebar.collapsed { height: 60px; overflow: hidden; }
         
-        /* Header con Botón Toggle */
         .header { 
             padding: 15px; 
             border-bottom: 1px solid rgba(255,255,255,0.1); 
@@ -38,13 +34,10 @@
         .title-group h1 { margin: 0; font-size: 16px; font-weight: 600; color: #38bdf8; }
         .title-group .subtitle { font-size: 10px; color: #94a3b8; margin-top: 2px; text-transform: uppercase; }
         
-        .toggle-btn {
-            background: none; border: none; color: #fff; font-size: 20px; cursor: pointer;
-            padding: 5px; border-radius: 4px; transition: background 0.2s;
-        }
-        .toggle-btn:hover { background: rgba(255,255,255,0.1); }
+        .toggle-btn { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; padding: 5px; }
 
-        /* STATUS BAR */
+        .scroll-content { overflow-y: auto; flex: 1; padding-bottom: 10px; }
+
         .status-bar {
             padding: 8px 15px; font-size: 10px; color: #fff;
             border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -54,10 +47,6 @@
         .live-dot { height: 6px; width: 6px; background-color: #22c55e; border-radius: 50%; display: inline-block; margin-right: 5px; box-shadow: 0 0 5px #22c55e; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-        /* CONTENIDO SCROLLABLE */
-        .scroll-content { overflow-y: auto; flex: 1; padding-bottom: 10px; }
-
-        /* CONTROLES */
         .controls { padding: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .btn-var {
             background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1;
@@ -68,7 +57,6 @@
         .btn-var.active { background: rgba(56, 189, 248, 0.2); border-color: #38bdf8; color: #fff; font-weight: 600; }
         .btn-air { border-color: rgba(56, 189, 248, 0.4); }
 
-        /* LEYENDA */
         .legend-panel { padding: 0 15px 15px 15px; }
         .legend-title { font-size: 11px; color: #e2e8f0; margin-bottom: 8px; display: flex; justify-content: space-between; }
         .legend-bar { height: 10px; border-radius: 5px; position: relative; margin-bottom: 6px; }
@@ -79,22 +67,18 @@
         .stat-val { display: block; font-size: 14px; font-weight: 600; color: #fff; font-family: 'Roboto Mono'; }
         .stat-lbl { font-size: 8px; color: #64748b; text-transform: uppercase; }
 
-        /* RESPONSIVE MOBILE */
         @media (max-width: 600px) {
             .sidebar { width: calc(100% - 20px); max-height: 60vh; }
-            .sidebar.collapsed { width: 50px; height: 50px; border-radius: 25px; overflow: hidden; }
+            .sidebar.collapsed { width: 50px; height: 50px; border-radius: 25px; }
             .sidebar.collapsed .header { padding: 0; justify-content: center; height: 100%; }
             .sidebar.collapsed .title-group { display: none; }
-            .sidebar.collapsed .toggle-btn { font-size: 24px; }
         }
 
-        /* POPUPS */
         .leaflet-popup-content-wrapper { background: #ffffff !important; color: #1e293b !important; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: none; }
         .leaflet-popup-tip { background: #ffffff !important; }
         .leaflet-popup-content { margin: 10px 12px; line-height: 1.5; }
         
         #loading { text-align:center; padding:20px; color:#94a3b8; font-style:italic; font-size: 12px; }
-
     </style>
 </head>
 <body>
@@ -166,10 +150,19 @@
             o3: { name: 'Ozono (O3)', unit: 'ppb', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 250], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             pm10: { name: 'Partículas PM10', unit: 'µg/m³', min: 0, max: 215, stops: [0, 45, 75, 130, 215, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             pm25: { name: 'Partículas PM2.5', unit: 'µg/m³', min: 0, max: 150, stops: [0, 25, 45, 80, 147, 200], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
+            
             tmp: { name: 'Temperatura', unit: '°C', min: 0, max: 35, stops: [0, 10, 20, 30, 35], colors: ['#0000ff', '#00ffff', '#ffff00', '#ff0000', '#800000'] },
             rh: { name: 'Humedad', unit: '%', min: 0, max: 100, stops: [0, 25, 50, 75, 100], colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b'] },
             wsp: { name: 'Viento', unit: 'm/s', min: 0, max: 15, stops: [0, 3, 6, 9, 15], colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c'] },
-            alt: { name: 'Altitud', unit: 'm', min: 2230, max: 4000, stops: [2230, 2260, 2400, 2900, 3500, 4000], colors: ['#0d47a1', '#1b5e20', '#8bc34a', '#fbc02d', '#795548', '#eeeeee'] },
+            
+            // --- ALTITUD RESTAURADA (Sensibilidad Valle) ---
+            alt: { 
+                name: 'Altitud', unit: 'm', 
+                min: 2230, max: 4000, 
+                stops: [2230, 2260, 2400, 2900, 3500, 4000], 
+                colors: ['#0d47a1', '#1b5e20', '#8bc34a', '#fbc02d', '#795548', '#eeeeee'] 
+            },
+            
             building_vol: { name: 'Volumen Construido', unit: 'm³', min: 0, max: 1200000, stops: [0, 10000, 100000, 400000, 800000, 1200000], colors: ['#111111', '#2c2c2c', '#666666', '#ef4444', '#f59e0b', '#ffffff'] }
         };
 
@@ -177,12 +170,10 @@
         let currentMetric = 'o3';
         let geoLayer = null;
 
-        // --- SISTEMA DE AUTO-REFRESH (:20 min) ---
+        // Auto-Refresh
         function loadData() {
-            console.log("🔄 Actualizando datos...");
             document.getElementById('connection-status').innerText = "ACTUALIZANDO...";
-            document.getElementById('connection-status').style.color = "#fbbf24"; // Amarillo
-            
+            document.getElementById('connection-status').style.color = "#fbbf24";
             fetch(API_URL)
                 .then(response => response.json())
                 .then(data => {
@@ -190,8 +181,7 @@
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('main-content').style.display = 'block';
                     document.getElementById('connection-status').innerText = "EN VIVO";
-                    document.getElementById('connection-status').style.color = "#22c55e"; // Verde
-
+                    document.getElementById('connection-status').style.color = "#22c55e";
                     if(data.length > 0 && data[0].timestamp) {
                         const dateObj = new Date(data[0].timestamp);
                         const timeStr = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -202,32 +192,17 @@
                 .catch(err => {
                     document.getElementById('connection-status').innerText = "ERROR";
                     document.getElementById('connection-status').style.color = "#ef4444";
-                    console.error("Error API:", err);
                 });
         }
-
-        // Timer Inteligente
+        
         setInterval(() => {
             const now = new Date();
-            const minutes = now.getMinutes();
-            // Si es el minuto 20, 21 o 22 (margen de seguridad)
-            if (minutes >= 20 && minutes <= 22) {
-                // Solo si no hemos actualizado en los últimos 5 mins para no spammear
-                // (Lógica simplificada para demo: refresh cada 5 mins si estamos en la ventana)
-                console.log(`⏰ Hora de actualización detectada (${now.toLocaleTimeString()}). Verificando API...`);
-                loadData();
-            }
-        }, 60000 * 5); // Check cada 5 minutos
-
-        // Carga Inicial
+            if (now.getMinutes() >= 20 && now.getMinutes() <= 22) loadData();
+        }, 60000 * 5);
         loadData();
 
-        // UI Logic
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('collapsed');
-        }
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
 
-        // --- RENDERIZADO (IGUAL QUE V26) ---
         function getColor(val, metric) {
             const conf = CONFIG[metric];
             let v = Math.max(conf.min, Math.min(val, conf.max));
@@ -243,7 +218,10 @@
             return conf.colors[0];
         }
 
-        function hexToRgb(hex) { const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0}; }
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0};
+        }
         function lerp(start, end, t) { return Math.round(start + (end - start) * t); }
 
         function renderMap() {
@@ -264,29 +242,47 @@
 
                 const color = getColor(val, currentMetric);
                 const bounds = [[p.lat - RECT_SIZE, p.lon - RECT_SIZE], [p.lat + RECT_SIZE, p.lon + RECT_SIZE]];
-                
                 const isStation = p.station ? true : false;
-                const strokeColor = isStation ? '#ffffff' : color; const weight = isStation ? 2 : 0;
+                const strokeColor = isStation ? '#ffffff' : color;
+                const weight = isStation ? 2 : 0;
                 
-                const rect = L.rectangle(bounds, { color: strokeColor, weight: weight, fillOpacity: 0.75, fillColor: color });
+                const rect = L.rectangle(bounds, {
+                    color: strokeColor, weight: weight, fillOpacity: 0.75, fillColor: color
+                });
 
                 const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
                 const loc_text = (p.mun && p.mun !== 'N/A') ? `📍 ${p.mun}, ${p.edo}` : `📍 Coordenadas: ${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`;
                 let headerHTML = `<div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">🕒 ${p.timestamp || 'Live'}</div>`;
                 if (isStation) { headerHTML += `<div style="background:#38bdf8; color:#0f172a; padding:4px 8px; border-radius:4px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:12px;">📡 Estación: ${p.station}</div>`; }
 
-                rect.bindPopup(`<div style="font-family:'Inter'; color:#334155; min-width: 175px;">${headerHTML}<div style="margin-bottom:8px; font-size:11px; font-weight:600; color:#3b82f6; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">${loc_text}</div><div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;"><span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${(p.ias||0).toFixed(0)} pts</span><span style="font-weight:600; color:#000;">☢️ Riesgo:</span> <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span><span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> <span>${p.o3.toFixed(1)} ppb</span><span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm10||0).toFixed(1)} µg</span><span style="font-weight:600; color:#000; white-space:nowrap;">🟣 PM2.5${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm25||0).toFixed(1)} µg</span><hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;"><span style="color:#475569;">🏙️ Vol:</span> <span>${(p.building_vol/1000).toFixed(0)}k m³</span><span style="color:#475569;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span><span style="color:#475569;">⛰️ Alt:</span> <span>${p.altitude?.toFixed(0)} m</span></div></div>`);
+                rect.bindPopup(`
+                    <div style="font-family:'Inter'; color:#334155; min-width: 175px;">
+                        ${headerHTML}
+                        <div style="margin-bottom:8px; font-size:11px; font-weight:600; color:#3b82f6; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">${loc_text}</div>
+                        <div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;">
+                            <span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${(p.ias||0).toFixed(0)} pts</span>
+                            <span style="font-weight:600; color:#000;">☢️ Riesgo:</span> <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> <span>${p.o3.toFixed(1)} ppb</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm10||0).toFixed(1)} µg</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟣 PM2.5${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${(p.pm25||0).toFixed(1)} µg</span>
+                            <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;">
+                            <span style="color:#475569;">🏙️ Vol:</span> <span>${(p.building_vol/1000).toFixed(0)}k m³</span>
+                            <span style="color:#475569;">🌡️ Temp:</span> <span>${p.tmp?.toFixed(1)} °C</span>
+                            
+                            <span style="color:#475569;">💧 Hum:</span> <span>${p.rh?.toFixed(0)} %</span>
+                            
+                            <span style="color:#475569;">💨 Viento:</span> <span>${p.wsp?.toFixed(1)} m/s</span>
+                            <span style="color:#475569;">⛰️ Alt:</span> <span>${p.altitude?.toFixed(0)} m</span>
+                        </div>
+                    </div>
+                `);
                 
                 rect.on('mouseover', function(){ this.setStyle({ fillOpacity: 0.9, weight: isStation?3:1, color: '#fff' })});
                 rect.on('mouseout', function(){ this.setStyle({ fillOpacity: 0.75, weight: weight, color: strokeColor })});
                 rectangles.push(rect);
             });
             geoLayer = L.layerGroup(rectangles).addTo(map);
-            
-            // Stats Dinámicos
-            if (vals.length > 0) {
-                updateLegend(conf, Math.min(...vals), Math.max(...vals), vals.reduce((a,b)=>a+b,0)/vals.length);
-            }
+            if (vals.length > 0) updateLegend(conf, Math.min(...vals), Math.max(...vals), vals.reduce((a,b)=>a+b,0)/vals.length);
         }
 
         function updateLegend(conf, min, max, avg) {
