@@ -17,6 +17,8 @@ Para ir directamente al directorio de trabajo en una sola línea (ideal al inici
 
 ```bash
 cd smability-aire-gpt-model
+# Aplicar cambios usando tu script de deploy rápido
+./deploy.sh
 ```
 
 ## 3. Borrar todos los zips y scripts viejos
