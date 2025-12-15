@@ -10,6 +10,7 @@ import cards
 
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 DYNAMODB_TABLE = 'SmabilityUsers'
+# URL MAESTRA PROPORCIONADA
 MASTER_API_URL = "https://y4zwdmw7vf.execute-api.us-east-1.amazonaws.com/prod/api/air-quality/current?type=reference"
 
 dynamodb = boto3.resource('dynamodb')
@@ -39,20 +40,46 @@ def get_maps_url(lat, lon):
 def clean_key(text):
     return "".join(e for e in text if e.isalnum()).lower()
 
+# --- LÓGICA DE CONTINGENCIA V52 (PARSER JSON) ---
 def check_master_api_contingency():
+    print(f"🔍 [SCAN] Consultando API Maestra: {MASTER_API_URL}")
     try:
         response = requests.get(MASTER_API_URL, timeout=5)
         if response.status_code == 200:
             data = response.json()
-            is_active = False
-            phase = "Fase 1"
-            pollutant = "Ozono"
             
-            if isinstance(data, dict):
-                if data.get('contingency') is True: is_active = True
+            # Buscamos el objeto 'contingency'
+            # Estructura esperada: "contingency": { "alert_type": "ozone", "phase": "Fase I", ... }
+            cont_obj = data.get('contingency')
             
-            if is_active: return True, phase, pollutant
-    except: pass
+            # Validación: Si existe y es un diccionario (no null, no false)
+            if cont_obj and isinstance(cont_obj, dict):
+                
+                # 1. Extraer Fase
+                phase = cont_obj.get('phase', 'Fase I')
+                
+                # 2. Extraer y Traducir Contaminante
+                raw_type = cont_obj.get('alert_type', 'ozone').lower()
+                pollutant = "Ozono" if "ozone" in raw_type else "Partículas"
+                
+                # 3. Extraer Valor (Opcional, para enriquecer)
+                try:
+                    val_data = cont_obj.get('value', {})
+                    val_num = val_data.get('value')
+                    val_unit = val_data.get('unit', '')
+                    if val_num:
+                        pollutant += f" ({val_num} {val_unit})"
+                except: pass
+
+                print(f"🚨 [CONTINGENCIA ACTIVA] {phase} por {pollutant}")
+                return True, phase, pollutant
+            
+            else:
+                print("✅ [NORMAL] No hay objeto de contingencia activo.")
+                
+    except Exception as e: 
+        print(f"⚠️ Error API Maestra: {e}")
+        
     return False, "", ""
 
 def process_user(user, current_hour_str, contingency_data):
@@ -68,23 +95,32 @@ def process_user(user, current_hour_str, contingency_data):
         conditions = [v.get('condition', 'Padecimiento') for v in health_map.values() if isinstance(v, dict)]
         if conditions: health_str = ", ".join(conditions)
 
-    # 1. CONTINGENCIA
+    # 1. CONTINGENCIA (Prioridad)
     is_cont, phase, pol = contingency_data
     if is_cont:
         last_sent = user.get('last_contingency_date', '')
         today = get_cdmx_time().strftime("%Y-%m-%d")
         
+        # Solo enviar una vez al día por usuario
         if last_sent != today:
+            print(f"🚨 [PUSH CONTINGENCIA] Enviando a {user_id}")
             card = cards.CARD_CONTINGENCY.format(
                 user_name=first_name,
                 report_time=f"{current_hour_str.split(':')[0]}:20",
                 phase=phase,
                 pollutant=pol,
-                forecast_msg="Mantener precaución",
+                forecast_msg="Revisa recomendaciones oficiales.", # Mensaje fijo para contingencia
                 footer=cards.BOT_FOOTER
             )
             send_telegram_push(user_id, card)
-            table.update_item(Key={'user_id': user_id}, UpdateExpression="SET last_contingency_date = :d", ExpressionAttributeValues={':d': today})
+            
+            # Actualizar flag para no repetir hoy
+            table.update_item(
+                Key={'user_id': user_id}, 
+                UpdateExpression="SET last_contingency_date = :d", 
+                ExpressionAttributeValues={':d': today}
+            )
+            return # Si enviamos contingencia, quizás saltar otras alertas para no saturar
 
     # 2. RECORDATORIOS
     schedule = alerts.get('schedule', {})
@@ -99,8 +135,6 @@ def process_user(user, current_hour_str, contingency_data):
                 if data:
                     qa = data.get('calidad_aire', {})
                     cat = qa.get('category', 'Regular').title()
-                    
-                    # PERSONALIZACIÓN
                     custom_rec = cards.get_health_advice(cat, health_str)
                     info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Regular'])
                     
@@ -116,7 +150,7 @@ def process_user(user, current_hour_str, contingency_data):
                         natural_message=info['msg'],
                         forecast_msg=qa.get('forecast_24h', 'Estable'),
                         pollutant=qa.get('dominant_pollutant', 'N/A'),
-                        health_recommendation=custom_rec, # AQUI
+                        health_recommendation=custom_rec,
                         footer=cards.BOT_FOOTER
                     )
                     send_telegram_push(user_id, card)
@@ -139,8 +173,6 @@ def process_user(user, current_hour_str, contingency_data):
                     if count < 3:
                         qa = data['calidad_aire']
                         cat = qa.get('category', 'Mala').title()
-                        
-                        # PERSONALIZACIÓN
                         custom_rec = cards.get_health_advice(cat, health_str)
                         info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Mala'])
                         
@@ -157,7 +189,7 @@ def process_user(user, current_hour_str, contingency_data):
                             natural_message=info['msg'],
                             threshold=umbral,
                             pollutant=qa.get('dominant_pollutant', 'N/A'),
-                            health_recommendation=custom_rec, # AQUI
+                            health_recommendation=custom_rec,
                             footer=cards.BOT_FOOTER
                         )
                         send_telegram_push(user_id, card)
@@ -167,20 +199,21 @@ def process_user(user, current_hour_str, contingency_data):
                         table.update_item(Key={'user_id': user_id}, UpdateExpression=f"SET alerts.threshold.#{loc_name}.consecutive_sent = :zero", ExpressionAttributeNames={f"#{loc_name}": loc_name}, ExpressionAttributeValues={':zero': 0})
 
 def lambda_handler(event, context):
-    print("⏰ [V51] Scheduler Iniciado")
+    print("⏰ [V52] Scheduler - Iniciando ciclo...")
     now = get_cdmx_time()
     if now.hour < 6 or now.hour > 23: return {'statusCode': 200, 'body': 'Sleep'}
 
-    cont_data = check_master_api_contingency()
+    # Check Maestro de Contingencia
+    contingency_data = check_master_api_contingency() # (bool, phase, pollutant)
     
     try:
         paginator = dynamodb.meta.client.get_paginator('scan')
         count = 0
         for page in paginator.paginate(TableName=DYNAMODB_TABLE):
             for item in page['Items']:
-                process_user(item, now.strftime("%H:%M"), cont_data)
+                process_user(item, now.strftime("%H:%M"), contingency_data)
                 count += 1
-        print(f"✅ Procesados {count} usuarios.")
-    except Exception as e: print(f"Error: {e}")
+        print(f"✅ Ciclo finalizado. Usuarios: {count}")
+    except Exception as e: print(f"Error critico: {e}")
 
     return {'statusCode': 200, 'body': 'OK'}
