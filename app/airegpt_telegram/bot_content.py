@@ -1,12 +1,13 @@
+# app/airegpt_telegram/bot_content.py
+import cards
 BOT_VERSION = cards.BOT_VERSION
-
 TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
             "name": "consultar_calidad_aire",
             "description": "Obtiene TARJETA DE REPORTE oficial.",
-            "parameters": {"type": "object", "properties": {"lat": {"type": "number"}, "lon": {"type": "number"}, "nombre_ubicacion": {"type": "string", "description": "Nombre lugar (ej. Casa)."}}, "required": ["lat", "lon"]}
+            "parameters": {"type": "object", "properties": {"lat": {"type": "number"}, "lon": {"type": "number"}, "nombre_ubicacion": {"type": "string"}}, "required": ["lat", "lon"]}
         }
     },
     {
@@ -37,7 +38,7 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "borrar_perfil_completo",
-            "description": "☢️ BORRADO TOTAL. Confirmar con 'SI'.",
+            "description": "Borrado total.",
             "parameters": {"type": "object", "properties": {"confirmacion": {"type": "string", "enum": ["SI"]}}, "required": ["confirmacion"]}
         }
     },
@@ -45,7 +46,7 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "configurar_alerta_ias",
-            "description": "Configura alerta IAS (Max 1 por ubicación).",
+            "description": "Configura alerta IAS.",
             "parameters": {"type": "object", "properties": {"nombre_ubicacion": {"type": "string"}, "umbral_ias": {"type": "integer"}}, "required": ["nombre_ubicacion", "umbral_ias"]}
         }
     },
@@ -53,7 +54,7 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "borrar_alerta_ias",
-            "description": "Elimina alerta de umbral.",
+            "description": "Elimina alerta.",
             "parameters": {"type": "object", "properties": {"nombre_ubicacion": {"type": "string"}}, "required": ["nombre_ubicacion"]}
         }
     },
@@ -61,8 +62,8 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "configurar_recordatorio",
-            "description": "Configura reporte diario (Max 1 por ubicación).",
-            "parameters": {"type": "object", "properties": {"nombre_ubicacion": {"type": "string"}, "hora": {"type": "string", "description": "Format HH:MM"}}, "required": ["nombre_ubicacion", "hora"]}
+            "description": "Configura reporte diario.",
+            "parameters": {"type": "object", "properties": {"nombre_ubicacion": {"type": "string"}, "hora": {"type": "string"}}, "required": ["nombre_ubicacion", "hora"]}
         }
     },
     {
@@ -77,7 +78,7 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "guardar_perfil_salud",
-            "description": "Agrega padecimiento (Max 2).",
+            "description": "Agrega padecimiento.",
             "parameters": {"type": "object", "properties": {"tipo_padecimiento": {"type": "string"}, "es_vulnerable": {"type": "boolean"}}, "required": ["tipo_padecimiento", "es_vulnerable"]}
         }
     },
