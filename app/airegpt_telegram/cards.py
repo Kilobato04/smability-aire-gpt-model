@@ -91,4 +91,3 @@ CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
 
 _Fuente: CAMe / SIMAT_
 {footer}"""
-EOF
