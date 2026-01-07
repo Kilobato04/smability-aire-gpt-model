@@ -1,4 +1,3 @@
-# app/airegpt_telegram/bot_content.py
 import cards
 BOT_VERSION = cards.BOT_VERSION
 TOOLS_SCHEMA = [
@@ -14,7 +13,7 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "guardar_ubicacion",
-            "description": "Guarda ubicación (Max 3).",
+            "description": "Guarda ubicación.",
             "parameters": {"type": "object", "properties": {"nombre": {"type": "string"}, "lat": {"type": "number"}, "lon": {"type": "number"}}, "required": ["nombre", "lat", "lon"]}
         }
     },
