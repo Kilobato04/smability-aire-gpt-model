@@ -1,4 +1,3 @@
-# app/airegpt_telegram/lambda_scheduler.py
 import json
 import os
 import time
@@ -23,21 +22,31 @@ def send_telegram_push(chat_id, text):
         time.sleep(0.05)
     except: pass
 
-def interpret_timeline(current_ias, timeline):
+def interpret_timeline_short(current_ias, timeline):
+    """Resumen corto para Alertas de Emergencia"""
     if not timeline or not isinstance(timeline, list): return "Estable"
     try:
         max_point = max(timeline, key=lambda x: x.get('ias', 0))
-        min_point = min(timeline, key=lambda x: x.get('ias', 0))
-        diff_up = max_point['ias'] - current_ias
-        diff_down = current_ias - min_point['ias']
-        risk_map = {"Bajo": "BUENA", "Moderado": "REGULAR", "Alto": "MALA", "Muy Alto": "MUY MALA", "Extremadamente Alto": "EXTREMA"}
-        if diff_up > 15:
-            r_text = risk_map.get(max_point.get('riesgo'), "MALA")
-            return f"⚠️ Sube a {r_text} a las {max_point['hora']}"
-        elif diff_down > 15:
-            return f"🟢 Mejora a las {min_point['hora']}"
-        else: return "➡️ Tendencia Estable"
+        diff = max_point['ias'] - current_ias
+        if diff > 10: return f"Sigue alta hasta las {max_point['hora']}"
+        elif diff < -10: return "Mejora pronto"
+        return "Estable"
     except: return "Estable"
+
+def format_forecast_block(timeline):
+    """Bloque visual para Reportes Diarios"""
+    if not timeline or not isinstance(timeline, list): return "➡️ Estable"
+    block = ""
+    cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extrema"}
+    emoji_map = {"Bajo": "🟢", "Moderado": "🟡", "Alto": "🟠", "Muy Alto": "🔴", "Extremadamente Alto": "🟣"}
+    count = 0
+    for t in timeline:
+        if count >= 4: break
+        riesgo_bot = cat_map.get(t.get('riesgo'), "Regular")
+        emoji = emoji_map.get(t.get('riesgo'), "🟢")
+        block += f"`{t.get('hora')}` | {emoji} {t.get('ias')} {riesgo_bot}\n"
+        count += 1
+    return block.strip()
 
 def check_master_api_contingency():
     try:
@@ -79,7 +88,7 @@ def process_user(user, current_hour_str, contingency_data):
             table.update_item(Key={'user_id': user_id}, UpdateExpression="SET last_contingency_date = :d", ExpressionAttributeValues={':d': today})
             return
 
-    # 2. RECORDATORIOS
+    # 2. RECORDATORIOS (Reporte Diario = Bloque Visual Completo)
     for loc_name, config in alerts.get('schedule', {}).items():
         if config.get('time', '').split(':')[0] == current_hour_str.split(':')[0]:
             loc_data = locations.get(loc_name)
@@ -87,8 +96,7 @@ def process_user(user, current_hour_str, contingency_data):
                 data = get_location_air_data(loc_data['lat'], loc_data['lon'])
                 if data:
                     qa = data.get('aire', {})
-                    # LOGICA DE PRONOSTICO INTEGRADA
-                    f_str = interpret_timeline(qa.get('ias',0), data.get('pronostico_timeline', []))
+                    f_block = format_forecast_block(data.get('pronostico_timeline', [])) # <--- BLOQUE VISUAL
                     
                     cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extremadamente Mala"}
                     cat = cat_map.get(qa.get('riesgo'), "Regular")
@@ -98,13 +106,13 @@ def process_user(user, current_hour_str, contingency_data):
                         maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
                         report_time=f"{current_hour_str.split(':')[0]}:20", region="ZMVM",
                         ias_value=qa.get('ias', 0), risk_category=cat, risk_circle=info['emoji'],
-                        natural_message=info['msg'], forecast_msg=f_str,
-                        pollutant="N/A", health_recommendation=cards.get_health_advice(cat, h_str),
+                        natural_message=info['msg'], forecast_block=f_block, # CAMBIO A BLOCK
+                        health_recommendation=cards.get_health_advice(cat, h_str),
                         footer=cards.BOT_FOOTER
                     )
                     send_telegram_push(user_id, card)
 
-    # 3. ALERTAS UMBRAL
+    # 3. ALERTAS UMBRAL (Emergencia = Resumen Corto)
     for loc_name, config in alerts.get('threshold', {}).items():
         if not config.get('active', False): continue
         umbral = max(int(config.get('umbral', 100)), 100)
@@ -117,7 +125,7 @@ def process_user(user, current_hour_str, contingency_data):
                 if cur_ias > umbral:
                     count = int(config.get('consecutive_sent', 0))
                     if count < 3:
-                        f_str = interpret_timeline(cur_ias, data.get('pronostico_timeline', []))
+                        f_short = interpret_timeline_short(cur_ias, data.get('pronostico_timeline', [])) # <--- RESUMEN CORTO
                         cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extremadamente Mala"}
                         cat = cat_map.get(qa.get('riesgo'), "Regular")
                         info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Mala'])
@@ -126,7 +134,7 @@ def process_user(user, current_hour_str, contingency_data):
                             maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
                             report_time=f"{current_hour_str.split(':')[0]}:20", region="ZMVM",
                             risk_category=cat, risk_circle=info['emoji'], ias_value=cur_ias,
-                            forecast_msg=f_str, natural_message=info['msg'],
+                            forecast_msg=f_short, natural_message=info['msg'],
                             threshold=umbral, pollutant="N/A", health_recommendation=cards.get_health_advice(cat, h_str),
                             footer=cards.BOT_FOOTER
                         )
