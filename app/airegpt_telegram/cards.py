@@ -1,7 +1,6 @@
-# app/airegpt_telegram/cards.py
-BOT_VERSION = "v0.5.7 (Timeline)"
+# app/cards.py
+BOT_VERSION = "v0.5.8 (Onboarding + Forecast)"
 BOT_FOOTER = f"🤖 AIreGPT {BOT_VERSION}"
-IAS_SCALE_TEXT = "🟢(0-50) 🟡(51-75) 🟠(76-100) 🔴(101-150) 🟣(>150)"
 
 IAS_INFO = {
     "Buena": {"msg": "Aire limpio.", "rec": "¡Disfruta el exterior!", "emoji": "🟢"},
@@ -21,49 +20,61 @@ def get_health_advice(category, user_condition=None):
     else:
         return f"✅ **Buena noticia:** El aire es seguro para tu **{user_condition}**."
 
-CARD_ONBOARDING = """👋 **¡Hola {user_name}!**
-Soy **AIreGPT**, tu asistente personal de calidad del aire.
-📍 **1. Ubicaciones:** Guardo tus lugares frecuentes.
-☁️ **2. Precisión:** Datos locales exactos.
-🔮 **3. Pronóstico:** Tendencia de las próximas 4 horas.
-🔔 **4. Alertas:** Te aviso si la contaminación sube.
-🚨 **5. Contingencia:** Alerta oficial automática.
-👇 **CONFIGURACIÓN INICIAL (Obligatoria)**
-Para funcionar, necesito saber dónde está tu **CASA**.
-🚀 **PASO 1:** Toca el 📎 (Clip), elige **'Ubicación'** y envíame tu punto actual.
+CARD_ONBOARDING = """👋 **¡Bienvenido a AIreGPT!**
+Para protegerte, necesito configurar tus dos bases principales. Así podré avisarte antes de que respires aire malo.
+
+🏠 **1. Casa:** Para avisarte al despertar o fines de semana.
+🏢 **2. Trabajo:** Para avisarte antes de salir a tu trayecto.
+
+👇 **PASO 1:**
+Por favor, **envíame la ubicación de tu CASA** (toca el clip 📎 y selecciona "Ubicación").
+{footer}"""
+
+CARD_ONBOARDING_WORK = """✅ **¡Casa guardada!**
+
+🚀 **PASO 2:**
+Ahora, envíame la ubicación de tu **TRABAJO** (o escuela) para activar las alertas de movilidad.
+*(Toca el clip 📎 y selecciona "Ubicación")*
 {footer}"""
 
 CARD_REPORT = """👋 **{greeting} {user_name}**
 📍 **[{location_name}]({maps_url})** | {region}
 🕒 {report_time}
+
 {risk_circle} **{ias_value} puntos IAS** ({risk_category})
-🔮 **Pronóstico:** {forecast_msg}
+
+🔮 **Pronóstico Próximas 4h:**
+{forecast_block}
+
 📝 {natural_message}
-⚠️ **Principal:** {pollutant}
 🩺 **Recomendación:** {health_recommendation}
+
 📊 **Clima:** 🌡️ {temp}°C | 💧 {humidity}% | 💨 {wind_speed} m/s
 {footer}"""
 
-CARD_ALERT_IAS = """🔔 **ALERTA DE AIRE**
+CARD_ALERT_IAS = """🔔 **ALERTA: Límite Superado**
 📍 **[{location_name}]({maps_url})**
 🕒 {report_time} | {region}
+
 🛑 **Nivel {risk_category} detectado**
-{risk_circle} **{ias_value} puntos IAS**
+{risk_circle} **{ias_value} puntos IAS** (Tu límite: {threshold})
+
 🔮 **Tendencia:** {forecast_msg}
-📝 {natural_message}
-(Tu límite es {threshold}).
-☣️ **Causante:** {pollutant}
 🩺 **Consejo:** {health_recommendation}
-_Para desactivar: "Borrar alerta de {location_name}"_
+
+_Para silenciar: "Borrar alerta de {location_name}"_
 {footer}"""
 
-CARD_REMINDER = """⏰ **Tu Recordatorio Diario**
+CARD_REMINDER = """⏰ **Tu Reporte Diario**
 📍 **[{location_name}]({maps_url})**
 🕒 {report_time} | {region}
+
 {risk_circle} **{ias_value} puntos IAS** ({risk_category})
-🔮 **Pronóstico:** {forecast_msg}
+
+🔮 **Pronóstico:**
+{forecast_block}
+
 📝 {natural_message}
-⚠️ **Principal:** {pollutant}
 🩺 **Salud:** {health_recommendation}
 _Para cancelar: "Borrar recordatorio de {location_name}"_
 {footer}"""
@@ -71,10 +82,13 @@ _Para cancelar: "Borrar recordatorio de {location_name}"_
 CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
 🌎 Zona Metropolitana del Valle de México
 🕒 {report_time}
+
 ⚠️ **FASE ACTIVA:** {phase}
-☣️ **Contaminante:** {pollutant}
-🔮 **Evolución:** {forecast_msg}
+☣️ **Causa:** {pollutant}
+
 🛑 **Restricciones:** Doble Hoy No Circula activo.
 🛡️ **Acción:** Cierra ventanas y evita salir.
-_Para desactivar: "Desactivar contingencia"_
+
+_Fuente: CAMe / SIMAT_
 {footer}"""
+EOF
