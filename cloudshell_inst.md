@@ -18,7 +18,7 @@ Para ir directamente al directorio de trabajo en una sola línea (ideal al inici
 ```bash
 cd smability-aire-gpt-model
 # Aplicar cambios usando tu script de deploy rápido
-./deploy.sh - main model
+./deploy_heavy.sh - ajustes a lambdas modelo pesado
 ./deploy_api_light.sh - ajustes a lamda-api ligera
 ./remote_deploy_bot.sh - ajustes a bot telegram
 ```
