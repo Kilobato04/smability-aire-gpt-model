@@ -19,7 +19,8 @@ Para ir directamente al directorio de trabajo en una sola línea (ideal al inici
 cd smability-aire-gpt-model
 # Aplicar cambios usando tu script de deploy rápido
 ./deploy.sh - main model
-./remote_deploy_bot.sh - bot telegram
+./deploy_api_light.sh - ajustes a lamda-api ligera
+./remote_deploy_bot.sh - ajustes a bot telegram
 ```
 
 ## 3. Borrar todos los zips y scripts viejos
