@@ -14,7 +14,7 @@ BASE_PATH = os.environ.get('LAMBDA_TASK_ROOT', '/var/task')
 S3_BUCKET = os.environ.get('S3_BUCKET', 'smability-data-lake')
 S3_GRID_OUTPUT_KEY = os.environ.get('S3_GRID_OUTPUT_KEY', 'live_grid/latest_grid.json')
 
-# Actualizamos rutas a las nuevas subcarpetas del repo
+# Agregamos /app/ a todas las rutas internas
 MODEL_PATH_O3 = f"{BASE_PATH}/app/artifacts/model_o3.json"
 MODEL_PATH_PM10 = f"{BASE_PATH}/app/artifacts/model_pm10.json"
 MODEL_PATH_PM25 = f"{BASE_PATH}/app/artifacts/model_pm25.json"
