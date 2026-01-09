@@ -1,1 +1,20 @@
-()
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.env
+
+# Datos pesados y temporales
+*.tif
+*.zip
+*.csv
+/tmp/
+
+# AWS/CloudShell
+.aws/
+out.json
+out_f.json
+heavy_source.zip
