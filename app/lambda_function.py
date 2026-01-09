@@ -100,12 +100,15 @@ def inverse_distance_weighting(x, y, z, xi, yi, power=2):
 
 def prepare_grid_features(stations_df):
     # Lógica de carga de GeoJSONs y Admin Info usando las nuevas rutas PATHS
+    # Dentro de prepare_grid_features
     try:
         with open(STATIC_ADMIN_PATH, 'r') as f:
+            # Esto carga los 3,256 puntos con altitud y edificios
             grid_df = pd.DataFrame(json.load(f))
-    except:
-        # Fallback si no hay grid_admin_info
-        grid_df = pd.DataFrame([{'lat': 19.4, 'lon': -99.1, 'mun': 'CDMX', 'edo': 'CDMX'}])
+        print(f"✅ Malla cargada exitosamente: {len(grid_df)} puntos.")
+    except Exception as e:
+        print(f"❌ Error cargando malla: {e}. Usando fallback de un punto.")
+        grid_df = pd.DataFrame([{'lat': 19.4, 'lon': -99.1, 'mun': 'CDMX', 'edo': 'CDMX', 'altitude': 2240, 'building_vol': 0}])
 
     cdmx_tz = ZoneInfo("America/Mexico_City")
     now = datetime.now(cdmx_tz)
@@ -157,12 +160,35 @@ def lambda_handler(event, context):
         
         # Timestamp y guardado
         cdmx_tz = ZoneInfo("America/Mexico_City")
-        grid_df['timestamp'] = datetime.now(cdmx_tz).strftime("%Y-%m-%d %H:%M:%S")
+        # 1. Cruzar datos de estaciones reales (Para ver los iconos en el mapa)
+        grid_df = overwrite_with_real_data(grid_df, stations_df)
+
+        # 2. Generar Timestamp para toda la malla
+        cdmx_tz = ZoneInfo("America/Mexico_City")
+        current_ts = datetime.now(cdmx_tz).strftime("%Y-%m-%d %H:%M:%S")
+        grid_df['timestamp'] = current_ts
+
+        # 3. Selección de columnas y limpieza de NaN (Vital para el JS del Front-end)
+        final_cols = [
+            'timestamp', 'lat', 'lon', 'mun', 'edo', 
+            'altitude', 'building_vol', 
+            'tmp', 'rh', 'wsp', 'wdr', 
+            'o3', 'pm10', 'pm25', 'ias', 
+            'station', 'risk', 'dominant'
+        ]
         
-        final_cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk']
-        json_output = grid_df[final_cols].to_json(orient='records')
+        # Filtramos columnas existentes y convertimos NaN a None (null en JSON)
+        # Esto evita que el mapa desaparezca por un error de 'NaN is not defined'
+        final_df = grid_df[final_cols].replace({np.nan: None})
+        json_output = final_df.to_json(orient='records')
         
-        s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=json_output, ContentType='application/json')
+        # 4. Guardado en S3
+        s3_client.put_object(
+            Bucket=S3_BUCKET, 
+            Key=S3_GRID_OUTPUT_KEY, 
+            Body=json_output, 
+            ContentType='application/json'
+        )
         return {'statusCode': 200, 'body': 'Grid Maestro V56 OK'}
     except Exception as e:
         print(f"❌ Error Fatal: {str(e)}"); return {'statusCode': 500, 'body': str(e)}
