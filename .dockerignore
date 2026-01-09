@@ -1,1 +1,9 @@
-x
+.git
+.gitignore
+training/
+*.tif
+*.zip
+*.csv
+node_modules/
+__pycache__/
+*.md
