@@ -5,3 +5,5 @@ xgboost==2.0.3
 requests==2.31.0
 openai>=1.50.0
 httpx>=0.27.0
+python-telegram-bot
+scipy==1.11.4
