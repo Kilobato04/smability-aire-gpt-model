@@ -18,6 +18,7 @@ Para ir directamente al directorio de trabajo en una sola línea (ideal al inici
 ```bash
 cd smability-aire-gpt-model
 # Aplicar cambios usando tu script de deploy rápido
+git push origin main - push despues de commit en github
 ./deploy_heavy.sh - ajustes a lambdas modelo pesado
 ./deploy_api_light.sh - ajustes a lamda-api ligera
 ./remote_deploy_bot.sh - ajustes a bot telegram
