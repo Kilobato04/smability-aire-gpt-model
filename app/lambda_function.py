@@ -15,13 +15,13 @@ S3_BUCKET = os.environ.get('S3_BUCKET', 'smability-data-lake')
 S3_GRID_OUTPUT_KEY = os.environ.get('S3_GRID_OUTPUT_KEY', 'live_grid/latest_grid.json')
 
 # Actualizamos rutas a las nuevas subcarpetas del repo
-MODEL_PATH_O3 = f"{BASE_PATH}/artifacts/model_o3.json"
-MODEL_PATH_PM10 = f"{BASE_PATH}/artifacts/model_pm10.json"
-MODEL_PATH_PM25 = f"{BASE_PATH}/artifacts/model_pm25.json"
+MODEL_PATH_O3 = f"{BASE_PATH}/app/artifacts/model_o3.json"
+MODEL_PATH_PM10 = f"{BASE_PATH}/app/artifacts/model_pm10.json"
+MODEL_PATH_PM25 = f"{BASE_PATH}/app/artifacts/model_pm25.json"
 
-STATIC_TOPO_PATH = f"{BASE_PATH}/geograficos/malla_valle_mexico_final.geojson"
-STATIC_BUILD_PATH = f"{BASE_PATH}/geograficos/capa_edificios_v2.json"
-STATIC_ADMIN_PATH = f"{BASE_PATH}/geograficos/grid_admin_info.json"
+STATIC_TOPO_PATH = f"{BASE_PATH}/app/geograficos/malla_valle_mexico_final.geojson"
+STATIC_BUILD_PATH = f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json"
+STATIC_ADMIN_PATH = f"{BASE_PATH}/app/geograficos/grid_admin_info.json"
 
 GRID_BASE_PATH = '/tmp/grid_base_prod_v56.csv'
 SMABILITY_API_URL = "https://y4zwdmw7vf.execute-api.us-east-1.amazonaws.com/prod/api/air-quality/current?type=reference,smaa"
