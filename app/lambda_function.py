@@ -46,9 +46,8 @@ def get_risk_level(ias):
     else: return "Extremadamente Alto"
 
 def overwrite_with_real_data(grid_df, stations_df):
-    """Calibración de Bias e Inyección de nombres de estación"""
     if stations_df.empty: 
-        print("⚠️ LOG: Sin estaciones para calibrar. Saltando Bias Correction.")
+        print("⚠️ LOG: Sin estaciones para calibrar.")
         return grid_df
     
     for pol in ['o3', 'pm10', 'pm25']:
@@ -80,6 +79,7 @@ def inverse_distance_weighting(x, y, z, xi, yi, power=2):
     return np.sum(weights * z[None, :], axis=1) / np.sum(weights, axis=1)
 
 def load_models():
+    print("⬇️ LOG: Cargando modelos XGBoost...")
     models = {}
     for p in ['o3', 'pm10', 'pm25']:
         path = f"{BASE_PATH}/app/artifacts/model_{p}.json"
@@ -90,15 +90,16 @@ def load_models():
                 models[p] = m
                 print(f"✅ Modelo {p} cargado.")
             except Exception as e:
-                print(f"❌ Error cargando modelo {p}: {e}")
+                print(f"❌ Error cargando {p}: {e}")
     return models
 
-    def prepare_grid_features(stations_df):
+def prepare_grid_features(stations_df):
+    # --- LOG ESTRATÉGICO 1 ---
     with open(STATIC_ADMIN_PATH, 'r') as f:
         grid_df = pd.DataFrame(json.load(f))
     
-    # LOG ESTRATÉGICO: Verificación de Malla
-    print(f"📡 CHECK CAPAS: Malla cargada con {len(grid_df)} pts.")
+    alt_mean = grid_df['altitude'].mean() if 'altitude' in grid_df else 0
+    print(f"📡 CHECK CAPAS: Malla cargada ({len(grid_df)} pts). Altitud Avg={alt_mean:.2f}m")
     
     tz = ZoneInfo("America/Mexico_City")
     now = datetime.now(tz)
@@ -107,51 +108,37 @@ def load_models():
     grid_df['month_sin'] = np.sin(2 * np.pi * now.month / 12)
     grid_df['month_cos'] = np.cos(2 * np.pi * now.month / 12)
     
-    # Interpolación Meteo con Blindaje Individual
     for feat, default in [('tmp', 20.0), ('rh', 40.0), ('wsp', 1.0), ('wdr', 90.0)]:
         try:
-            # Verificamos si la columna existe y tiene al menos un dato no nulo
             if feat in stations_df.columns and stations_df[feat].notna().any():
                 valid = stations_df.dropna(subset=[feat, 'lat', 'lon'])
                 if not valid.empty:
-                    grid_df[feat] = inverse_distance_weighting(
-                        valid['lat'].values, 
-                        valid['lon'].values, 
-                        valid[feat].values, 
-                        grid_df['lat'].values, 
-                        grid_df['lon'].values
-                    )
+                    grid_df[feat] = inverse_distance_weighting(valid['lat'].values, valid['lon'].values, valid[feat].values, grid_df['lat'].values, grid_df['lon'].values)
                     continue
             grid_df[feat] = default
         except Exception as e:
-            print(f"⚠️ LOG: Error interpolando {feat}: {e}. Usando default {default}")
-            grid_df[feat] = default
-    
+            print(f"⚠️ Error IDW {feat}: {e}"); grid_df[feat] = default
+            
     grid_df['station_numeric'] = -1
     return grid_df
 
 def lambda_handler(event, context):
-    print("🚀 INICIANDO PREDICTOR MAESTRO V56.2 (BLINDADO)...")
+    print("🚀 INICIANDO PREDICTOR MAESTRO V56.3...")
     try:
         models = load_models()
         
-        # Consumo de API con Blindaje Profundo
         try:
             r = requests.get(SMABILITY_API_URL, timeout=15)
-            r.raise_for_status()
             resp_raw = r.json().get('stations', [])
             print(f"📡 CHECK API: {len(resp_raw)} estaciones recibidas.")
-        except Exception as api_err:
-            print(f"⚠️ LOG: Error en API de referencia: {api_err}")
-            resp_raw = []
+        except Exception as e:
+            print(f"⚠️ LOG: Error API: {e}"); resp_raw = []
 
         parsed = []
         for s in resp_raw:
-            # FIX: Asegurar que met y pol no sean None aunque el key exista
             met = s.get('meteorological') or {}
             pol = s.get('pollutants') or {}
             
-            # Helper para navegar el JSON anidado
             def get_deep(d, k1, k2):
                 return d.get(k1, {}).get(k2, {}).get('value') if d.get(k1) else None
 
@@ -171,29 +158,22 @@ def lambda_handler(event, context):
         stations_df = pd.DataFrame(parsed).dropna(subset=['lat', 'lon'])
         grid_df = prepare_grid_features(stations_df)
         
-        # Predicción Base
         FEATURES = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp']
         for p in ['o3', 'pm10', 'pm25']:
             if p in models:
                 grid_df[p] = models[p].predict(grid_df[FEATURES]).clip(0)
             else: grid_df[p] = 0.0
 
-        # Calibración y Estaciones
         grid_df = overwrite_with_real_data(grid_df, stations_df)
 
-        # NOM-172 e IAS
         def get_metrics(row):
-            s_o3 = get_ias_score(row['o3'], 'o3')
-            s_p10 = get_ias_score(row['pm10'], 'pm10')
-            s_p25 = get_ias_score(row['pm25'], 'pm25')
-            scores = {'O3': s_o3, 'PM10': s_p10, 'PM2.5': s_p25}
+            scores = {'O3': get_ias_score(row['o3'], 'o3'), 'PM10': get_ias_score(row['pm10'], 'pm10'), 'PM2.5': get_ias_score(row['pm25'], 'pm25')}
             dom = max(scores, key=scores.get)
             return pd.Series([max(scores.values()), dom])
 
         grid_df[['ias', 'dominant']] = grid_df.apply(get_metrics, axis=1)
         grid_df['risk'] = grid_df['ias'].apply(get_risk_level)
         
-        # Guardado final
         tz = ZoneInfo("America/Mexico_City")
         grid_df['timestamp'] = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
         cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant']
@@ -201,10 +181,9 @@ def lambda_handler(event, context):
         final_df = grid_df[cols].replace({np.nan: None})
         final_json = final_df.to_json(orient='records')
         
-        print(f"📦 CHECK OUTPUT: JSON generado con {len(final_df)} pts. Tamaño: {len(final_json)/1024:.2f} KB")
+        print(f"📦 CHECK OUTPUT: Tamaño={len(final_json)/1024:.2f} KB")
         s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=final_json, ContentType='application/json')
         
-        return {'statusCode': 200, 'body': 'V56.2 Success'}
+        return {'statusCode': 200, 'body': 'V56.3 Success'}
     except Exception as e:
-        print(f"❌ ERROR FATAL: {str(e)}")
-        return {'statusCode': 500, 'body': str(e)}
+        print(f"❌ ERROR FATAL: {str(e)}"); return {'statusCode': 500, 'body': str(e)}
