@@ -6,7 +6,8 @@ phases:
       - echo Logging in to Amazon ECR...
       - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/smability-aire-predictor
+      # --- LÍNEA CORREGIDA ABAJO ---
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/smability-aire-repo
       - IMAGE_TAG=latest
   build:
     commands:
@@ -21,4 +22,5 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo Updating Lambda function...
+      # Asegúrate de que el nombre de la función abajo sea el correcto (Smability-Aire-Predictor-Heavy o similar)
       - aws lambda update-function-code --function-name Smability-Aire-Predictor-Heavy --image-uri $REPOSITORY_URI:$IMAGE_TAG
