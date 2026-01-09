@@ -80,38 +80,52 @@ def inverse_distance_weighting(x, y, z, xi, yi, power=2):
     return np.sum(weights * z[None, :], axis=1) / np.sum(weights, axis=1)
 
 def load_models():
-    print("⬇️ LOG: Cargando modelos XGBoost...")
     models = {}
     for p in ['o3', 'pm10', 'pm25']:
         path = f"{BASE_PATH}/app/artifacts/model_{p}.json"
         if os.path.exists(path):
-            m = xgb.XGBRegressor(); m.load_model(path); models[p] = m
+            try:
+                m = xgb.XGBRegressor()
+                m.load_model(path)
+                models[p] = m
+                print(f"✅ Modelo {p} cargado.")
+            except Exception as e:
+                print(f"❌ Error cargando modelo {p}: {e}")
     return models
 
-def prepare_grid_features(stations_df):
+    def prepare_grid_features(stations_df):
     with open(STATIC_ADMIN_PATH, 'r') as f:
         grid_df = pd.DataFrame(json.load(f))
     
-    # --- LOG ESTRATÉGICO 1: Capas ---
-    alt_mean = grid_df['altitude'].mean() if 'altitude' in grid_df else 0
-    bld_mean = grid_df['building_vol'].mean() if 'building_vol' in grid_df else 0
-    print(f"📡 CHECK CAPAS: Altitud Avg={alt_mean:.2f}m, Urbano Avg={bld_mean:.2f}")
+    # LOG ESTRATÉGICO: Verificación de Malla
+    print(f"📡 CHECK CAPAS: Malla cargada con {len(grid_df)} pts.")
     
-    cdmx_tz = ZoneInfo("America/Mexico_City")
-    now = datetime.now(cdmx_tz)
+    tz = ZoneInfo("America/Mexico_City")
+    now = datetime.now(tz)
     grid_df['hour_sin'] = np.sin(2 * np.pi * now.hour / 24)
     grid_df['hour_cos'] = np.cos(2 * np.pi * now.hour / 24)
     grid_df['month_sin'] = np.sin(2 * np.pi * now.month / 12)
     grid_df['month_cos'] = np.cos(2 * np.pi * now.month / 12)
     
-    # Interpolación Meteo (IDW)
+    # Interpolación Meteo con Blindaje Individual
     for feat, default in [('tmp', 20.0), ('rh', 40.0), ('wsp', 1.0), ('wdr', 90.0)]:
-        if not stations_df.empty and feat in stations_df.columns:
-            valid = stations_df.dropna(subset=[feat])
-            if not valid.empty:
-                grid_df[feat] = inverse_distance_weighting(valid['lat'].values, valid['lon'].values, valid[feat].values, grid_df['lat'].values, grid_df['lon'].values)
-                continue
-        grid_df[feat] = default
+        try:
+            # Verificamos si la columna existe y tiene al menos un dato no nulo
+            if feat in stations_df.columns and stations_df[feat].notna().any():
+                valid = stations_df.dropna(subset=[feat, 'lat', 'lon'])
+                if not valid.empty:
+                    grid_df[feat] = inverse_distance_weighting(
+                        valid['lat'].values, 
+                        valid['lon'].values, 
+                        valid[feat].values, 
+                        grid_df['lat'].values, 
+                        grid_df['lon'].values
+                    )
+                    continue
+            grid_df[feat] = default
+        except Exception as e:
+            print(f"⚠️ LOG: Error interpolando {feat}: {e}. Usando default {default}")
+            grid_df[feat] = default
     
     grid_df['station_numeric'] = -1
     return grid_df
