@@ -1,30 +1,26 @@
 FROM public.ecr.aws/lambda/python:3.11
 
+# 1. Dependencias de Sistema (Necesarias para que XGBoost no falle)
+RUN yum update -y && yum install -y gcc gcc-c++ make cmake libgfortran && yum clean all
+
+# 2. Instalación de Python Packages (Optimizada)
 RUN pip install --no-cache-dir --upgrade pip
 COPY requirements.txt ${LAMBDA_TASK_ROOT}
-RUN pip install --no-cache-dir --only-binary=:all: -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Código App
-COPY app/lambda_function.py ${LAMBDA_TASK_ROOT}
-COPY app/lambda_api_light.py ${LAMBDA_TASK_ROOT}
-COPY app/lambda_chatbot.py ${LAMBDA_TASK_ROOT}
+# 3. Código y Estructura (Paradigma GitHub-First)
+# Copiamos la carpeta app que ya tiene subcarpetas: artifacts, geograficos, airegpt_telegram
+COPY app/ ${LAMBDA_TASK_ROOT}/app/
 
-# Recursos
-COPY app/grid_base.csv ${LAMBDA_TASK_ROOT}
-COPY malla_valle_mexico_final.geojson ${LAMBDA_TASK_ROOT}
+# 4. Punto de Entrada (Ubicamos la lambda principal donde AWS la espera)
+RUN cp ${LAMBDA_TASK_ROOT}/app/lambda_function.py ${LAMBDA_TASK_ROOT}/lambda_function.py
 
-# Entrenamiento
-COPY training/raw_data/dataset_aire_zmcdmx.zip ${LAMBDA_TASK_ROOT}/training/raw_data/
-COPY training/raw_data/stationssimat.csv ${LAMBDA_TASK_ROOT}/training/raw_data/
-COPY training/train_model.py ${LAMBDA_TASK_ROOT}/training/
+# 5. Mapeo de Recursos (Para mantener compatibilidad con tus rutas del código V36)
+# Esto asegura que los archivos existan tanto en la subcarpeta como en la raíz del task
+RUN cp -r ${LAMBDA_TASK_ROOT}/app/geograficos/* ${LAMBDA_TASK_ROOT}/ 2>/dev/null || true
+RUN mkdir -p ${LAMBDA_TASK_ROOT}/artifacts && cp -r ${LAMBDA_TASK_ROOT}/app/artifacts/* ${LAMBDA_TASK_ROOT}/artifacts/ 2>/dev/null || true
 
-RUN python -c "import zipfile, os; \
-    zip_path = os.environ['LAMBDA_TASK_ROOT'] + '/training/raw_data/dataset_aire_zmcdmx.zip'; \
-    output_dir = '/tmp/dataset_final'; \
-    print(f'🔓 Descomprimiendo {zip_path}...'); \
-    zipfile.ZipFile(zip_path, 'r').extractall(output_dir)"
-
-RUN python ${LAMBDA_TASK_ROOT}/training/train_model.py
-RUN ls -la ${LAMBDA_TASK_ROOT}
+# 6. Verificación (Para que veas en los logs de CodeBuild que todo está en su lugar)
+RUN ls -la ${LAMBDA_TASK_ROOT} && ls -la ${LAMBDA_TASK_ROOT}/artifacts/
 
 CMD [ "lambda_function.lambda_handler" ]
