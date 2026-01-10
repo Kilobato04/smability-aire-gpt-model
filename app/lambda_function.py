@@ -51,38 +51,63 @@ def inverse_distance_weighting(x, y, z, xi, yi):
 
 # --- 4. HANDLER PRINCIPAL (ESTADO: MONITORIZACIÓN V56.6) ---
 def lambda_handler(event, context):
-    print("🚀 INICIANDO PREDICTOR MAESTRO V56.6 - CONSOLIDADO")
+    # --- CAMBIO DE VERSIÓN PARA MONITOREO ---
+    VERSION = "V56.7" 
+    print(f"🚀 INICIANDO PREDICTOR MAESTRO {VERSION} - CONSOLIDADO")
+    
     try:
         # A. Carga de Modelos
         models = {}
         for p in ['o3', 'pm10', 'pm25']:
             path = f"{BASE_PATH}/app/artifacts/model_{p}.json"
             if os.path.exists(path):
-                m = xgb.XGBRegressor(); m.load_model(path); models[p] = m
-                print(f"✅ Modelo {p} cargado correctamente.")
+                try:
+                    m = xgb.XGBRegressor(); m.load_model(path); models[p] = m
+                    print(f"✅ Modelo {p} cargado correctamente.")
+                except Exception as e_mod:
+                    print(f"❌ Error cargando {p}: {e_mod}")
         
-        # B. Consumo de API con Blindaje y Health Check
-        # Propósito: Evitar 'NoneType' error si faltan bloques de meteorología o contaminantes.
+        # B. Consumo de API con Blindaje de "Fuerza Bruta"
+        stations_raw = []
         try:
             r = requests.get(SMABILITY_API_URL, timeout=15)
-            stations_raw = r.json().get('stations', [])
-        except Exception as e:
-            print(f"⚠️ Error crítico consultando API: {e}")
-            stations_raw = []
+            # Verificamos que la respuesta sea exitosa antes de intentar parsear
+            if r.status_code == 200:
+                try:
+                    res_json = r.json()
+                    # Si el JSON no es un diccionario, forzamos uno vacío
+                    if isinstance(res_json, dict):
+                        stations_raw = res_json.get('stations') or []
+                    else:
+                        print(f"⚠️ El JSON recibido no es un diccionario: {type(res_json)}")
+                except Exception as e_json:
+                    print(f"⚠️ Error parseando JSON: {e_json}")
+            else:
+                print(f"⚠️ API respondió con status {r.status_code}")
+        except Exception as e_api:
+            print(f"⚠️ Fallo en conexión con API: {e_api}")
+
+        # REPORTE DE SALUD INICIAL
+        print(f"📡 API MONITOR: {len(stations_raw)} objetos recibidos para procesar.")
 
         counts = {"o3": 0, "pm10": 0, "pm25": 0, "tmp": 0, "rh": 0, "wsp": 0}
         parsed = []
 
         for s in stations_raw:
-            # Blindaje estructural: Aseguramos que pol y met sean diccionarios siempre
+            # Blindaje extra por si alguna estación llega como None
+            if not isinstance(s, dict): continue
+            
             pol = s.get('pollutants') or {}
             met = s.get('meteorological') or {}
             
-            # Función interna segura para extraer valores y contar salud del API
             def safe_extract(d, key, count_key):
-                val = d.get(key, {}).get('avg_1h', {}).get('value') if isinstance(d.get(key), dict) else None
-                if val is not None: counts[count_key] += 1
-                return val
+                if not isinstance(d, dict): return None
+                val_obj = d.get(key)
+                if isinstance(val_obj, dict):
+                    val = val_obj.get('avg_1h', {}).get('value')
+                    if val is not None: counts[count_key] += 1
+                    return val
+                return None
 
             parsed.append({
                 'name': s.get('station_name', 'Unknown'),
@@ -96,7 +121,7 @@ def lambda_handler(event, context):
                 'wsp': safe_extract(met, 'wind_speed', 'wsp')
             })
         
-        print(f"📡 API MONITOR: {len(stations_raw)} recibidas. Salud Datos -> O3:{counts['o3']}, PM10:{counts['pm10']}, TMP:{counts['tmp']}")
+        print(f"📊 DATA DISPONIBLE: O3:{counts['o3']}, PM10:{counts['pm10']}, TMP:{counts['tmp']}")
         stations_df = pd.DataFrame(parsed).dropna(subset=['lat', 'lon'])
 
         # C. Carga de Malla y Datos Geográficos (ESTADO: BAJO TEST)
