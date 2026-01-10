@@ -270,17 +270,31 @@ def lambda_handler(event, context):
         cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
                 'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant']
         
+# --- INICIO DEL REEMPLAZO (SECCIÓN H: EXPORTACIÓN DUAL) ---
         final_json = grid_df[cols].replace({np.nan: None}).to_json(orient='records')
         
+        # 1. GUARDAR EL "LATEST" (Sobrescribe para el Dashboard)
         s3_client.put_object(
             Bucket=S3_BUCKET, 
             Key=S3_GRID_OUTPUT_KEY, 
             Body=final_json, 
             ContentType='application/json'
         )
+
+        # 2. GUARDAR EL "HISTÓRICO" (Formato: grid_2026-01-10_13-20.json)
+        timestamp_name = now_mx.strftime("%Y-%m-%d_%H-%M")
+        history_key = f"live_grid/grid_{timestamp_name}.json"
         
-        print(f"📦 SUCCESS {VERSION}: {len(final_json)/1024:.2f} KB guardados en S3.")
+        s3_client.put_object(
+            Bucket=S3_BUCKET, 
+            Key=history_key, 
+            Body=final_json, 
+            ContentType='application/json'
+        )
+        
+        print(f"📦 SUCCESS {VERSION}: Guardado Latest y Histórico ({history_key})")
         return {'statusCode': 200, 'body': f'Predictor {VERSION} OK'}
+        # --- FIN DEL REEMPLAZO ---
 
     except Exception as e:
         print(f"❌ ERROR FATAL: {e}")
