@@ -49,64 +49,52 @@ def inverse_distance_weighting(x, y, z, xi, yi):
     weights = 1.0 / (dist ** 2)
     return np.sum(weights * z[None, :], axis=1) / np.sum(weights, axis=1)
 
-# --- 4. HANDLER PRINCIPAL (ESTADO: MONITORIZACIÓN V56.6) ---
+# --- 4. HANDLER PRINCIPAL (ESTADO: MONITORIZACIÓN V56.8) ---
 def lambda_handler(event, context):
-    # --- CAMBIO DE VERSIÓN PARA MONITOREO ---
-    VERSION = "V56.7" 
+    # --- BITÁCORA V56.8: Blindaje de Ingesta y Calibración ---
+    VERSION = "V56.8" 
     print(f"🚀 INICIANDO PREDICTOR MAESTRO {VERSION} - CONSOLIDADO")
     
     try:
         # A. Carga de Modelos
-        models = {}
-        for p in ['o3', 'pm10', 'pm25']:
-            path = f"{BASE_PATH}/app/artifacts/model_{p}.json"
-            if os.path.exists(path):
-                try:
-                    m = xgb.XGBRegressor(); m.load_model(path); models[p] = m
-                    print(f"✅ Modelo {p} cargado correctamente.")
-                except Exception as e_mod:
-                    print(f"❌ Error cargando {p}: {e_mod}")
+        models = load_models()
         
         # B. Consumo de API con Blindaje de "Fuerza Bruta"
         stations_raw = []
         try:
             r = requests.get(SMABILITY_API_URL, timeout=15)
-            # Verificamos que la respuesta sea exitosa antes de intentar parsear
             if r.status_code == 200:
-                try:
-                    res_json = r.json()
-                    # Si el JSON no es un diccionario, forzamos uno vacío
-                    if isinstance(res_json, dict):
-                        stations_raw = res_json.get('stations') or []
-                    else:
-                        print(f"⚠️ El JSON recibido no es un diccionario: {type(res_json)}")
-                except Exception as e_json:
-                    print(f"⚠️ Error parseando JSON: {e_json}")
+                res_json = r.json()
+                if isinstance(res_json, dict):
+                    stations_raw = res_json.get('stations') or []
+                else:
+                    print(f"⚠️ API: El JSON no es un diccionario: {type(res_json)}")
             else:
-                print(f"⚠️ API respondió con status {r.status_code}")
+                print(f"⚠️ API: Status Error {r.status_code}")
         except Exception as e_api:
-            print(f"⚠️ Fallo en conexión con API: {e_api}")
+            print(f"⚠️ API: Fallo de conexión: {e_api}")
 
-        # REPORTE DE SALUD INICIAL
-        print(f"📡 API MONITOR: {len(stations_raw)} objetos recibidos para procesar.")
+        print(f"📡 API MONITOR: {len(stations_raw)} estaciones recibidas.")
 
         counts = {"o3": 0, "pm10": 0, "pm25": 0, "tmp": 0, "rh": 0, "wsp": 0}
         parsed = []
 
         for s in stations_raw:
-            # Blindaje extra por si alguna estación llega como None
             if not isinstance(s, dict): continue
             
+            # Blindaje estructural: Aseguramos diccionarios aunque vengan null en el JSON
             pol = s.get('pollutants') or {}
             met = s.get('meteorological') or {}
             
+            # Helper interno de extracción segura para evitar el error 'NoneType'
             def safe_extract(d, key, count_key):
                 if not isinstance(d, dict): return None
-                val_obj = d.get(key)
-                if isinstance(val_obj, dict):
-                    val = val_obj.get('avg_1h', {}).get('value')
-                    if val is not None: counts[count_key] += 1
-                    return val
+                metric_obj = d.get(key)
+                if isinstance(metric_obj, dict):
+                    val = metric_obj.get('avg_1h', {}).get('value')
+                    if val is not None:
+                        counts[count_key] += 1
+                        return val
                 return None
 
             parsed.append({
@@ -124,12 +112,12 @@ def lambda_handler(event, context):
         print(f"📊 DATA DISPONIBLE: O3:{counts['o3']}, PM10:{counts['pm10']}, TMP:{counts['tmp']}")
         stations_df = pd.DataFrame(parsed).dropna(subset=['lat', 'lon'])
 
-        # C. Carga de Malla y Datos Geográficos (ESTADO: BAJO TEST)
+        # C. Carga de Malla y Datos Geográficos
         with open(STATIC_ADMIN_PATH, 'r') as f:
             grid_df = pd.DataFrame(json.load(f))
         
         alt_mean = grid_df['altitude'].mean() if 'altitude' in grid_df else 0
-        print(f"✅ MALLA CARGADA: {len(grid_df)} puntos. Altitud Promedio: {alt_mean:.1f}m")
+        print(f"✅ MALLA CARGADA: {len(grid_df)} puntos. Altitud Avg: {alt_mean:.1f}m")
         
         # D. Interpolación Meteorológica para Malla
         tz = ZoneInfo("America/Mexico_City")
@@ -146,14 +134,13 @@ def lambda_handler(event, context):
             else: 
                 grid_df[feat] = default
 
-        # E. Predicción XGBoost y Calibración BIAS (ESTADO: BAJO TEST)
+        # E. Predicción XGBoost y Calibración BIAS
         grid_df['station_numeric'] = -1
         feats = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp']
         
         for p in ['o3', 'pm10', 'pm25']:
             if p in models:
                 grid_df[p] = models[p].predict(grid_df[feats]).clip(0)
-                # Calibración de Bias solo si hay estaciones reales para ese contaminante
                 v_real = stations_df[f'{p}_real'].dropna()
                 if not v_real.empty:
                     bias = v_real.mean() - grid_df[p].mean()
@@ -162,15 +149,15 @@ def lambda_handler(event, context):
             else: 
                 grid_df[p] = 0.0
 
-        # F. Inyección de Marcadores y Nombres (ESTADO: ESTABLE)
+        # F. Marcadores de Estaciones Reales
         grid_df['station'] = None
         for _, st in stations_df.iterrows():
             dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
             idx = dist.idxmin()
             grid_df.at[idx, 'station'] = st['name']
 
-        # G. Cálculo de IAS y Dominante (ESTADO: ESTABLE)
-        def process_row_ias(row):
+        # G. Cálculo de IAS y Dominante
+        def process_row_metrics(row):
             scores = {
                 'O3': get_ias_score(row['o3'], 'o3'), 
                 'PM10': get_ias_score(row['pm10'], 'pm10'), 
@@ -179,18 +166,18 @@ def lambda_handler(event, context):
             dom_pol = max(scores, key=scores.get)
             return pd.Series([max(scores.values()), dom_pol])
 
-        grid_df[['ias', 'dominant']] = grid_df.apply(process_row_ias, axis=1)
+        grid_df[['ias', 'dominant']] = grid_df.apply(process_row_metrics, axis=1)
         grid_df['risk'] = grid_df['ias'].apply(get_risk_level)
         grid_df['timestamp'] = now.strftime("%Y-%m-%d %H:%M:%S")
 
-        # H. Guardado Final S3 (ESTADO: ESTABLE)
+        # H. Guardado Final S3
         cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant']
         final_json = grid_df[cols].replace({np.nan: None}).to_json(orient='records')
         
         s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=final_json, ContentType='application/json')
-        print(f"📦 ÉXITO: Archivo generado ({len(final_json)/1024:.2f} KB) y guardado en S3.")
+        print(f"📦 ÉXITO {VERSION}: Guardado {len(final_json)/1024:.2f} KB en S3.")
         
-        return {'statusCode': 200, 'body': 'Predictor V56.6 Finalizado'}
+        return {'statusCode': 200, 'body': f'Predictor {VERSION} Success'}
 
     except Exception as e:
         print(f"❌ ERROR FATAL: {e}")
