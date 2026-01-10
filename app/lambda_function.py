@@ -12,6 +12,10 @@ import os
 BASE_PATH = os.environ.get('LAMBDA_TASK_ROOT', '/var/task')
 S3_BUCKET = os.environ.get('S3_BUCKET', 'smability-data-lake')
 S3_GRID_OUTPUT_KEY = os.environ.get('S3_GRID_OUTPUT_KEY', 'live_grid/latest_grid.json')
+# --- CONFIGURACIÓN S3 ---
+S3_BUCKET = "smability-data-lake"
+# Los modelos ahora viven en: models/model_xxx.json
+MODEL_S3_PREFIX = "models/"
 
 MODEL_PATH_O3 = f"{BASE_PATH}/app/artifacts/model_o3.json"
 MODEL_PATH_PM10 = f"{BASE_PATH}/app/artifacts/model_pm10.json"
@@ -44,18 +48,25 @@ def get_risk_level(ias):
 
 # --- 3. FUNCIONES DE CARGA Y PROCESAMIENTO ---
 def load_models():
-    """Carga los modelos XGBoost con validación de existencia"""
+    """Descarga modelos desde S3 y los carga en XGBoost"""
     models = {}
-    for p in ['o3', 'pm10', 'pm25']:
-        path = f"{BASE_PATH}/app/artifacts/model_{p}.json"
-        if os.path.exists(path):
-            try:
-                m = xgb.XGBRegressor()
-                m.load_model(path)
-                models[p] = m
-                print(f"✅ Modelo {p} cargado.")
-            except Exception as e:
-                print(f"❌ Error en modelo {p}: {e}")
+    pollutants = ['o3', 'pm10', 'pm25']
+    
+    for p in pollutants:
+        s3_key = f"{MODEL_S3_PREFIX}model_{p}.json"
+        local_path = f"/tmp/model_{p}.json"
+        
+        try:
+            print(f"descargando de S3: {s3_key}...")
+            s3_client.download_file(S3_BUCKET, s3_key, local_path)
+            
+            m = xgb.XGBRegressor()
+            m.load_model(local_path)
+            models[p] = m
+            print(f"✅ Modelo {p} cargado desde S3.")
+        except Exception as e:
+            print(f"⚠️ No se pudo cargar el modelo {p} desde S3: {e}")
+            
     return models
 
 def inverse_distance_weighting(x, y, z, xi, yi):
@@ -66,15 +77,36 @@ def inverse_distance_weighting(x, y, z, xi, yi):
     return np.sum(weights * z[None, :], axis=1) / np.sum(weights, axis=1)
 
 def prepare_grid_features(stations_df):
-    """Carga malla y genera variables temporales y meteo"""
-    if not os.path.exists(STATIC_ADMIN_PATH):
-        raise FileNotFoundError(f"Malla no encontrada en {STATIC_ADMIN_PATH}")
-        
-    with open(STATIC_ADMIN_PATH, 'r') as f:
-        grid_df = pd.DataFrame(json.load(f))
+    """Carga malla valle (con 'elevation') y la une con datos administrativos"""
+    # 1. Cargar Malla Valle (GeoJSON)
+    # Nota: Asegúrate de que el nombre del archivo en tu repo sea el correcto
+    MALLA_PATH = f"{BASE_PATH}/app/geograficos/malla_valle_mexico_final.geojson"
     
-    print(f"✅ MALLA: {len(grid_df)} pts. Altitud Avg: {grid_df['altitude'].mean():.1f}m")
+    with open(MALLA_PATH, 'r') as f:
+        malla_data = json.load(f)
     
+    # Extraer datos del GeoJSON
+    malla_list = []
+    for feature in malla_data['features']:
+        coords = feature['geometry']['coordinates']
+        props = feature['properties']
+        malla_list.append({
+            'lon': coords[0],
+            'lat': coords[1],
+            'altitude': props.get('elevation', 2240) # Aquí corregimos el nombre de la columna
+        })
+    
+    grid_df = pd.DataFrame(malla_list)
+    
+    # 2. Cargar Capa de Edificios / Administrativa
+    # (Hacemos un merge por cercanía o si las coordenadas coinciden exactamente)
+    with open(f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json", 'r') as f:
+        edificios_df = pd.DataFrame(json.load(f))
+    
+    # Unimos las capas (suponiendo que las coordenadas son las mismas en la malla)
+    grid_df = pd.merge(grid_df, edificios_df[['lat', 'lon', 'building_vol']], on=['lat', 'lon'], how='left').fillna(0)
+    
+    # 3. Variables Temporales e Interpolación Meteo
     tz = ZoneInfo("America/Mexico_City")
     now = datetime.now(tz)
     grid_df['hour_sin'] = np.sin(2 * np.pi * now.hour / 24)
