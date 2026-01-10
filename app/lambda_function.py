@@ -193,29 +193,72 @@ def lambda_handler(event, context):
         # Procesamiento de Malla y Predicción
         grid_df = prepare_grid_features(stations_df)
         
+# --- INICIO DEL REEMPLAZO (SECCIÓN E y F) ---
+        grid_df['station_numeric'] = -1
         feats = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp']
+        
         for p in ['o3', 'pm10', 'pm25']:
             if p in models:
+                # 1. Predicción base de la IA
                 grid_df[p] = models[p].predict(grid_df[feats]).clip(0)
-                # Calibración BIAS
-                v_real = stations_df[f'{p}_real'].dropna()
-                if not v_real.empty:
-                    bias = v_real.mean() - grid_df[p].mean()
+                
+                # 2. Preparar datos para la Tabla de Auditoría
+                real_col = f'{p}_real'
+                v_real_all = stations_df[['name', 'lat', 'lon', real_col]].copy()
+                
+                # Comparativa: ¿Qué dijo la IA en la ubicación de la estación?
+                st_preds = []
+                for _, st in v_real_all.iterrows():
+                    dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
+                    idx_closest = dist.idxmin()
+                    st_preds.append(grid_df.at[idx_closest, p])
+                v_real_all['raw_ai'] = st_preds
+                
+                # 3. Cálculo del Bias
+                v_valid = v_real_all.dropna(subset=[real_col])
+                bias = 0
+                if not v_valid.empty:
+                    bias = v_valid[real_col].mean() - v_valid['raw_ai'].mean()
                     grid_df[p] = (grid_df[p] + bias).clip(0)
-                    print(f"⚖️ BIAS {p.upper()}: {bias:.2f}")
-            else: grid_df[p] = 0.0
+                
+                # 4. REPORTE VISUAL EN LOGS (TABLA)
+                unit = "ppb" if p == "o3" else "µg/m³"
+                print(f"\n📊 TABLA DE CALIBRACIÓN: {p.upper()} (Bias: {bias:+.2f} {unit})")
+                header = f"{'Estación':<25} | {'Raw AI':<10} | {'Real':<10} | {'Bias':<10} | {'Final':<10}"
+                print("-" * len(header))
+                print(header)
+                print("-" * len(header))
+                
+                for _, row in v_real_all.iterrows():
+                    real_val = f"{row[real_col]:.2f}" if pd.notnull(row[real_col]) else "N/A"
+                    # Si hay dato real, el final es el real. Si no, es AI + Bias.
+                    final_val = row[real_col] if pd.notnull(row[real_col]) else (row['raw_ai'] + bias)
+                    print(f"{row['name'][:24]:<25} | {row['raw_ai']:<10.2f} | {real_val:<10} | {bias:<+10.2f} | {max(0, final_val):<10.2f}")
+                print("-" * len(header))
+            else:
+                grid_df[p] = 0.0
 
-        # Marcadores y Métricas Finales
+        # F. Marcadores y Sobrescritura de Estaciones (Garantiza error 0 en sensores)
         grid_df['station'] = None
         for _, st in stations_df.iterrows():
             dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
             idx = dist.idxmin()
             grid_df.at[idx, 'station'] = st['name']
+            for p in ['o3', 'pm10', 'pm25']:
+                real_val = st.get(f'{p}_real')
+                if pd.notnull(real_val):
+                    grid_df.at[idx, p] = real_val
+# --- FIN DEL REEMPLAZO ---
 
+        # G. Cálculo de IAS y Dominante (NOM-172-2024)
         def calc_ias_row(row):
-            s = {'O3': get_ias_score(row['o3'], 'o3'), 'PM10': get_ias_score(row['pm10'], 'pm10'), 'PM2.5': get_ias_score(row['pm25'], 'pm25')}
-            dom = max(s, key=s.get)
-            return pd.Series([max(s.values()), dom])
+            scores = {
+                'O3': get_ias_score(row['o3'], 'o3'), 
+                'PM10': get_ias_score(row['pm10'], 'pm10'), 
+                'PM2.5': get_ias_score(row['pm25'], 'pm25')
+            }
+            dom_pol = max(scores, key=scores.get)
+            return pd.Series([max(scores.values()), dom_pol])
 
         grid_df[['ias', 'dominant']] = grid_df.apply(calc_ias_row, axis=1)
         grid_df['risk'] = grid_df['ias'].apply(get_risk_level)
@@ -223,12 +266,20 @@ def lambda_handler(event, context):
         now_mx = datetime.now(ZoneInfo("America/Mexico_City"))
         grid_df['timestamp'] = now_mx.strftime("%Y-%m-%d %H:%M:%S")
 
-        cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant']
+        # H. Exportación Final a S3
+        cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
+                'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant']
+        
         final_json = grid_df[cols].replace({np.nan: None}).to_json(orient='records')
         
-        s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=final_json, ContentType='application/json')
-        print(f"📦 SUCCESS V56.9: {len(final_json)/1024:.2f} KB en S3.")
+        s3_client.put_object(
+            Bucket=S3_BUCKET, 
+            Key=S3_GRID_OUTPUT_KEY, 
+            Body=final_json, 
+            ContentType='application/json'
+        )
         
+        print(f"📦 SUCCESS {VERSION}: {len(final_json)/1024:.2f} KB guardados en S3.")
         return {'statusCode': 200, 'body': f'Predictor {VERSION} OK'}
 
     except Exception as e:
