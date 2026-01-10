@@ -46,144 +46,132 @@ def get_risk_level(ias):
     else: return "Extremadamente Alto"
 
 def overwrite_with_real_data(grid_df, stations_df):
-    if stations_df.empty: 
-        print("⚠️ LOG: Sin estaciones para calibrar.")
-        return grid_df
-    
-    for pol in ['o3', 'pm10', 'pm25']:
+    if stations_df.empty: return grid_df
+    metrics = ['o3', 'pm10', 'pm25']
+    for pol in metrics:
         real_col = f'{pol}_real'
         if real_col in stations_df.columns:
-            valid_ref = stations_df[real_col].dropna()
-            if not valid_ref.empty:
-                real_avg = valid_ref.mean()
+            valid_vals = pd.to_numeric(stations_df[real_col], errors='coerce').dropna()
+            if not valid_vals.empty:
+                real_avg = valid_vals.mean()
                 model_avg = grid_df[pol].mean()
                 bias = real_avg - model_avg
-                print(f"📊 LOG BIAS: {pol.upper()} -> Real: {real_avg:.2f}, Modelo: {model_avg:.2f}, Bias: {bias:.2f}")
+                print(f"📊 BIAS {pol.upper()}: Real={real_avg:.1f}, Modelo={model_avg:.1f}, Bias={bias:.1f}")
                 grid_df[pol] = (grid_df[pol] + bias).clip(lower=0)
-
-    grid_df['station'] = None
+    
+    # Inyección de nombres
     for _, st in stations_df.iterrows():
         dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
         idx = dist.idxmin()
         grid_df.at[idx, 'station'] = st['name']
-        for pol in ['o3', 'pm10', 'pm25']:
-            val = st.get(f'{pol}_real')
-            if val is not None and not np.isnan(val):
-                grid_df.at[idx, pol] = val
     return grid_df
 
-def inverse_distance_weighting(x, y, z, xi, yi, power=2):
+def inverse_distance_weighting(x, y, z, xi, yi):
     dist = np.sqrt((xi[:, None] - x[None, :])**2 + (yi[:, None] - y[None, :])**2)
     dist = np.maximum(dist, 1e-12)
-    weights = 1.0 / (dist ** power)
+    weights = 1.0 / (dist ** 2)
     return np.sum(weights * z[None, :], axis=1) / np.sum(weights, axis=1)
 
 def load_models():
-    print("⬇️ LOG: Cargando modelos XGBoost...")
     models = {}
     for p in ['o3', 'pm10', 'pm25']:
         path = f"{BASE_PATH}/app/artifacts/model_{p}.json"
         if os.path.exists(path):
-            try:
-                m = xgb.XGBRegressor()
-                m.load_model(path)
-                models[p] = m
-                print(f"✅ Modelo {p} cargado.")
-            except Exception as e:
-                print(f"❌ Error cargando {p}: {e}")
+            m = xgb.XGBRegressor(); m.load_model(path); models[p] = m
+            print(f"✅ Modelo {p} cargado.")
     return models
 
-def prepare_grid_features(stations_df):
-    # --- LOG ESTRATÉGICO 1 ---
-    with open(STATIC_ADMIN_PATH, 'r') as f:
-        grid_df = pd.DataFrame(json.load(f))
-    
-    alt_mean = grid_df['altitude'].mean() if 'altitude' in grid_df else 0
-    print(f"📡 CHECK CAPAS: Malla cargada ({len(grid_df)} pts). Altitud Avg={alt_mean:.2f}m")
-    
-    tz = ZoneInfo("America/Mexico_City")
-    now = datetime.now(tz)
-    grid_df['hour_sin'] = np.sin(2 * np.pi * now.hour / 24)
-    grid_df['hour_cos'] = np.cos(2 * np.pi * now.hour / 24)
-    grid_df['month_sin'] = np.sin(2 * np.pi * now.month / 12)
-    grid_df['month_cos'] = np.cos(2 * np.pi * now.month / 12)
-    
-    for feat, default in [('tmp', 20.0), ('rh', 40.0), ('wsp', 1.0), ('wdr', 90.0)]:
-        try:
-            if feat in stations_df.columns and stations_df[feat].notna().any():
-                valid = stations_df.dropna(subset=[feat, 'lat', 'lon'])
-                if not valid.empty:
-                    grid_df[feat] = inverse_distance_weighting(valid['lat'].values, valid['lon'].values, valid[feat].values, grid_df['lat'].values, grid_df['lon'].values)
-                    continue
-            grid_df[feat] = default
-        except Exception as e:
-            print(f"⚠️ Error IDW {feat}: {e}"); grid_df[feat] = default
-            
-    grid_df['station_numeric'] = -1
-    return grid_df
-
 def lambda_handler(event, context):
-    print("🚀 INICIANDO PREDICTOR MAESTRO V56.3...")
+    print("🚀 INICIANDO PREDICTOR MAESTRO V56.4...")
     try:
         models = load_models()
         
+        # 1. API con Blindaje Extremo
         try:
             r = requests.get(SMABILITY_API_URL, timeout=15)
-            resp_raw = r.json().get('stations', [])
-            print(f"📡 CHECK API: {len(resp_raw)} estaciones recibidas.")
+            stations_raw = r.json().get('stations') or []
+            print(f"📡 CHECK API: {len(stations_raw)} estaciones recibidas.")
         except Exception as e:
-            print(f"⚠️ LOG: Error API: {e}"); resp_raw = []
+            print(f"⚠️ Error API: {e}"); stations_raw = []
 
         parsed = []
-        for s in resp_raw:
-            met = s.get('meteorological') or {}
-            pol = s.get('pollutants') or {}
+        for s in stations_raw:
+            if not s: continue
+            # Extraer de forma segura incluso si faltan diccionarios completos
+            p = s.get('pollutants') or {}
+            m = s.get('meteorological') or {}
             
-            def get_deep(d, k1, k2):
-                return d.get(k1, {}).get(k2, {}).get('value') if d.get(k1) else None
+            def safe_get(d, k1, k2):
+                tmp = d.get(k1)
+                if isinstance(tmp, dict):
+                    return tmp.get(k2, {}).get('value')
+                return None
 
             parsed.append({
                 'name': s.get('station_name', 'Unknown'),
                 'lat': float(s['latitude']) if s.get('latitude') else None,
                 'lon': float(s['longitude']) if s.get('longitude') else None,
-                'o3_real': get_deep(pol, 'o3', 'avg_1h'),
-                'pm10_real': get_deep(pol, 'pm10', 'avg_1h'),
-                'pm25_real': get_deep(pol, 'pm25', 'avg_1h'),
-                'tmp': get_deep(met, 'temperature', 'avg_1h'),
-                'rh': get_deep(met, 'relative_humidity', 'avg_1h'),
-                'wsp': get_deep(met, 'wind_speed', 'avg_1h'),
-                'wdr': get_deep(met, 'wind_direction', 'avg_1h')
+                'o3_real': safe_get(p, 'o3', 'avg_1h'),
+                'pm10_real': safe_get(p, 'pm10', 'avg_1h'),
+                'pm25_real': safe_get(p, 'pm25', 'avg_1h'),
+                'tmp': safe_get(m, 'temperature', 'avg_1h'),
+                'rh': safe_get(m, 'relative_humidity', 'avg_1h'),
+                'wsp': safe_get(m, 'wind_speed', 'avg_1h')
             })
         
         stations_df = pd.DataFrame(parsed).dropna(subset=['lat', 'lon'])
-        grid_df = prepare_grid_features(stations_df)
         
-        FEATURES = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp']
+        # 2. Cargar Malla
+        if not os.path.exists(STATIC_ADMIN_PATH):
+            raise FileNotFoundError(f"No existe la malla en {STATIC_ADMIN_PATH}")
+            
+        with open(STATIC_ADMIN_PATH, 'r') as f:
+            grid_df = pd.DataFrame(json.load(f))
+        
+        print(f"✅ Malla cargada: {len(grid_df)} puntos. Altitud Avg: {grid_df['altitude'].mean():.1f}")
+
+        # 3. Features Temporales y Meteo
+        tz = ZoneInfo("America/Mexico_City")
+        now = datetime.now(tz)
+        grid_df['hour_sin'] = np.sin(2 * np.pi * now.hour / 24)
+        grid_df['hour_cos'] = np.cos(2 * np.pi * now.hour / 24)
+        grid_df['month_sin'] = np.sin(2 * np.pi * now.month / 12)
+        grid_df['month_cos'] = np.cos(2 * np.pi * now.month / 12)
+
+        for feat, default in [('tmp', 20.0), ('rh', 40.0), ('wsp', 1.0)]:
+            valid = stations_df.dropna(subset=[feat])
+            if not valid.empty:
+                grid_df[feat] = inverse_distance_weighting(valid['lat'].values, valid['lon'].values, valid[feat].values, grid_df['lat'].values, grid_df['lon'].values)
+            else: grid_df[feat] = default
+
+        # 4. Predicción y Calibración
+        grid_df['station_numeric'] = -1
+        feats = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp']
+        
         for p in ['o3', 'pm10', 'pm25']:
             if p in models:
-                grid_df[p] = models[p].predict(grid_df[FEATURES]).clip(0)
+                grid_df[p] = models[p].predict(grid_df[feats]).clip(0)
             else: grid_df[p] = 0.0
 
         grid_df = overwrite_with_real_data(grid_df, stations_df)
 
-        def get_metrics(row):
-            scores = {'O3': get_ias_score(row['o3'], 'o3'), 'PM10': get_ias_score(row['pm10'], 'pm10'), 'PM2.5': get_ias_score(row['pm25'], 'pm25')}
-            dom = max(scores, key=scores.get)
-            return pd.Series([max(scores.values()), dom])
+        # 5. IAS y Riesgo
+        def calc_row(row):
+            s = {'O3': get_ias_score(row['o3'], 'o3'), 'PM10': get_ias_score(row['pm10'], 'pm10'), 'PM2.5': get_ias_score(row['pm25'], 'pm25')}
+            dom = max(s, key=s.get)
+            return pd.Series([max(s.values()), dom])
 
-        grid_df[['ias', 'dominant']] = grid_df.apply(get_metrics, axis=1)
+        grid_df[['ias', 'dominant']] = grid_df.apply(calc_row, axis=1)
         grid_df['risk'] = grid_df['ias'].apply(get_risk_level)
+        grid_df['timestamp'] = now.strftime("%Y-%m-%d %H:%M:%S")
+
+        # 6. Guardado S3
+        cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant']
+        output = grid_df[cols].replace({np.nan: None}).to_json(orient='records')
         
-        tz = ZoneInfo("America/Mexico_City")
-        grid_df['timestamp'] = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-        cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 'tmp', 'rh', 'wsp', 'wdr', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant']
+        print(f"📦 OUTPUT: {len(output)/1024:.1f} KB")
+        s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=output, ContentType='application/json')
         
-        final_df = grid_df[cols].replace({np.nan: None})
-        final_json = final_df.to_json(orient='records')
-        
-        print(f"📦 CHECK OUTPUT: Tamaño={len(final_json)/1024:.2f} KB")
-        s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=final_json, ContentType='application/json')
-        
-        return {'statusCode': 200, 'body': 'V56.3 Success'}
+        return {'statusCode': 200, 'body': 'V56.4 OK'}
     except Exception as e:
-        print(f"❌ ERROR FATAL: {str(e)}"); return {'statusCode': 500, 'body': str(e)}
+        print(f"❌ ERROR: {e}"); return {'statusCode': 500, 'body': str(e)}
