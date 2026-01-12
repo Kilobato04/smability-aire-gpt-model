@@ -1,13 +1,8 @@
 [build]
-  # Forzamos a que no busque en subcarpetas
-  base = ""
-  # El directorio que contiene el index.html
   publish = "."
-  # Un comando que no hace nada y termina rápido
-  command = "echo 'Despliegue estático optimizado'"
+  command = "echo 'Despliegue estático'"
 
 [build.environment]
-  # Estas variables evitan que Netlify active el motor de Python
+  # Desactivamos explícitamente los detectores
   NETLIFY_SKIP_PYTHON_INSTALL = "true"
-  PYTHON_VERSION = "0"
-  NODE_VERSION = "20" # Forzamos una versión de Node para que no busque Python
+  PYTHON_VERSION = ""
