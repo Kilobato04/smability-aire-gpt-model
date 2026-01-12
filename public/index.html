@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smability Dashboard - CDMX</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+    
+    <style>
+        body { margin: 0; padding: 0; background: #0f172a; font-family: 'Inter', sans-serif; color: #e2e8f0; overflow: hidden; }
+        #map { height: 100vh; width: 100%; background: #0f172a; z-index: 1; }
+        
+        .sidebar {
+            position: absolute; top: 10px; left: 10px; z-index: 2000;
+            background: rgba(15, 23, 42, 0.95); width: 320px;
+            border-radius: 12px; border: 1px solid rgba(56, 189, 248, 0.2);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6); backdrop-filter: blur(10px);
+            display: flex; flex-direction: column; overflow: hidden;
+            transition: transform 0.3s ease, height 0.3s ease;
+            max-height: 90vh;
+        }
+        .sidebar.collapsed { height: 60px; overflow: hidden; }
+
+        .header { padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: linear-gradient(to right, rgba(56,189,248,0.1), transparent); display: flex; justify-content: space-between; align-items: center; }
+        .title-group h1 { margin: 0; font-size: 18px; font-weight: 600; color: #38bdf8; letter-spacing: -0.5px; }
+        .title-group .subtitle { font-size: 11px; color: #94a3b8; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px; }
+        .toggle-btn { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; padding: 5px; outline: none; }
+
+        .time-controls { padding: 12px 20px; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .time-select { width: 100%; padding: 8px 10px; background: #1e293b; color: #fff; border: 1px solid #475569; border-radius: 6px; font-size: 12px; font-family: 'Roboto Mono', monospace; cursor: pointer; outline: none; appearance: none; }
+        
+        .scroll-content { overflow-y: auto; flex: 1; padding-bottom: 10px; }
+        .status-bar { padding: 8px 20px; font-size: 10px; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; background: rgba(0,0,0,0.2); }
+        .live-dot { height: 6px; width: 6px; background-color: #22c55e; border-radius: 50%; display: inline-block; margin-right: 6px; box-shadow: 0 0 6px #22c55e; animation: pulse 2s infinite; }
+        
+        .controls { padding: 15px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .btn-var { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #94a3b8; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 11px; text-align: center; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: 500; }
+        .btn-var:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .btn-var.active { background: rgba(56, 189, 248, 0.15); border-color: #38bdf8; color: #fff; font-weight: 600; }
+
+        .legend-panel { padding: 5px 20px 20px 20px; }
+        .legend-title { font-size: 11px; color: #e2e8f0; margin-bottom: 10px; display: flex; justify-content: space-between; font-weight: 500; }
+        .legend-bar { height: 8px; border-radius: 4px; position: relative; margin-bottom: 8px; }
+        .legend-labels { display: flex; justify-content: space-between; font-size: 9px; color: #64748b; font-family: 'Roboto Mono'; }
+        .stats-row { display: flex; justify-content: space-between; margin-top: 15px; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); }
+        .stat-item { text-align: center; }
+        .stat-val { display: block; font-size: 14px; font-weight: 600; color: #fff; font-family: 'Roboto Mono'; margin-bottom: 2px; }
+        .stat-lbl { font-size: 8px; color: #64748b; text-transform: uppercase; }
+
+        #loading { text-align:center; padding:30px; color:#94a3b8; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .spinner { width: 20px; height: 20px; border: 2px solid rgba(56,189,248,0.3); border-top: 2px solid #38bdf8; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        @media (max-width: 600px) { .sidebar { width: calc(100% - 20px); max-height: 65vh; } }
+        .leaflet-popup-content-wrapper { background: #ffffff !important; color: #1e293b !important; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: none; padding: 0; }
+        .leaflet-popup-tip { background: #ffffff !important; }
+        .leaflet-popup-content { margin: 24px 16px 16px 16px; line-height: 1.5; }
+
+        /* Elimina cualquier borde residual en los cuadros del mapa */
+        .leaflet-interactive {
+            stroke: none !important;
+            stroke-width: 0 !important;
+            outline: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar" id="sidebar">
+        <div class="header">
+            <div class="title-group">
+                <h1>Smability AI</h1>
+                <div class="subtitle">Monitor Ambiental ZMVM</div>
+            </div>
+            <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
+        </div>
+        
+        <div class="time-controls">
+            <select id="time-select" class="time-select" onchange="changeTime()">
+                <option value="latest" selected>🔴 En Vivo (Cargando...)</option>
+            </select>
+        </div>
+
+        <div class="scroll-content">
+            <div class="status-bar">
+                <span><span class="live-dot" id="dot-indicator"></span><span id="connection-status">CONECTANDO...</span></span>
+                <span id="update-time" style="font-family:'Roboto Mono'">--:--</span>
+            </div>
+
+            <div id="loading">
+                <div class="spinner"></div>
+                <div>Cargando datos...</div>
+            </div>
+
+            <div id="main-content" style="display:none;">
+                <div class="controls">
+                    <div class="btn-var btn-air active" id="btn-ias" onclick="setMode('ias', this)">🚦 IAS</div>
+                    <div class="btn-var btn-air" onclick="setMode('o3', this)">🔴 O3</div>
+                    <div class="btn-var btn-air" onclick="setMode('pm10', this)">🟤 PM10</div>
+                    <div class="btn-var btn-air" onclick="setMode('pm25', this)">🟣 PM2.5</div>
+                    <div class="btn-var" onclick="setMode('tmp', this)">🌡️ Temp</div>
+                    <div class="btn-var" onclick="setMode('rh', this)">💧 Hum</div>
+                    <div class="btn-var" onclick="setMode('wsp', this)">💨 Viento</div>
+                    <div class="btn-var" style="grid-column: span 1;" onclick="setMode('alt', this)">⛰️ Alt</div>
+                    <div class="btn-var" style="grid-column: span 1;" onclick="setMode('building_vol', this)">🏙️ Urbano</div>
+                </div>
+
+                <div class="legend-panel">
+                    <div class="legend-title">
+                        <span id="legend-name">Índice Aire y Salud</span>
+                        <span id="legend-unit" style="color: #64748b;">Pts</span>
+                    </div>
+                    <div class="legend-bar" id="color-bar"></div>
+                    <div class="legend-labels" id="legend-ticks"></div>
+
+                    <div class="stats-row">
+                        <div class="stat-item"><span class="stat-val" id="stat-min">--</span><span class="stat-lbl">Mínimo</span></div>
+                        <div class="stat-item"><span class="stat-val" id="stat-avg">--</span><span class="stat-lbl">Promedio</span></div>
+                        <div class="stat-item"><span class="stat-val" id="stat-max">--</span><span class="stat-lbl">Máximo</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
+
+        const map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([19.4326, -99.1332], 10);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'Smability AI', maxZoom: 19 }).addTo(map);
+
+        const CONFIG = {
+            ias: { name: 'Índice Aire y Salud', unit: 'Pts', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
+            o3: { name: 'Ozono (O3)', unit: 'ppb', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 250], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
+            pm10: { name: 'Partículas PM10', unit: 'µg/m³', min: 0, max: 215, stops: [0, 45, 75, 130, 215, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
+            pm25: { name: 'Partículas PM2.5', unit: 'µg/m³', min: 0, max: 150, stops: [0, 25, 45, 80, 147, 200], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
+            tmp: { name: 'Temperatura', unit: '°C', min: 0, max: 35, stops: [0, 10, 20, 30, 35], colors: ['#0000ff', '#00ffff', '#ffff00', '#ff0000', '#800000'] },
+            rh: { name: 'Humedad', unit: '%', min: 0, max: 100, stops: [0, 25, 50, 75, 100], colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b'] },
+            wsp: { name: 'Viento', unit: 'm/s', min: 0, max: 15, stops: [0, 3, 6, 9, 15], colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c'] },
+            alt: { name: 'Altitud', unit: 'm', min: 2230, max: 4000, stops: [2230, 2260, 2400, 2900, 3500, 4000], colors: ['#0d47a1', '#1b5e20', '#8bc34a', '#fbc02d', '#795548', '#eeeeee'] },
+            building_vol: { name: 'Densidad Urbana', unit: 'm³', min: 0, max: 1200000, stops: [0, 10000, 100000, 400000, 800000, 1200000], colors: ['#ffffff', '#e0e0e0', '#fca5a5', '#ef4444', '#b91c1c', '#7f1d1d'] }
+        };
+
+        let globalData = null;
+        let fallbackData = null; 
+        let currentMetric = 'ias'; 
+        let geoLayer = null;
+
+        console.log("🚀 Iniciando Dashboard V6.5 (Safe Time Parse)");
+        generateLocalTimeOptions();
+        loadMapData('latest');
+
+        function generateLocalTimeOptions() {
+            const select = document.getElementById('time-select');
+            select.innerHTML = ''; 
+            const optLatest = document.createElement('option');
+            optLatest.value = 'latest'; optLatest.innerText = "🔴 En Vivo (Cargando...)";
+            select.appendChild(optLatest);
+
+            const now = new Date();
+            let start = new Date(now);
+            if (start.getMinutes() < 20) start.setHours(start.getHours() - 1);
+            start.setMinutes(20); start.setSeconds(0);
+
+            for (let i = 0; i < 24; i++) {
+                const d = new Date(start.getTime() - (i * 60 * 60 * 1000));
+                const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0'); const hour = String(d.getHours()).padStart(2, '0');
+                const min = String(d.getMinutes()).padStart(2, '0');
+                const val = `${year}-${month}-${day}_${hour}-${min}`;
+                const label = `${day}/${month} - ${hour}:${min}`;
+                const opt = document.createElement('option');
+                opt.value = val; opt.innerText = label;
+                select.appendChild(opt);
+            }
+        }
+
+        function loadMapData(forceTimestamp = null) {
+            const select = document.getElementById('time-select');
+            const timestampKey = forceTimestamp || select.value;
+
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('main-content').style.opacity = '0.3';
+            
+            let url = BASE_API_URL + "?mode=map";
+            if (timestampKey !== 'latest') { url += `&timestamp=${timestampKey}`; }
+            url += `&_t=${Date.now()}`;
+
+            fetch(url)
+                .then(response => { if(!response.ok) throw new Error("Datos no encontrados"); return response.json(); })
+                .then(data => {
+                    globalData = data;
+                    if (timestampKey === 'latest') {
+                        fallbackData = data; 
+                        
+                        // PARSING SEGURO DE FECHA (Sin timezone shift)
+                        let timeStr = "--:--";
+                        if(data.length > 0 && data[0].timestamp) {
+                            // "2025-12-11 13:20:00" -> Cortamos los caracteres exactos
+                            // [11, 16] extrae "13:20"
+                            timeStr = data[0].timestamp.substring(11, 16);
+                            
+                            // Actualizar etiqueta del dropdown
+                            const latOpt = select.querySelector('option[value="latest"]');
+                            if(latOpt) latOpt.innerText = `🔴 En Vivo - ${timeStr}`;
+                            document.getElementById('update-time').innerText = timeStr;
+                        }
+                        
+                        document.getElementById('connection-status').innerText = "EN VIVO";
+                        document.getElementById('connection-status').style.color = "#22c55e";
+                        document.getElementById('dot-indicator').style.backgroundColor = "#22c55e";
+                        document.getElementById('dot-indicator').style.boxShadow = "0 0 6px #22c55e";
+                    } else {
+                        document.getElementById('connection-status').innerText = "HISTÓRICO";
+                        document.getElementById('connection-status').style.color = "#38bdf8";
+                        document.getElementById('dot-indicator').style.backgroundColor = "#38bdf8";
+                        document.getElementById('dot-indicator').style.boxShadow = "0 0 6px #38bdf8";
+                        
+                        if(data.length > 0 && data[0].timestamp) {
+                            const ts = data[0].timestamp;
+                            const timeStr = ts.substring(11, 16);
+                            document.getElementById('update-time').innerText = timeStr;
+                        }
+                    }
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('main-content').style.display = 'block';
+                    document.getElementById('main-content').style.opacity = '1';
+                    renderMap();
+                })
+                .catch(err => {
+                    console.error("Error carga:", err);
+                    document.getElementById('loading').innerHTML = `<div style="color:#ef4444">Sin datos para esta hora.</div>`;
+                });
+        }
+
+        function changeTime() { loadMapData(); }
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
+
+        function getColor(val, metric) {
+            const conf = CONFIG[metric];
+            let v = Number(val || 0);
+            v = Math.max(conf.min, Math.min(v, conf.max));
+            const stops = conf.stops;
+            for (let i = 0; i < stops.length - 1; i++) {
+                if (v >= stops[i] && v <= stops[i+1]) {
+                    const t = (v - stops[i]) / (stops[i+1] - stops[i]);
+                    const c1 = hexToRgb(conf.colors[i]);
+                    const c2 = hexToRgb(conf.colors[i+1]);
+                    return `rgb(${lerp(c1.r, c2.r, t)}, ${lerp(c1.g, c2.g, t)}, ${lerp(c1.b, c2.b, t)})`;
+                }
+            }
+            return conf.colors[0];
+        }
+
+        function hexToRgb(hex) { const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : {r:0,g:0,b:0}; }
+        function lerp(start, end, t) { return Math.round(start + (end - start) * t); }
+
+        function renderMap() {
+            if (!globalData) return;
+            if (geoLayer) map.removeLayer(geoLayer);
+            
+            const conf = CONFIG[currentMetric]; 
+            const RECT_SIZE = 0.005;
+            const OVERLAP = 1.08;
+            const rectangles = []; 
+            const vals = [];
+
+            let dataKey = currentMetric;
+            if (currentMetric === 'alt') dataKey = 'altitude'; 
+
+            for(let i=0; i < globalData.length; i++) {
+                let p = globalData[i];
+                let val = p[dataKey];
+                
+                if ((dataKey === 'altitude' || dataKey === 'building_vol') && (!val || val === 0)) {
+                    if (fallbackData && fallbackData[i]) {
+                        val = fallbackData[i][dataKey];
+                    }
+                }
+
+                val = Number(val || 0);
+                vals.push(val);
+
+                const color = getColor(val, currentMetric);
+                // Aplicamos el OVERLAP para que los cuadros se encimen sutilmente y borren la rejilla
+                const bounds = [
+                    [p.lat - (RECT_SIZE * OVERLAP), p.lon - (RECT_SIZE * OVERLAP)], 
+                    [p.lat + (RECT_SIZE * OVERLAP), p.lon + (RECT_SIZE * OVERLAP)]
+                ];
+                const isStation = p.station ? true : false;
+                const strokeColor = isStation ? '#ffffff' : color;
+                const weight = isStation ? 2 : 0;
+                const fillOp = isStation ? 0.9 : 0.75;
+                const rect = L.rectangle(bounds, { 
+                    stroke: isStation, // Solo dibuja borde si es una estación
+                    color: '#ffffff', 
+                    weight: isStation ? 2 : 0, 
+                    fillOpacity: fillOp, 
+                    fillColor: color 
+                });
+
+                const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
+                const loc_text = (p.mun && p.mun !== 'N/A') ? `📍 ${p.mun}, ${p.edo}` : `📍 ${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`;
+                
+                let bVol = Number(p.building_vol || 0);
+                let altVal = Number(p.altitude || 0);
+                if (bVol === 0 && fallbackData && fallbackData[i]) bVol = Number(fallbackData[i].building_vol || 0);
+                if (altVal === 0 && fallbackData && fallbackData[i]) altVal = Number(fallbackData[i].altitude || 0);
+
+                let headerHTML = `<div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">🕒 ${p.timestamp || 'Live'}</div>`;
+                if (isStation) { headerHTML += `<div style="background:#38bdf8; color:#0f172a; padding:4px 8px; border-radius:4px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:12px;">📡 Estación: ${p.station}</div>`; }
+
+                rect.bindPopup(`
+                    <div style="font-family:'Inter'; color:#334155; min-width: 175px;">
+                        ${headerHTML}
+                        <div style="margin-bottom:8px; font-size:11px; font-weight:600; color:#3b82f6; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">${loc_text}</div>
+                        <div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;">
+                            <span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${Number(p.ias||0).toFixed(0)} pts</span>
+                            <span style="font-weight:600; color:#000;">☢️ Riesgo:</span> <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> <span>${Number(p.o3||0).toFixed(1)} ppb</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${Number(p.pm10||0).toFixed(1)} µg</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟣 PM2.5${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${Number(p.pm25||0).toFixed(1)} µg</span>
+                            <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;">
+                            <span style="color:#475569;">🏙️ Vol:</span> <span>${(bVol/1000).toFixed(0)}k m³</span>
+                            <span style="color:#475569;">🌡️ Temp:</span> <span>${Number(p.tmp||0).toFixed(1)} °C</span>
+                            <span style="color:#475569;">💧 Hum:</span> <span>${Number(p.rh||0).toFixed(0)} %</span>
+                            <span style="color:#475569;">💨 Viento:</span> <span>${Number(p.wsp||0).toFixed(1)} m/s</span>
+                            <span style="color:#475569;">⛰️ Alt:</span> <span>${altVal.toFixed(0)} m</span>
+                        </div>
+                    </div>
+                `);
+                
+                rect.on('mouseover', function(){ this.setStyle({ fillOpacity: 0.9, weight: isStation?3:1, color: '#fff' })});
+                // Ajuste sugerido para el mouseout
+                rect.on('mouseout', function(){ 
+                    this.setStyle({ 
+                        fillOpacity: 0.75, 
+                        weight: weight, 
+                        color: strokeColor,
+                        stroke: isStation // <--- Añade esta línea
+                    })
+                });
+                rectangles.push(rect);
+            }
+            geoLayer = L.layerGroup(rectangles).addTo(map);
+            if (vals.length > 0) updateLegend(conf, Math.min(...vals), Math.max(...vals), vals.reduce((a,b)=>a+b,0)/vals.length);
+        }
+
+        function updateLegend(conf, min, max, avg) {
+            document.getElementById('legend-name').innerText = conf.name;
+            document.getElementById('legend-unit').innerText = conf.unit;
+            let gradStr = 'linear-gradient(to right';
+            for(let i=0; i<conf.stops.length; i++) {
+                let pct = ((conf.stops[i] - conf.min) / (conf.max - conf.min)) * 100;
+                gradStr += `, ${conf.colors[i]} ${pct}%`;
+            }
+            gradStr += ')';
+            document.getElementById('color-bar').style.background = gradStr;
+            document.getElementById('legend-ticks').innerHTML = conf.stops.map(s => `<span>${s}</span>`).join('');
+            document.getElementById('stat-min').innerText = min.toFixed(1);
+            document.getElementById('stat-max').innerText = max.toFixed(1);
+            document.getElementById('stat-avg').innerText = avg.toFixed(1);
+        }
+
+        window.setMode = (mode, el) => {
+            currentMetric = mode;
+            document.querySelectorAll('.btn-var').forEach(b => b.classList.remove('active'));
+            if(el) el.classList.add('active');
+            renderMap();
+        };
+    </script>
+</body>
+</html>
