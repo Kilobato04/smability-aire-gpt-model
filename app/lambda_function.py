@@ -12,6 +12,9 @@ import os
 BASE_PATH = os.environ.get('LAMBDA_TASK_ROOT', '/var/task')
 S3_BUCKET = os.environ.get('S3_BUCKET', 'smability-data-lake')
 S3_GRID_OUTPUT_KEY = os.environ.get('S3_GRID_OUTPUT_KEY', 'live_grid/latest_grid.json')
+# --- CONFIGURACIÓN DE CONTROL MAESTRO ---
+# 1.0 = Original | >1.0 = Más limpio (Verde) | <1.0 = Más contaminado (Rojo)
+BIAS_SENSITIVITY = 1.0
 # --- CONFIGURACIÓN S3 ---
 S3_BUCKET = "smability-data-lake"
 # Los modelos ahora viven en: models/model_xxx.json
@@ -241,8 +244,14 @@ def lambda_handler(event, context):
                 v_valid = v_real_all.dropna(subset=[real_col])
                 bias = 0
                 if not v_valid.empty:
-                    bias = v_valid[real_col].mean() - v_valid['raw_ai'].mean()
-                    grid_df[p] = (grid_df[p] + bias).clip(0)
+                    # Cálculo del bias base
+                    raw_bias = v_valid[real_col].mean() - v_valid['raw_ai'].mean()
+                    
+                    # APLICACIÓN DE LA PERILLA DE SENSIBILIDAD
+                    applied_bias = raw_bias * BIAS_SENSITIVITY
+                    
+                    grid_df[p] = (grid_df[p] + applied_bias).clip(0)
+                    print(f"DEBUG: {p.upper()} - Bias Original: {raw_bias:+.2f} | Aplicado (x{BIAS_SENSITIVITY}): {applied_bias:+.2f}")
                 
                 # 4. REPORTE VISUAL EN LOGS (TABLA)
                 unit = "ppb" if p == "o3" else "µg/m³"
