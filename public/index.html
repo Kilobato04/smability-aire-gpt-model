@@ -59,13 +59,22 @@
         .leaflet-popup-tip { background: #ffffff !important; }
         .leaflet-popup-content { margin: 24px 16px 16px 16px; line-height: 1.5; }
 
-        /* Elimina cualquier borde residual en los cuadros del mapa */
         .leaflet-interactive {
-            stroke: none !important;
-            stroke-width: 0 !important;
             shape-rendering: crispEdges;
+            stroke: none;
+            stroke-width: 0;
             outline: none !important;
         }
+        
+        /* Excepción: Permitir que las estaciones mantengan su borde blanco */
+        .leaflet-interactive[stroke="#ffffff"], 
+        .leaflet-interactive[stroke="white"] {
+            stroke: #ffffff !important;
+            stroke-width: 2px !important;
+            stroke-opacity: 1 !important;
+            shape-rendering: auto; /* Para que el círculo de la estación se vea suave/redondo */
+        }
+        
     </style>
 </head>
 <body>
@@ -269,7 +278,7 @@
             
             const conf = CONFIG[currentMetric]; 
             const RECT_SIZE = 0.005;
-            const OVERLAP = 1.12;
+            const OVERLAP = 1.02;
             const rectangles = []; 
             const vals = [];
 
@@ -300,11 +309,15 @@
                 const weight = isStation ? 2 : 0;
                 const fillOp = isStation ? 0.9 : 0.75;
                 const rect = L.rectangle(bounds, { 
-                    stroke: isStation, // Solo dibuja borde si es una estación
+                    stroke: isStation, 
                     color: '#ffffff', 
                     weight: isStation ? 2 : 0, 
                     fillOpacity: fillOp, 
-                    fillColor: color 
+                    fillColor: color,
+                    // Propiedades para eliminar fisuras:
+                    lineCap: 'butt',
+                    lineJoin: 'miter',
+                    smoothFactor: 0 
                 });
 
                 const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
