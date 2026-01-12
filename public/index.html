@@ -10,7 +10,7 @@
     
     <style>
         body { margin: 0; padding: 0; background: #0f172a; font-family: 'Inter', sans-serif; color: #e2e8f0; overflow: hidden; }
-        #map { height: 100vh; width: 100%; background: #0f172a; z-index: 1; }
+        #map { height: 100vh; width: 100%; background: #191a1a; z-index: 1; }
         
         .sidebar {
             position: absolute; top: 10px; left: 10px; z-index: 2000;
@@ -159,10 +159,21 @@
         const map = L.map('map', { 
             zoomControl: false, 
             preferCanvas: true,
-            renderer: L.canvas({ padding: 0.5 }) // Agrega un padding al renderizador para evitar cortes en los bordes
+            renderer: L.canvas({ padding: 0.5 }) 
         }).setView([19.4326, -99.1332], 10);
+        
         L.control.zoom({ position: 'bottomright' }).addTo(map);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'Smability AI', maxZoom: 19 }).addTo(map);
+        
+        // CONFIGURACIÓN MAPBOX
+        const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiY21rYnJseG1kMDZnczNlb2xrdDhrejE1biJ9.VFEMLEntTg5fDXDefQTnFA';
+        const MAPBOX_STYLE = 'mapbox/dark-v11'; // Estilo Dark profesional
+        
+        L.tileLayer(`https://api.mapbox.com/styles/v1/${MAPBOX_STYLE}/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, {
+            attribution: '© Mapbox © OpenStreetMap',
+            tileSize: 512,
+            zoomOffset: -1,
+            maxZoom: 19
+        }).addTo(map);
 
         const CONFIG = {
             ias: { name: 'Índice Aire y Salud', unit: 'Pts', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
@@ -325,7 +336,7 @@
                 const isStation = p.station ? true : false;
                 const strokeColor = isStation ? '#ffffff' : color;
                 const weight = isStation ? 2 : 0;
-                const fillOp = isStation ? 0.9 : 0.75;
+                const fillOp = isStation ? 0.9 : 0.65;
                 const rect = L.rectangle(bounds, { 
                     stroke: isStation, 
                     color: '#ffffff', 
