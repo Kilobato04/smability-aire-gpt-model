@@ -212,13 +212,15 @@ def lambda_handler(event, context):
         # E. Predicción y Calibración
         grid_df['station_numeric'] = -1
         
-        # --- ESTA ES LA LÍNEA CLAVE PARA ELIMINAR LOS WARNINGS ---
+        # 1. Aseguramos tipos de datos y pre-inicializamos
         for p in ['o3', 'pm10', 'pm25']:
-            grid_df[p] = 0.0  # Inicializamos
-            grid_df[p] = grid_df[p].astype(float) # Forzamos que sea float64
-        # --------------------------------------------------------
-
+            grid_df[p] = 0.0
+            grid_df[p] = grid_df[p].astype(float)
+        
         feats = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp']
+        
+        # 2. Bucle de predicción y calibración (Alineación corregida)
+        for p in ['o3', 'pm10', 'pm25']:
             if p in models:
                 # 1. Predicción base de la IA
                 grid_df[p] = models[p].predict(grid_df[feats]).clip(0)
