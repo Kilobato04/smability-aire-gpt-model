@@ -75,6 +75,10 @@
             shape-rendering: auto; /* Para que el círculo de la estación se vea suave/redondo */
         }
         
+        .leaflet-canvas-layer {
+            shape-rendering: crispEdges;
+        }
+        
     </style>
 </head>
 <body>
@@ -278,7 +282,7 @@
             
             const conf = CONFIG[currentMetric]; 
             const RECT_SIZE = 0.005;
-            const OVERLAP = 1.02;
+            const OVERLAP = 1.01;
             const rectangles = []; 
             const vals = [];
 
