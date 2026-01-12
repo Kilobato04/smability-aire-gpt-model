@@ -164,16 +164,22 @@ def lambda_handler(event, context):
             pol = s.get('pollutants') or {}
             met = s.get('meteorological') or {}
             
+# --- INICIO DEL REEMPLAZO (AJUSTE TEMPORAL PMs) ---
             def safe_val(d, key, c_key):
                 obj = d.get(key)
                 if isinstance(obj, dict):
-                    inner = obj.get('avg_1h')
+                    # Si es PM10 o PM25, usamos el promedio móvil de 12h de la norma
+                    # Para O3 y Meteorología, seguimos usando el avg_1h
+                    target_window = 'avg_12h' if key in ['pm10', 'pm25'] else 'avg_1h'
+                    
+                    inner = obj.get(target_window)
                     if isinstance(inner, dict):
                         val = inner.get('value')
                         if val is not None:
                             counts[c_key] += 1
                             return val
                 return None
+            # --- FIN DEL REEMPLAZO ---
 
             parsed.append({
                 'name': s.get('station_name', 'Unknown'),
