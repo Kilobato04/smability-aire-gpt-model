@@ -79,18 +79,20 @@
             shape-rendering: crispEdges;
         }
         /* Ataca directamente al canvas de Mapbox/Leaflet */
+        .leaflet-canvas-layer canvas, 
         canvas.leaflet-zoom-animated {
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
             image-rendering: pixelated; /* <--- Esto hace que los cuadros encajen perfecto */
-        }
+        }      
         
         /* Asegura que los patentes de Leaflet no tengan borde */
         .leaflet-interactive {
             stroke-width: 0 !important;
             stroke-opacity: 0 !important;
+            outline: none !important;
         }
-        
+             
     </style>
 </head>
 <body>
@@ -309,7 +311,7 @@
             
             const conf = CONFIG[currentMetric]; 
             const RECT_SIZE = 0.005;
-            const OVERLAP = 1.04;
+            const OVERLAP = 1.06;
             const rectangles = []; 
             const vals = [];
 
@@ -340,16 +342,13 @@
                 const weight = isStation ? 2 : 0;
                 const fillOp = isStation ? 0.9 : 0.65;
                 const rect = L.rectangle(bounds, { 
-                    stroke: isStation, // Solo true si es estación
-                    color: '#ffffff', 
-                    weight: isStation ? 2 : 0, 
-                    fillOpacity: fillOp, 
-                    fillColor: color,
-                    interactive: true,
-                    // Forzamos al renderizador a no "inventar" bordes
-                    lineCap: 'butt',
-                    lineJoin: 'miter'
-                });
+                        stroke: isStation,      // <--- SÚPER IMPORTANTE: False para la IA
+                        color: '#ffffff', 
+                        weight: isStation ? 2 : 0, 
+                        fillOpacity: fillOp, 
+                        fillColor: color,
+                        interactive: true
+                    });
 
                 const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
                 const loc_text = (p.mun && p.mun !== 'N/A') ? `📍 ${p.mun}, ${p.edo}` : `📍 ${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`;
@@ -382,16 +381,19 @@
                     </div>
                 `);
                 
-                rect.on('mouseover', function(){ this.setStyle({ fillOpacity: 0.9, weight: isStation?3:1, color: '#fff' })});
-                // Ajuste sugerido para el mouseout
-                rect.on('mouseout', function(){ 
-                    this.setStyle({ 
-                        fillOpacity: 0.75, 
-                        weight: weight, 
-                        color: strokeColor,
-                        stroke: isStation // <--- Añade esta línea
-                    })
+                rect.on('mouseover', function() {
+                    // Solo aumentamos la opacidad, no agregamos bordes (evita la estela)
+                    this.setStyle({ fillOpacity: 0.9 });
+                    if (isStation) { this.setStyle({ weight: 4 }); }
                 });
+                // Ajuste sugerido para el mouseout
+                rect.on('mouseout', function() {
+                        this.setStyle({ 
+                            fillOpacity: fillOp,
+                            weight: isStation ? 2 : 0,
+                            stroke: isStation 
+                        });
+                    });
                 rectangles.push(rect);
             }
             geoLayer = L.layerGroup(rectangles).addTo(map);
