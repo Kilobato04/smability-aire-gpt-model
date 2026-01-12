@@ -1,11 +1,6 @@
 [build]
   publish = "."
-  command = "echo 'Skipping build...'"
+  command = "echo 'Static site only'"
 
 [build.environment]
-  NETLIFY_SKIP_PYTHON_INSTALL = "true"
-
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+  PYTHON_VERSION = "0.0.0"
