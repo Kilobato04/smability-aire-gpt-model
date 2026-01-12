@@ -63,6 +63,7 @@
         .leaflet-interactive {
             stroke: none !important;
             stroke-width: 0 !important;
+            shape-rendering: crispEdges;
             outline: none !important;
         }
     </style>
@@ -268,7 +269,7 @@
             
             const conf = CONFIG[currentMetric]; 
             const RECT_SIZE = 0.005;
-            const OVERLAP = 1.08;
+            const OVERLAP = 1.12;
             const rectangles = []; 
             const vals = [];
 
