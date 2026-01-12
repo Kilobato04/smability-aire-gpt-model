@@ -1,0 +1,4 @@
+[tools]
+# Le decimos que no use nada de esto
+python = "none"
+node = "20"
