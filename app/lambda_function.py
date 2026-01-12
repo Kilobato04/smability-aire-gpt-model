@@ -14,7 +14,7 @@ S3_BUCKET = os.environ.get('S3_BUCKET', 'smability-data-lake')
 S3_GRID_OUTPUT_KEY = os.environ.get('S3_GRID_OUTPUT_KEY', 'live_grid/latest_grid.json')
 # --- CONFIGURACIÓN DE CONTROL MAESTRO ---
 # 1.0 = Original | >1.0 = Más limpio (Verde) | <1.0 = Más contaminado (Rojo)
-BIAS_SENSITIVITY = 0.3
+BIAS_SENSITIVITY = 5.0
 # --- CONFIGURACIÓN S3 ---
 S3_BUCKET = "smability-data-lake"
 # Los modelos ahora viven en: models/model_xxx.json
@@ -242,7 +242,8 @@ def lambda_handler(event, context):
                 
                 # 3. Cálculo del Bias
                 v_valid = v_real_all.dropna(subset=[real_col])
-                bias = 0
+                applied_bias = 0  # <--- RED DE SEGURIDAD: Definir por defecto
+                
                 if not v_valid.empty:
                     # Cálculo del bias base
                     raw_bias = v_valid[real_col].mean() - v_valid['raw_ai'].mean()
@@ -255,7 +256,9 @@ def lambda_handler(event, context):
                 
                 # 4. REPORTE VISUAL EN LOGS (TABLA)
                 unit = "ppb" if p == "o3" else "µg/m³"
-                print(f"\n📊 TABLA DE CALIBRACIÓN: {p.upper()} (Bias: {bias:+.2f} {unit})")
+                
+                # Reportamos claramente qué factor de sensibilidad se usó
+                print(f"\n📊 TABLA DE CALIBRACIÓN: {p.upper()} (Bias Aplicado: {applied_bias:+.2f} {unit} | Sensibilidad: x{BIAS_SENSITIVITY})")
                 header = f"{'Estación':<25} | {'Raw AI':<10} | {'Real':<10} | {'Bias':<10} | {'Final':<10}"
                 print("-" * len(header))
                 print(header)
@@ -263,9 +266,13 @@ def lambda_handler(event, context):
                 
                 for _, row in v_real_all.iterrows():
                     real_val = f"{row[real_col]:.2f}" if pd.notnull(row[real_col]) else "N/A"
-                    # Si hay dato real, el final es el real. Si no, es AI + Bias.
-                    final_val = row[real_col] if pd.notnull(row[real_col]) else (row['raw_ai'] + bias)
-                    print(f"{row['name'][:24]:<25} | {row['raw_ai']:<10.2f} | {real_val:<10} | {bias:<+10.2f} | {max(0, final_val):<10.2f}")
+                    
+                    # El valor final en la tabla refleja la IA + el bias aplicado
+                    final_val_in_table = row['raw_ai'] + applied_bias
+                    
+                    # Una sola línea de print limpia
+                    print(f"{row['name'][:24]:<25} | {row['raw_ai']:<10.2f} | {real_val:<10} | {applied_bias:<+10.2f} | {max(0, final_val_in_table):<10.2f}")
+                
                 print("-" * len(header))
             else:
                 grid_df[p] = 0.0
