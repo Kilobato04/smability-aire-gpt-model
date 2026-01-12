@@ -78,6 +78,16 @@
         .leaflet-canvas-layer {
             shape-rendering: crispEdges;
         }
+        canvas.leaflet-zoom-animated {
+        /* Fuerza al navegador a no suavizar el lienzo, evitando las líneas de rejilla */
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
+        
+        .leaflet-interactive {
+            stroke-width: 0;
+        }
         
     </style>
 </head>
