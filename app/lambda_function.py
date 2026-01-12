@@ -93,37 +93,35 @@ def prepare_grid_features(stations_df):
         })
     grid_df = pd.DataFrame(malla_list)
     
-# --- INICIO DEL REEMPLAZO: FUSIÓN GEOGRÁFICA ROBUSTA ---
-    # 2. Cargar Capa de Edificios
+# --- AJUSTE SIMPLIFICADO: COINCIDENCIA TOTAL GEOGRÁFICA ---
+    # 1. Cargar Edificios
     with open(f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json", 'r') as f:
         edificios_df = pd.DataFrame(json.load(f))
     
-    # 3. Cargar Capa Administrativa (MUN y EDO)
+    # 2. Cargar Administración
     with open(f"{BASE_PATH}/app/geograficos/grid_admin_info.json", 'r') as f:
         admin_df = pd.DataFrame(json.load(f))
 
-    # Creamos llaves de cruce redondeadas a 3 decimales en todas las capas
-    # Esto soluciona los nulos en building_vol, mun y edo
-    grid_df['lat_match'] = grid_df['lat'].round(3)
-    grid_df['lon_match'] = grid_df['lon'].round(3)
+    # Creamos llaves de cruce con 2 decimales para máxima compatibilidad
+    # Esto asegura que no queden celdas en gris (building_vol = 0)
+    grid_df['lat_key'] = grid_df['lat'].round(2)
+    grid_df['lon_key'] = grid_df['lon'].round(2)
     
-    for df in [edificios_df, admin_df]:
-        df['lat_match'] = df['lat'].round(3)
-        df['lon_match'] = df['lon'].round(3)
-        # Eliminamos duplicados por redondeo para evitar que crezca la malla
-        df.drop_duplicates(subset=['lat_match', 'lon_match'], inplace=True)
+    for df_temp in [edificios_df, admin_df]:
+        df_temp['lat_key'] = df_temp['lat'].round(2)
+        df_temp['lon_key'] = df_temp['lon'].round(2)
+        df_temp.drop_duplicates(subset=['lat_key', 'lon_key'], inplace=True)
 
-    # --- FUSIÓN MAESTRA ---
-    # Unimos con Edificios
-    grid_df = pd.merge(grid_df, edificios_df[['lat_match', 'lon_match', 'building_vol']], 
-                       on=['lat_match', 'lon_match'], how='left')
-    
-    # Unimos con Administración (mun, edo)
-    grid_df = pd.merge(grid_df, admin_df[['lat_match', 'lon_match', 'mun', 'edo']], 
-                       on=['lat_match', 'lon_match'], how='left')
-    
-    # Limpieza final
-    grid_df.drop(columns=['lat_match', 'lon_match'], inplace=True)
+    # Fusionamos Edificios
+    grid_df = pd.merge(grid_df, edificios_df[['lat_key', 'lon_key', 'building_vol']], 
+                       on=['lat_key', 'lon_key'], how='left')
+
+    # Fusionamos Administración
+    grid_df = pd.merge(grid_df, admin_df[['lat_key', 'lon_key', 'mun', 'edo']], 
+                       on=['lat_key', 'lon_key'], how='left')
+
+    # Limpieza: Borramos llaves y llenamos nulos
+    grid_df.drop(columns=['lat_key', 'lon_key'], inplace=True)
     grid_df['building_vol'] = grid_df['building_vol'].fillna(0)
     grid_df['mun'] = grid_df['mun'].fillna("Valle de México")
     grid_df['edo'] = grid_df['edo'].fillna("Edomex/CDMX")
@@ -211,10 +209,16 @@ def lambda_handler(event, context):
         grid_df = prepare_grid_features(stations_df)
         
 # --- INICIO DEL REEMPLAZO (SECCIÓN E y F) ---
+        # E. Predicción y Calibración
         grid_df['station_numeric'] = -1
-        feats = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp']
         
+        # --- ESTA ES LA LÍNEA CLAVE PARA ELIMINAR LOS WARNINGS ---
         for p in ['o3', 'pm10', 'pm25']:
+            grid_df[p] = 0.0  # Inicializamos
+            grid_df[p] = grid_df[p].astype(float) # Forzamos que sea float64
+        # --------------------------------------------------------
+
+        feats = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp']
             if p in models:
                 # 1. Predicción base de la IA
                 grid_df[p] = models[p].predict(grid_df[feats]).clip(0)
