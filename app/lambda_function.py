@@ -93,30 +93,41 @@ def prepare_grid_features(stations_df):
         })
     grid_df = pd.DataFrame(malla_list)
     
+# --- INICIO DEL REEMPLAZO: FUSIÓN GEOGRÁFICA ROBUSTA ---
     # 2. Cargar Capa de Edificios
     with open(f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json", 'r') as f:
         edificios_df = pd.DataFrame(json.load(f))
-        edificios_df['lat'] = edificios_df['lat'].round(5)
-        edificios_df['lon'] = edificios_df['lon'].round(5)
     
-    # 3. Cargar Capa Administrativa (Para MUN y EDO)
-    # Usamos el archivo que mencionaste que tiene los nombres políticos
+    # 3. Cargar Capa Administrativa (MUN y EDO)
     with open(f"{BASE_PATH}/app/geograficos/grid_admin_info.json", 'r') as f:
         admin_df = pd.DataFrame(json.load(f))
-        admin_df['lat'] = admin_df['lat'].round(5)
-        admin_df['lon'] = admin_df['lon'].round(5)
+
+    # Creamos llaves de cruce redondeadas a 3 decimales en todas las capas
+    # Esto soluciona los nulos en building_vol, mun y edo
+    grid_df['lat_match'] = grid_df['lat'].round(3)
+    grid_df['lon_match'] = grid_df['lon'].round(3)
+    
+    for df in [edificios_df, admin_df]:
+        df['lat_match'] = df['lat'].round(3)
+        df['lon_match'] = df['lon'].round(3)
+        # Eliminamos duplicados por redondeo para evitar que crezca la malla
+        df.drop_duplicates(subset=['lat_match', 'lon_match'], inplace=True)
 
     # --- FUSIÓN MAESTRA ---
-    # Unimos elevación con edificios
-    grid_df = pd.merge(grid_df, edificios_df[['lat', 'lon', 'building_vol']], on=['lat', 'lon'], how='left')
+    # Unimos con Edificios
+    grid_df = pd.merge(grid_df, edificios_df[['lat_match', 'lon_match', 'building_vol']], 
+                       on=['lat_match', 'lon_match'], how='left')
     
-    # Unimos con datos administrativos (mun, edo)
-    grid_df = pd.merge(grid_df, admin_df[['lat', 'lon', 'mun', 'edo']], on=['lat', 'lon'], how='left')
+    # Unimos con Administración (mun, edo)
+    grid_df = pd.merge(grid_df, admin_df[['lat_match', 'lon_match', 'mun', 'edo']], 
+                       on=['lat_match', 'lon_match'], how='left')
     
-    # Limpieza: Llenar nulos en caso de que alguna coordenada no coincida exactamente
+    # Limpieza final
+    grid_df.drop(columns=['lat_match', 'lon_match'], inplace=True)
     grid_df['building_vol'] = grid_df['building_vol'].fillna(0)
     grid_df['mun'] = grid_df['mun'].fillna("Valle de México")
     grid_df['edo'] = grid_df['edo'].fillna("Edomex/CDMX")
+    # --- FIN DEL REEMPLAZO ---
 
     # 4. Variables Temporales e Interpolación
     tz = ZoneInfo("America/Mexico_City")
@@ -253,7 +264,8 @@ def lambda_handler(event, context):
             for p in ['o3', 'pm10', 'pm25']:
                 real_val = st.get(f'{p}_real')
                 if pd.notnull(real_val):
-                    grid_df.at[idx, p] = real_val
+                    # Forzamos a float para evitar que pandas se queje del tipo de dato
+                    grid_df.at[idx, p] = float(real_val)
 # --- FIN DEL REEMPLAZO ---
 
         # G. Cálculo de IAS y Dominante (NOM-172-2024)
