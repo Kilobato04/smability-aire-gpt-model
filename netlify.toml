@@ -1,0 +1,11 @@
+[build]
+  publish = "."
+  command = "echo 'Skipping build...'"
+
+[build.environment]
+  NETLIFY_SKIP_PYTHON_INSTALL = "true"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
