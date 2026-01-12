@@ -146,7 +146,11 @@
     <script>
         const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
 
-        const map = L.map('map', { zoomControl: false, preferCanvas: true }).setView([19.4326, -99.1332], 10);
+        const map = L.map('map', { 
+            zoomControl: false, 
+            preferCanvas: true,
+            renderer: L.canvas({ padding: 0.5 }) // Agrega un padding al renderizador para evitar cortes en los bordes
+        }).setView([19.4326, -99.1332], 10);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: 'Smability AI', maxZoom: 19 }).addTo(map);
 
@@ -282,7 +286,7 @@
             
             const conf = CONFIG[currentMetric]; 
             const RECT_SIZE = 0.005;
-            const OVERLAP = 1.01;
+            const OVERLAP = 1.05;
             const rectangles = []; 
             const vals = [];
 
@@ -317,11 +321,7 @@
                     color: '#ffffff', 
                     weight: isStation ? 2 : 0, 
                     fillOpacity: fillOp, 
-                    fillColor: color,
-                    // Propiedades para eliminar fisuras:
-                    lineCap: 'butt',
-                    lineJoin: 'miter',
-                    smoothFactor: 0 
+                    fillColor: color
                 });
 
                 const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
