@@ -14,7 +14,7 @@ S3_BUCKET = os.environ.get('S3_BUCKET', 'smability-data-lake')
 S3_GRID_OUTPUT_KEY = os.environ.get('S3_GRID_OUTPUT_KEY', 'live_grid/latest_grid.json')
 # --- CONFIGURACIÓN DE CONTROL MAESTRO ---
 # 1.0 = Original | >1.0 = Más limpio (Verde) | <1.0 = Más contaminado (Rojo)
-BIAS_SENSITIVITY = 1.0
+BIAS_SENSITIVITY = 0.3
 # --- CONFIGURACIÓN S3 ---
 S3_BUCKET = "smability-data-lake"
 # Los modelos ahora viven en: models/model_xxx.json
