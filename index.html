@@ -58,6 +58,13 @@
         .leaflet-popup-content-wrapper { background: #ffffff !important; color: #1e293b !important; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); border: none; padding: 0; }
         .leaflet-popup-tip { background: #ffffff !important; }
         .leaflet-popup-content { margin: 24px 16px 16px 16px; line-height: 1.5; }
+
+        /* Elimina cualquier borde residual en los cuadros del mapa */
+        .leaflet-interactive {
+            stroke: none !important;
+            stroke-width: 0 !important;
+            outline: none !important;
+        }
     </style>
 </head>
 <body>
@@ -260,7 +267,8 @@
             if (geoLayer) map.removeLayer(geoLayer);
             
             const conf = CONFIG[currentMetric]; 
-            const RECT_SIZE = 0.005; 
+            const RECT_SIZE = 0.005;
+            const OVERLAP = 1.08;
             const rectangles = []; 
             const vals = [];
 
@@ -281,7 +289,11 @@
                 vals.push(val);
 
                 const color = getColor(val, currentMetric);
-                const bounds = [[p.lat - RECT_SIZE, p.lon - RECT_SIZE], [p.lat + RECT_SIZE, p.lon + RECT_SIZE]];
+                // Aplicamos el OVERLAP para que los cuadros se encimen sutilmente y borren la rejilla
+                const bounds = [
+                    [p.lat - (RECT_SIZE * OVERLAP), p.lon - (RECT_SIZE * OVERLAP)], 
+                    [p.lat + (RECT_SIZE * OVERLAP), p.lon + (RECT_SIZE * OVERLAP)]
+                ];
                 const isStation = p.station ? true : false;
                 const strokeColor = isStation ? '#ffffff' : color;
                 const weight = isStation ? 2 : 0;
