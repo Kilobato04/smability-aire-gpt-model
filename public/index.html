@@ -496,25 +496,68 @@
                 const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
                 const loc_text = (p.mun && p.mun !== 'N/A') ? `📍 ${p.mun}, ${p.edo}` : `📍 ${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`;
                 
+                // --- [INICIO FUSIÓN: DISEÑO ORIGINAL + FUENTES] ---
                 let bVol = Number(p.building_vol || 0);
                 let altVal = Number(p.altitude || 0);
+                // Fallback para datos faltantes en malla
                 if (bVol === 0 && fallbackData && fallbackData[i]) bVol = Number(fallbackData[i].building_vol || 0);
                 if (altVal === 0 && fallbackData && fallbackData[i]) altVal = Number(fallbackData[i].altitude || 0);
 
                 let headerHTML = `<div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">🕒 ${p.timestamp || 'Live'}</div>`;
                 if (isStation) { headerHTML += `<div style="background:#38bdf8; color:#0f172a; padding:4px 8px; border-radius:4px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:12px;">📡 Estación: ${p.station}</div>`; }
 
+                // 1. LÓGICA DE FUENTES (NUEVO)
+                let sourcesObj = {};
+                try { if (p.sources) sourcesObj = JSON.parse(p.sources); } catch (e) {}
+
+                const fmtSrc = (pol) => {
+                    let src = sourcesObj[pol];
+                    if (!src) {
+                        const win = (pol === 'pm10' || pol === 'pm25') ? '12h' : '1h';
+                        src = `IA ${win}`;
+                    }
+                    const isIA = src.includes("IA");
+                    // Usamos colores que contrasten bien en tu popup blanco/gris
+                    const color = isIA ? '#94a3b8' : '#0ea5e9'; 
+                    const weight = isIA ? '400' : '700';
+
+                    // Etiqueta flotante pequeña
+                    return `<span style="font-size:0.7em; color:${color}; margin-left:3px; font-weight:${weight}; display:inline-block; vertical-align:middle;">
+                                (${src})
+                            </span>`;
+                };
+
+                // 2. CONTENIDO (TU DISEÑO GRID ORIGINAL + ETIQUETAS INYECTADAS)
                 rect.bindPopup(`
-                    <div style="font-family:'Inter'; color:#334155; min-width: 175px;">
+                    <div style="font-family:'Inter'; color:#334155; min-width: 190px;">
                         ${headerHTML}
                         <div style="margin-bottom:8px; font-size:11px; font-weight:600; color:#3b82f6; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">${loc_text}</div>
-                        <div style="display:grid; grid-template-columns: 1fr auto; gap: 5px; font-size:12px;">
-                            <span style="font-weight:600; color:#000;">🚦 IAS:</span> <span style="font-weight:bold;">${Number(p.ias||0).toFixed(0)} pts</span>
-                            <span style="font-weight:600; color:#000;">☢️ Riesgo:</span> <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> <span>${Number(p.o3||0).toFixed(1)} ppb</span>
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${Number(p.pm10||0).toFixed(1)} µg</span>
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟣 PM2.5${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> <span>${Number(p.pm25||0).toFixed(1)} µg</span>
-                            <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:2px 0;">
+                        
+                        <div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:12px; align-items: center;">
+                            
+                            <span style="font-weight:600; color:#000;">🚦 IAS:</span> 
+                            <span style="font-weight:bold;">${Number(p.ias||0).toFixed(0)} pts</span>
+                            
+                            <span style="font-weight:600; color:#000;">☢️ Riesgo:</span> 
+                            <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
+                            
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> 
+                            <span style="white-space:nowrap;">
+                                ${Number(p.o3||0).toFixed(1)} ppb ${fmtSrc('o3')}
+                            </span>
+                            
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> 
+                            <span style="white-space:nowrap;">
+                                ${Number(p.pm10||0).toFixed(1)} µg ${fmtSrc('pm10')}
+                            </span>
+                            
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟣 PM2.5${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> 
+                            <span style="white-space:nowrap;">
+                                ${Number(p.pm25||0).toFixed(1)} µg ${fmtSrc('pm25')}
+                            </span>
+
+                            <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:4px 0;">
+                            
                             <span style="color:#475569;">🏙️ Vol:</span> <span>${(bVol/1000).toFixed(0)}k m³</span>
                             <span style="color:#475569;">🌡️ Temp:</span> <span>${Number(p.tmp||0).toFixed(1)} °C</span>
                             <span style="color:#475569;">💧 Hum:</span> <span>${Number(p.rh||0).toFixed(0)} %</span>
@@ -523,6 +566,7 @@
                         </div>
                     </div>
                 `);
+                // --- [FIN FUSIÓN] ---
                 
                 rect.on('mouseover', function() {
                     // Solo aumentamos la opacidad, no agregamos bordes (evita la estela)
