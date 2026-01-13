@@ -422,6 +422,33 @@
             if(el) el.classList.add('active');
             renderMap();
         };
+        // --- COPIAR DESDE AQUÍ ---
+        function scheduleNextUpdate() {
+            const now = new Date();
+            const nextUpdate = new Date(now);
+        
+            // Si ya pasamos el minuto 20 de esta hora, programamos para la siguiente hora
+            if (now.getMinutes() >= 20) {
+                nextUpdate.setHours(now.getHours() + 1);
+            }
+            
+            nextUpdate.setMinutes(20);
+            nextUpdate.setSeconds(20);
+            nextUpdate.setMilliseconds(0);
+        
+            const msUntilUpdate = nextUpdate.getTime() - now.getTime();
+            
+            console.log(`🔄 Próxima actualización en: ${(msUntilUpdate / 1000 / 60).toFixed(1)} min`);
+        
+            setTimeout(() => {
+                console.log("🚀 Ejecutando Auto-Refresh Programado...");
+                loadMapData('latest'); 
+                generateLocalTimeOptions(); 
+                scheduleNextUpdate(); // Re-ciclar
+            }, msUntilUpdate);
+        }
+        scheduleNextUpdate();
+        // --- HASTA AQUÍ ---
     </script>
 </body>
 </html>
