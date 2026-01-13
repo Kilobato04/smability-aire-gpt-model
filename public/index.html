@@ -382,6 +382,15 @@
             fetch(url)
                 .then(response => { if(!response.ok) throw new Error("Datos no encontrados"); return response.json(); })
                 .then(data => {
+                    // --- [ADAPTADOR DE LLAVES JSON] ---
+                    // Como el JSON ahora trae espacios ("o3 1h"), los mapeamos a variables simples
+                    // para que el resto del código (renderMap, popups, colores) no se rompa.
+                    data.forEach(p => {
+                        p.o3 = p['o3 1h'] || p.o3;
+                        p.pm10 = p['pm10 12h'] || p.pm10;
+                        p.pm25 = p['pm25 12h'] || p.pm25;
+                    });
+                    // --- [FIN ADAPTADOR] ---
                     globalData = data;
                     if (timestampKey === 'latest') {
                         fallbackData = data; 
