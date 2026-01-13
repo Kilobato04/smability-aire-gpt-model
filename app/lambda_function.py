@@ -384,14 +384,14 @@ def lambda_handler(event, context):
         cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
                 'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant', 'sources']
         
-        # Seleccionamos columnas y RENOMBRAMOS para el JSON final
+       # --- ESTE ES EL BLOQUE QUE FALTA QUE CORRA 👇 ---
         final_df = grid_df[cols].rename(columns={
             'o3': 'o3 1h',
             'pm10': 'pm10 12h',
             'pm25': 'pm25 12h'
         })
         
-# --- INICIO DEL REEMPLAZO (SECCIÓN H: EXPORTACIÓN DUAL) ---
+        # --- INICIO DEL REEMPLAZO (SECCIÓN H: EXPORTACIÓN DUAL) ---
         final_json = grid_df[cols].replace({np.nan: None}).to_json(orient='records')
         
         # 1. GUARDAR EL "LATEST" (Sobrescribe para el Dashboard)
