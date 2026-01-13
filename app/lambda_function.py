@@ -384,17 +384,22 @@ def lambda_handler(event, context):
         cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
                 'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant', 'sources']
         
-       # --- ESTE ES EL BLOQUE QUE FALTA QUE CORRA 👇 ---
+        print("🔍 [DEBUG] Iniciando transformación de columnas...")
+
+        # 1. Renombrar columnas en un NUEVO DataFrame (final_df)
         final_df = grid_df[cols].rename(columns={
             'o3': 'o3 1h',
             'pm10': 'pm10 12h',
             'pm25': 'pm25 12h'
         })
         
-        # --- INICIO DEL REEMPLAZO (SECCIÓN H: EXPORTACIÓN DUAL) ---
-        final_json = grid_df[cols].replace({np.nan: None}).to_json(orient='records')
+        # 2. LOG DE VERIFICACIÓN (Esto debe salir en CloudWatch)
+        print(f"🔍 [DEBUG] Columnas Finales: {final_df.columns.tolist()}")
+
+        # 3. Generar JSON usando FINAL_DF (¡Aquí estaba el error!)
+        final_json = final_df.replace({np.nan: None}).to_json(orient='records')
         
-        # 1. GUARDAR EL "LATEST" (Sobrescribe para el Dashboard)
+        # 4. Guardar en S3 (Latest)
         s3_client.put_object(
             Bucket=S3_BUCKET, 
             Key=S3_GRID_OUTPUT_KEY, 
@@ -402,7 +407,7 @@ def lambda_handler(event, context):
             ContentType='application/json'
         )
 
-        # 2. GUARDAR EL "HISTÓRICO" (Formato: grid_2026-01-10_13-20.json)
+        # 5. Guardar en S3 (Histórico)
         timestamp_name = now_mx.strftime("%Y-%m-%d_%H-%M")
         history_key = f"live_grid/grid_{timestamp_name}.json"
         
@@ -414,7 +419,11 @@ def lambda_handler(event, context):
         )
         
         print(f"📦 SUCCESS {VERSION}: Guardado Latest y Histórico ({history_key})")
-        return {'statusCode': 200, 'body': f'Predictor {VERSION} OK'}
+        return {
+            'statusCode': 200, 
+            'body': final_json, # Regresamos el JSON nuevo para verlo en el Test de consola
+            'headers': {'Content-Type': 'application/json'}
+        }
         # --- FIN DEL REEMPLAZO ---
 
     except Exception as e:
