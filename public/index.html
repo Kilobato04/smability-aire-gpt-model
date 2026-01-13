@@ -538,7 +538,7 @@
 
                 // 2. CONTENIDO (TU DISEÑO GRID ORIGINAL + ETIQUETAS INYECTADAS)
                 rect.bindPopup(`
-                    <div style="font-family:'Inter'; color:#334155; min-width: 190px;">
+                    <div style="font-family:'Inter'; color:#334155; min-width: 195px;">
                         ${headerHTML}
                         <div style="margin-bottom:8px; font-size:11px; font-weight:600; color:#3b82f6; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">${loc_text}</div>
                         
@@ -550,17 +550,23 @@
                             <span style="font-weight:600; color:#000;">☢️ Riesgo:</span> 
                             <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
                             
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 O3${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> 
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">
+                                🔴 O3 <span style="font-size:9px; color:#64748b;">(1h)</span>${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:
+                            </span> 
                             <span style="white-space:nowrap;">
                                 ${Number(p.o3||0).toFixed(1)} ppb ${fmtSrc('o3')}
                             </span>
                             
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 PM10${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> 
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">
+                                🟤 PM10 <span style="font-size:9px; color:#64748b;">(12h)</span>${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:
+                            </span> 
                             <span style="white-space:nowrap;">
                                 ${Number(p.pm10||0).toFixed(1)} µg ${fmtSrc('pm10')}
                             </span>
                             
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟣 PM2.5${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> 
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">
+                                🟣 PM2.5 <span style="font-size:9px; color:#64748b;">(12h)</span>${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:
+                            </span> 
                             <span style="white-space:nowrap;">
                                 ${Number(p.pm25||0).toFixed(1)} µg ${fmtSrc('pm25')}
                             </span>
@@ -575,7 +581,7 @@
                         </div>
                     </div>
                 `);
-                // --- [FIN FUSIÓN] ---
+                // --- [FIN POPUP] ---
                 
                 rect.on('mouseover', function() {
                     // Solo aumentamos la opacidad, no agregamos bordes (evita la estela)
