@@ -380,26 +380,27 @@ def lambda_handler(event, context):
         now_mx = datetime.now(ZoneInfo("America/Mexico_City"))
         grid_df['timestamp'] = now_mx.strftime("%Y-%m-%d %H:%M:%S")
 
-        # H. Exportación Final a S3
-        cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
-                'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant', 'sources']
+        # H. Exportación Final a S3 (LIMPIEZA DE COLUMNAS FANTASMA)
+        # 1. Definimos las columnas ORIGINALES que queremos extraer
+        cols_to_export = [
+            'timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
+            'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant', 'sources'
+        ]
         
-        print("🔍 [DEBUG] Iniciando transformación de columnas...")
-
-        # 1. Renombrar columnas en un NUEVO DataFrame (final_df)
-        final_df = grid_df[cols].rename(columns={
+        # 2. Creamos un DataFrame NUEVO y LIMPIO con solo esas columnas
+        final_df = grid_df[cols_to_export].copy()
+        
+        # 3. Renombramos explícitamente las columnas de contaminantes
+        final_df.rename(columns={
             'o3': 'o3 1h',
             'pm10': 'pm10 12h',
             'pm25': 'pm25 12h'
-        })
+        }, inplace=True)
         
-        # 2. LOG DE VERIFICACIÓN (Esto debe salir en CloudWatch)
-        print(f"🔍 [DEBUG] Columnas Finales: {final_df.columns.tolist()}")
-
-        # 3. Generar JSON usando FINAL_DF (¡Aquí estaba el error!)
+        # 4. Generamos el JSON final (Sin columnas fantasma, sin nulos)
         final_json = final_df.replace({np.nan: None}).to_json(orient='records')
         
-        # 4. Guardar en S3 (Latest)
+        # 5. Guardar "Latest" en S3
         s3_client.put_object(
             Bucket=S3_BUCKET, 
             Key=S3_GRID_OUTPUT_KEY, 
@@ -407,7 +408,7 @@ def lambda_handler(event, context):
             ContentType='application/json'
         )
 
-        # 5. Guardar en S3 (Histórico)
+        # 6. Guardar "Histórico" en S3
         timestamp_name = now_mx.strftime("%Y-%m-%d_%H-%M")
         history_key = f"live_grid/grid_{timestamp_name}.json"
         
@@ -418,10 +419,12 @@ def lambda_handler(event, context):
             ContentType='application/json'
         )
         
-        print(f"📦 SUCCESS {VERSION}: Guardado Latest y Histórico ({history_key})")
+        print(f"📦 SUCCESS {VERSION}: Grid generado y guardado correctamente.")
+        
+        # Respuesta limpia para la API (Sin devolver el JSON gigante)
         return {
             'statusCode': 200, 
-            'body': final_json, # Regresamos el JSON nuevo para verlo en el Test de consola
+            'body': json.dumps({'message': f'Predictor {VERSION} OK', 'timestamp': timestamp_name}),
             'headers': {'Content-Type': 'application/json'}
         }
         # --- FIN DEL REEMPLAZO ---
