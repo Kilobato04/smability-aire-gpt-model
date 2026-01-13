@@ -206,14 +206,17 @@ def lambda_handler(event, context):
             })
         
         print(f"📊 SALUD API: Recibidas {len(stations_raw)} | O3:{counts['o3']} | TMP:{counts['tmp']}")
-        stations_df = pd.DataFrame(parsed).dropna(subset=['lat', 'lon'])
-       
-        # --- [INICIO DEL NUEVO FIX: MODO INERCIA MEDIA NOCHE] ---
-        # Si stations_df está vacío o todos los contaminantes son None (Mantenimiento SIMAT)
+        # --- [PROCESAMIENTO ROBUSTO DE STATIONS_DF] ---
+        if not parsed:
+            print("⚠️ [SISTEMA] 0 estaciones recibidas del SIMAT. Preparando contingencia...")
+            stations_df = pd.DataFrame(columns=['name', 'lat', 'lon', 'o3_real', 'pm10_real', 'pm25_real', 'tmp', 'rh', 'wsp'])
+        else:
+            stations_df = pd.DataFrame(parsed).dropna(subset=['lat', 'lon'])
+
+        # --- [LÓGICA DE FUENTE DE DATOS Y RESCATE] ---
         if stations_df.empty or stations_df[['o3_real', 'pm10_real', 'pm25_real']].isnull().all().all():
-            print("🌙 [SISTEMA] Gap detectado (Posible mantenimiento 00:00 - 01:00). Activando Open-Meteo...")
+            print("🌐 [OPEN-METEO] Intentando rescate de malla climática (20 puntos)...")
             
-            # 1. Definición de 20 puntos para cobertura total ZMVM
             pts = [(19.43,-99.13),(19.54,-99.20),(19.60,-99.04),(19.63,-99.10),(19.28,-99.17),
                    (19.25,-99.10),(19.19,-99.02),(19.36,-99.07),(19.40,-98.99),(19.42,-98.94),
                    (19.36,-99.26),(19.47,-99.23),(19.36,-99.35),(19.64,-98.91),(19.67,-99.18),
@@ -221,27 +224,41 @@ def lambda_handler(event, context):
             
             lats = ",".join([str(p[0]) for p in pts])
             lons = ",".join([str(p[1]) for p in pts])
-            url_om = f"https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=America%2FMexico_City"
+            url_om = f"https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&wind_speed_unit=ms&timezone=America%2FMexico_City"
             
             try:
                 res = requests.get(url_om, timeout=10).json()
-                # Promediamos el clima de los 20 puntos para el grid
-                clima_fix = {
-                    'tmp': np.mean([p['current']['temperature_2m'] for p in res]),
-                    'rh': np.mean([p['current']['relative_humidity_2m'] for p in res]),
-                    'wsp': np.mean([p['current']['wind_speed_10m'] for p in res])
-                }
-                # Creamos un stations_df sintético para que el resto del código no truene
-                # pero con valores climáticos reales de Open-Meteo
+                
+                # Manejo de respuesta (Lista vs Objeto único)
+                if isinstance(res, list):
+                    avg_tmp = np.mean([p['current']['temperature_2m'] for p in res])
+                    avg_rh = np.mean([p['current']['relative_humidity_2m'] for p in res])
+                    avg_wsp = np.mean([p['current']['wind_speed_10m'] for p in res])
+                else:
+                    avg_tmp = res['current']['temperature_2m']
+                    avg_rh = res['current']['relative_humidity_2m']
+                    avg_wsp = res['current']['wind_speed_10m']
+
                 stations_df = pd.DataFrame([{
                     'name': 'Inercia Climática', 'lat': 19.43, 'lon': -99.13,
                     'o3_real': None, 'pm10_real': None, 'pm25_real': None,
-                    'tmp': clima_fix['tmp'], 'rh': clima_fix['rh'], 'wsp': clima_fix['wsp']
+                    'tmp': avg_tmp, 'rh': avg_rh, 'wsp': avg_wsp
                 }])
-                print(f"✅ [MODO INERCIA] Clima promediado de 20 puntos: {clima_fix['tmp']:.1f}°C")
+                print(f"✅ [DATOS: OPEN-METEO] Rescate exitoso. Clima promedio: {avg_tmp:.1f}°C, RH: {avg_rh:.0f}%")
+                
             except Exception as e:
-                print(f"❌ Error invocando Open-Meteo: {e}")
-        # --- [FIN DEL NUEVO FIX] ---
+                print(f"🚨 [ERROR: OPEN-METEO] Falló la API externa: {e}")
+                print("🛠️ [DATOS: REGISTRO MANUAL] Aplicando valores failsafe de emergencia.")
+                stations_df = pd.DataFrame([{
+                    'name': 'Failsafe de Emergencia', 
+                    'lat': 19.43, 'lon': -99.13, 
+                    'o3_real': None, 'pm10_real': None, 'pm25_real': None,
+                    'tmp': 18.0, 'rh': 45.0, 'wsp': 2.5
+                }])
+        else:
+            print(f"📡 [DATOS: SIMAT] Utilizando {len(stations_df)} estaciones oficiales.")
+
+        # --- [FIN DEL BLOQUE DE RESCATE] ---
 
         # Procesamiento de Malla y Predicción
         grid_df = prepare_grid_features(stations_df)
