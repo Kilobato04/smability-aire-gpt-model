@@ -329,18 +329,40 @@ def lambda_handler(event, context):
             else:
                 grid_df[p] = 0.0
 
-        # F. Marcadores y Sobrescritura de Estaciones (Garantiza error 0 en sensores)
+        # --- [INICIO REEMPLAZO SECCIÓN F: ETIQUETADO DE FUENTES] ---
+        # F. Marcadores y Sobrescritura de Estaciones (Con Trazabilidad)
         grid_df['station'] = None
+        grid_df['sources'] = "{}" # Inicializamos columna para guardar el origen del dato
+
         for _, st in stations_df.iterrows():
+            # Encontrar la celda más cercana a la estación real
             dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
             idx = dist.idxmin()
+            
             grid_df.at[idx, 'station'] = st['name']
+            
+            # Diccionario para rastrear fuente por contaminante
+            cell_sources = {}
+            
             for p in ['o3', 'pm10', 'pm25']:
                 real_val = st.get(f'{p}_real')
+                
+                # Definimos la ventana de tiempo según el contaminante (Normativa)
+                window = "12h" if p in ['pm10', 'pm25'] else "1h"
+                
                 if pd.notnull(real_val):
-                    # Forzamos a float para evitar que pandas se queje del tipo de dato
+                    # CASO 1: HAY DATO DE SENSOR
+                    # Sobrescribimos la predicción de la IA con el dato duro
                     grid_df.at[idx, p] = float(real_val)
-# --- FIN DEL REEMPLAZO ---
+                    cell_sources[p] = f"Oficial {window}"
+                else:
+                    # CASO 2: NO HAY DATO DE SENSOR (Gap)
+                    # Mantenemos el valor que la IA predijo (ya calculado en Sección E)
+                    cell_sources[p] = f"IA {window}"
+            
+            # Guardamos el diccionario como string JSON para que pase al CSV/JSON final
+            grid_df.at[idx, 'sources'] = json.dumps(cell_sources)
+        # --- [FIN REEMPLAZO SECCIÓN F] ---
 
         # G. Cálculo de IAS y Dominante (NOM-172-2024)
         def calc_ias_row(row):
@@ -360,7 +382,7 @@ def lambda_handler(event, context):
 
         # H. Exportación Final a S3
         cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
-                'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant']
+                'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant', 'sources']
         
 # --- INICIO DEL REEMPLAZO (SECCIÓN H: EXPORTACIÓN DUAL) ---
         final_json = grid_df[cols].replace({np.nan: None}).to_json(orient='records')
