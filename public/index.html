@@ -319,25 +319,54 @@
             loadMapData(selectedOption.value);
         });
         
-        // Lógica básica de Play/Pause
+        // --- [INICIO ANCLA A: LÓGICA PLAY/PAUSE OPTIMIZADA] ---
         let isPlaying = false;
         let playInterval;
         
         document.getElementById('play-btn').addEventListener('click', function() {
+            // 1. COLAPSAR MENÚ AUTOMÁTICAMENTE
+            // Asumimos que tu sidebar tiene el ID 'sidebar' y se colapsa con la clase 'collapsed'
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar && !sidebar.classList.contains('collapsed')) {
+                // Si tienes una función toggleSidebar() definida arriba, la llamamos:
+                if (typeof toggleSidebar === "function") {
+                    toggleSidebar();
+                } else {
+                    // Si no, forzamos la clase directamente
+                    sidebar.classList.add('collapsed');
+                }
+            }
+        
             isPlaying = !isPlaying;
             this.innerText = isPlaying ? "⏸" : "▶";
             
             if (isPlaying) {
+                // Si el usuario da PLAY y el slider está en el final (24), reiniciamos al 0
+                if (parseInt(timeSlider.value) >= 24) {
+                    timeSlider.value = 0;
+                    timeSlider.dispatchEvent(new Event('input'));
+                }
+        
                 playInterval = setInterval(() => {
                     let nextVal = parseInt(timeSlider.value) + 1;
-                    if (nextVal > 24) nextVal = 0;
-                    timeSlider.value = nextVal;
-                    timeSlider.dispatchEvent(new Event('input'));
-                }, 2000); // Cambia cada 2 segundos
+                    
+                    if (nextVal > 24) {
+                        // --- DETENER LOOP AL LLEGAR AL FINAL ---
+                        clearInterval(playInterval);
+                        isPlaying = false;
+                        this.innerText = "▶";
+                        console.log("🏁 Ciclo completado.");
+                    } else {
+                        timeSlider.value = nextVal;
+                        // Disparamos el evento 'input' para que cargue el mapa
+                        timeSlider.dispatchEvent(new Event('input'));
+                    }
+                }, 1800); // 1.8 segundos para dar tiempo a la transición de Mapbox
             } else {
                 clearInterval(playInterval);
             }
         });
+        // --- [FIN ANCLA B] ---
 
         function loadMapData(forceTimestamp = null) {
             const select = document.getElementById('time-select');
