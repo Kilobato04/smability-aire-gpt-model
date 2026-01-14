@@ -10,13 +10,16 @@ phases:
 
   pre_build:
     commands:
-      - echo "📂 Usando Dataset incluido en el repositorio..."
-      - ls -l training/raw_data/dataset_aire_zmcdmx.zip
-      - unzip training/raw_data/dataset_aire_zmcdmx.zip -d /tmp/dataset_final
+      - echo "⬇️ Descargando Dataset Maestro desde S3..."
+      # Usamos S3 porque es la vía rápida y segura
+      - aws s3 cp s3://smability-data-lake/raw_data/dataset_aire_zmcdmx.zip /tmp/dataset.zip
+      - echo "📂 Descomprimiendo..."
+      - unzip /tmp/dataset.zip -d /tmp/dataset_final
 
   build:
     commands:
       - echo "🧠 INICIANDO ENTRENAMIENTO GRAND SLAM (5 Contaminantes)..."
+      # Apuntamos a la carpeta correcta donde está tu script
       - python training/train_v5_grand_slam.py
 
   post_build:
