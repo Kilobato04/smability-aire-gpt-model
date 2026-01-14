@@ -174,3 +174,4 @@ El archivo `index.html` es un dashboard Standalone.
 **Smability Technologies © 2025**
 \`\`\`
 EOF
+
