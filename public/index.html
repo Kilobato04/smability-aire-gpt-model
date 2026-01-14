@@ -521,18 +521,20 @@
 
                 const fmtSrc = (pol) => {
                     let src = sourcesObj[pol];
-                    if (!src) {
-                        const win = (pol === 'pm10' || pol === 'pm25') ? '12h' : '1h';
-                        src = `IA ${win}`;
-                    }
-                    const isIA = src.includes("IA");
-                    // Usamos colores que contrasten bien en tu popup blanco/gris
+                    
+                    // Si no existe fuente, asumimos IA (sin agregar tiempo, para no ser redundantes)
+                    if (!src) src = "IA";
+
+                    // TRUCO DE LIMPIEZA: Quitamos " 1h" o " 12h" del string
+                    // Ejemplo: "Oficial 12h" -> "Oficial"
+                    let displayLabel = src.replace(" 1h", "").replace(" 12h", "");
+
+                    const isIA = displayLabel.includes("IA");
                     const color = isIA ? '#94a3b8' : '#0ea5e9'; 
                     const weight = isIA ? '400' : '700';
 
-                    // Etiqueta flotante pequeña
                     return `<span style="font-size:0.7em; color:${color}; margin-left:3px; font-weight:${weight}; display:inline-block; vertical-align:middle;">
-                                (${src})
+                                (${displayLabel})
                             </span>`;
                 };
 
