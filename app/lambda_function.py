@@ -80,8 +80,10 @@ def inverse_distance_weighting(x, y, z, xi, yi):
     return np.sum(weights * z[None, :], axis=1) / np.sum(weights, axis=1)
 
 def prepare_grid_features(stations_df):
-    """Carga malla valle, edificios y datos administrativos para una fusión total"""
-    # 1. Cargar Malla Valle (Geometría y Elevación)
+    """
+    Carga malla valle, edificios y la NUEVA base de colonias pre-calculada.
+    """
+    # 1. Cargar Malla Valle (Geometría Base)
     MALLA_PATH = f"{BASE_PATH}/app/geograficos/malla_valle_mexico_final.geojson"
     with open(MALLA_PATH, 'r') as f:
         malla_data = json.load(f)
@@ -96,41 +98,53 @@ def prepare_grid_features(stations_df):
         })
     grid_df = pd.DataFrame(malla_list)
     
-# --- AJUSTE SIMPLIFICADO: COINCIDENCIA TOTAL GEOGRÁFICA ---
-    # 1. Cargar Edificios
+    # --- INICIO INTEGRACIÓN COLONIAS (NUEVO) ---
+    # 2. Cargar Base de Datos de Colonias (Generada en Colab)
+    COLONIAS_PATH = f"{BASE_PATH}/app/geograficos/grid_colonias_db.json"
+    try:
+        with open(COLONIAS_PATH, 'r') as f:
+            colonias_data = json.load(f)
+        cols_df = pd.DataFrame(colonias_data)
+    except Exception as e:
+        print(f"⚠️ Error cargando grid_colonias_db.json: {e}")
+        # Fallback de emergencia vacío
+        cols_df = pd.DataFrame(columns=['lat', 'lon', 'col', 'mun', 'edo', 'pob'])
+
+    # 3. Cargar Edificios
     with open(f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json", 'r') as f:
         edificios_df = pd.DataFrame(json.load(f))
+        
+    # --- FUSIÓN (MERGE) ESTRATÉGICA ---
+    # Usamos llaves de 5 decimales para asegurar coincidencia perfecta
+    grid_df['lat_key'] = grid_df['lat'].round(5)
+    grid_df['lon_key'] = grid_df['lon'].round(5)
     
-    # 2. Cargar Administración
-    with open(f"{BASE_PATH}/app/geograficos/grid_admin_info.json", 'r') as f:
-        admin_df = pd.DataFrame(json.load(f))
-
-    # Creamos llaves de cruce con 2 decimales para máxima compatibilidad
-    # Esto asegura que no queden celdas en gris (building_vol = 0)
-    grid_df['lat_key'] = grid_df['lat'].round(2)
-    grid_df['lon_key'] = grid_df['lon'].round(2)
+    cols_df['lat_key'] = cols_df['lat'].round(5)
+    cols_df['lon_key'] = cols_df['lon'].round(5)
     
-    for df_temp in [edificios_df, admin_df]:
-        df_temp['lat_key'] = df_temp['lat'].round(2)
-        df_temp['lon_key'] = df_temp['lon'].round(2)
-        df_temp.drop_duplicates(subset=['lat_key', 'lon_key'], inplace=True)
+    edificios_df['lat_key'] = edificios_df['lat'].round(5)
+    edificios_df['lon_key'] = edificios_df['lon'].round(5)
 
-    # Fusionamos Edificios
+    # A) Pegar Colonias + Municipios + Población
+    grid_df = pd.merge(grid_df, cols_df[['lat_key', 'lon_key', 'col', 'mun', 'edo', 'pob']], 
+                       on=['lat_key', 'lon_key'], how='left')
+                       
+    # B) Pegar Edificios
     grid_df = pd.merge(grid_df, edificios_df[['lat_key', 'lon_key', 'building_vol']], 
                        on=['lat_key', 'lon_key'], how='left')
 
-    # Fusionamos Administración
-    grid_df = pd.merge(grid_df, admin_df[['lat_key', 'lon_key', 'mun', 'edo']], 
-                       on=['lat_key', 'lon_key'], how='left')
-
-    # Limpieza: Borramos llaves y llenamos nulos
+    # --- LIMPIEZA FINAL ---
     grid_df.drop(columns=['lat_key', 'lon_key'], inplace=True)
-    grid_df['building_vol'] = grid_df['building_vol'].fillna(0)
+    
+    # Rellenar vacíos para seguridad
+    grid_df['col'] = grid_df['col'].fillna("Zona Federal / Sin Colonia")
     grid_df['mun'] = grid_df['mun'].fillna("Valle de México")
-    grid_df['edo'] = grid_df['edo'].fillna("Edomex/CDMX")
-    # --- FIN DEL REEMPLAZO ---
+    grid_df['edo'] = grid_df['edo'].fillna(np.nan) # Dejar como NaN para que to_json lo haga null
+    grid_df['pob'] = grid_df['pob'].fillna(0).astype(int)
+    grid_df['building_vol'] = grid_df['building_vol'].fillna(0)
+    # --- FIN INTEGRACIÓN ---
 
-    # 4. Variables Temporales e Interpolación
+    # 4. Variables Temporales e Interpolación (Se mantiene igual)
     tz = ZoneInfo("America/Mexico_City")
     now = datetime.now(tz)
     grid_df['hour_sin'] = np.sin(2 * np.pi * now.hour / 24)
@@ -391,7 +405,7 @@ def lambda_handler(event, context):
         final_df = pd.DataFrame()
 
         # A) Datos Base (Copiamos directo)
-        cols_base = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
+        cols_base = ['timestamp', 'lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
                      'tmp', 'rh', 'wsp', 'ias', 'station', 'risk', 'dominant', 'sources']
         
         for c in cols_base:
@@ -404,7 +418,7 @@ def lambda_handler(event, context):
 
         # 3. Ordenamos las columnas para que el JSON se vea ordenado
         cols_ordered = [
-            'timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
+            'timestamp', 'lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
             'tmp', 'rh', 'wsp', 'o3 1h', 'pm10 12h', 'pm25 12h', 
             'ias', 'station', 'risk', 'dominant', 'sources'
         ]
