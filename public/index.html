@@ -503,7 +503,29 @@
                     });
 
                 const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
-                const loc_text = (p.mun && p.mun !== 'N/A') ? `📍 ${p.mun}, ${p.edo}` : `📍 ${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`;
+                // --- [INICIO NUEVA LÓGICA DE UBICACIÓN Y POBLACIÓN] ---
+                
+                // 1. Formateador de Población (4383 -> 4.4k)
+                const fmtPob = (n) => {
+                    if (!n || n === 0) return '';
+                    if (n >= 1000) return `👥 ${(n/1000).toFixed(1)}k`;
+                    return `👥 ${n}`;
+                };
+
+                // 2. Lógica de Título de Ubicación Inteligente
+                let loc_text = `📍 ${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`; // Default
+                
+                if (p.col && p.col !== 'Zona Federal / Sin Colonia') {
+                    // Caso Ideal: Tenemos Colonia
+                    loc_text = `📍 ${p.col}, ${p.mun}`;
+                } else if (p.mun && p.mun !== 'Valle de México' && p.mun !== 'ZMVM') {
+                    // Caso Respaldo: Solo Municipio
+                    loc_text = `📍 ${p.mun}, ${p.edo || ''}`;
+                }
+
+                // 3. Cadena de Población
+                const pob_text = fmtPob(p.pob);
+                // --- [FIN LÓGICA] ---
                 
                 // --- [INICIO FUSIÓN: DISEÑO ORIGINAL + FUENTES] ---
                 let bVol = Number(p.building_vol || 0);
@@ -538,11 +560,17 @@
                             </span>`;
                 };
 
-                // 2. CONTENIDO (TU DISEÑO GRID ORIGINAL + ETIQUETAS INYECTADAS)
+                // 4. POPUP ACTUALIZADO
                 rect.bindPopup(`
                     <div style="font-family:'Inter'; color:#334155; min-width: 195px;">
                         ${headerHTML}
-                        <div style="margin-bottom:8px; font-size:11px; font-weight:600; color:#3b82f6; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">${loc_text}</div>
+                        
+                        <div style="margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">
+                            <div style="font-size:11px; font-weight:700; color:#3b82f6; margin-bottom:1px;">
+                                ${loc_text}
+                            </div>
+                            ${pob_text ? `<div style="font-size:10px; color:#64748b;">${pob_text} habitantes</div>` : ''}
+                        </div>
                         
                         <div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:12px; align-items: center;">
                             
