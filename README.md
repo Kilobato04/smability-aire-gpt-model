@@ -173,5 +173,43 @@ El archivo `index.html` es un dashboard Standalone.
 ---
 **Smability Technologies © 2025**
 \`\`\`
+
+cat > README.md <<EOF
+# 🌬️ Smability AI - AireGPT Training Pipeline
+
+Este repositorio contiene el pipeline de entrenamiento automatizado (MLOps) para los modelos de predicción de calidad del aire de Smability (AireGPT).
+
+## 🏗️ Arquitectura
+El sistema utiliza una arquitectura **Serverless** en AWS:
+1.  **Source:** Código en GitHub.
+2.  **Data Lake:** Datos históricos en Amazon S3 (`dataset_aire_zmcdmx.zip`).
+3.  **Compute:** AWS CodeBuild ejecuta el entrenamiento en un contenedor Ubuntu/Python.
+4.  **Artifacts:** Los modelos entrenados (\`.json\`) se guardan automáticamente en S3.
+
+## 🚀 Modelos "Grand Slam"
+El script \`train_v5_grand_slam.py\` entrena simultáneamente 5 modelos XGBoost:
+* **O3** (Ozono)
+* **PM10** (Partículas < 10 micras)
+* **PM2.5** (Partículas finas)
+* **CO** (Monóxido de Carbono)
+* **SO2** (Dióxido de Azufre)
+
+## 🛠️ Despliegue
+Para desplegar cambios en el algoritmo y re-entrenar:
+
+\`\`\`bash
+./deploy_training.sh
+\`\`\`
+
+Este script sube los cambios a GitHub, lo que detona un Webhook hacia AWS CodeBuild.
+
+## 📊 Inputs del Modelo
+* Variables Meteorológicas (Temp, RH, Viento).
+* Variables Temporales (Hora seno/coseno, Mes).
+* Variables Geoespaciales (Latitud, Longitud, Altitud).
+* Densidad Urbana (Volumen de edificios).
+
+---
+*Propiedad de Smability © 2026*
 EOF
 
