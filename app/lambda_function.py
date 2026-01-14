@@ -380,36 +380,40 @@ def lambda_handler(event, context):
         now_mx = datetime.now(ZoneInfo("America/Mexico_City"))
         grid_df['timestamp'] = now_mx.strftime("%Y-%m-%d %H:%M:%S")
 
-        # H. Exportación Final a S3 (GHOST BUSTER)
-        # 1. Creamos una copia del DataFrame para manipular
-        # Solo traemos las columnas base necesarias para evitar ruido
-        base_cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
-                     'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant', 'sources']
+        # H. Exportación Final a S3 (MÉTODO NUCLEAR)
+        print("🔍 [DEBUG] Iniciando construcción explícita del JSON...")
+
+        # 1. Limpieza preventiva: eliminamos columnas duplicadas si existieran
+        grid_df = grid_df.loc[:, ~grid_df.columns.duplicated()]
+
+        # 2. Creamos un DataFrame VACÍO y lo llenamos SOLO con lo que queremos
+        # Esto garantiza que no se cuele NADA del dataframe anterior
+        final_df = pd.DataFrame()
+
+        # A) Datos Base (Copiamos directo)
+        cols_base = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
+                     'tmp', 'rh', 'wsp', 'ias', 'station', 'risk', 'dominant', 'sources']
         
-        final_df = grid_df[base_cols].copy()
-        
-        # 2. Renombramos las columnas (Esto transforma 'o3' en 'o3 1h')
-        final_df.rename(columns={
-            'o3': 'o3 1h',
-            'pm10': 'pm10 12h',
-            'pm25': 'pm25 12h'
-        }, inplace=True)
-        
-        # 3. LISTA BLANCA (VIP): Definimos EXACTAMENTE qué queremos en el JSON final
-        # Usamos los nombres NUEVOS. Cualquier columna antigua (fantasmas) quedará fuera.
-        cols_vip = [
+        for c in cols_base:
+            final_df[c] = grid_df[c]
+
+        # B) Datos Renombrados (Asignación manual: Dato Viejo -> Columna Nueva)
+        final_df['o3 1h']    = grid_df['o3']
+        final_df['pm10 12h'] = grid_df['pm10']
+        final_df['pm25 12h'] = grid_df['pm25']
+
+        # 3. Ordenamos las columnas para que el JSON se vea ordenado
+        cols_ordered = [
             'timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
             'tmp', 'rh', 'wsp', 'o3 1h', 'pm10 12h', 'pm25 12h', 
             'ias', 'station', 'risk', 'dominant', 'sources'
         ]
-        
-        # 4. FILTRADO FINAL: Esto corta cualquier columna que no esté en cols_vip (Adiós o3:0)
-        final_df = final_df[cols_vip]
-        
-        # 5. Generamos el JSON limpio
+        final_df = final_df[cols_ordered]
+
+        # 4. Generamos el JSON
         final_json = final_df.replace({np.nan: None}).to_json(orient='records')
         
-        # 6. Guardar "Latest" en S3
+        # 5. Guardar "Latest"
         s3_client.put_object(
             Bucket=S3_BUCKET, 
             Key=S3_GRID_OUTPUT_KEY, 
@@ -417,7 +421,7 @@ def lambda_handler(event, context):
             ContentType='application/json'
         )
 
-        # 7. Guardar "Histórico" en S3
+        # 6. Guardar "Histórico"
         timestamp_name = now_mx.strftime("%Y-%m-%d_%H-%M")
         history_key = f"live_grid/grid_{timestamp_name}.json"
         
@@ -428,7 +432,7 @@ def lambda_handler(event, context):
             ContentType='application/json'
         )
         
-        print(f"📦 SUCCESS {VERSION}: Grid Limpio Guardado.")
+        print(f"📦 SUCCESS {VERSION}: Grid Nuclear Guardado (Sin Fantasmas).")
         
         return {
             'statusCode': 200, 
