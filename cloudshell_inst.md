@@ -48,3 +48,27 @@ nano deploy_fix_v28.sh
 bash deploy_fix_v28.sh
 ls -lh training/raw_data/
 ```
+
+# Workflow de Entrenamiento (MLOps)
+Objetivo: Actualizar los modelos de IA cuando cambian los datos o el algoritmo.
+
+Hacer cambios: Editar el código Python en training/ o actualizar el dataset en S3 (raw_data/).
+
+Desplegar: Desde la terminal del proyecto, ejecutar:
+
+Bash
+
+./deploy_training.sh
+Proceso Automático (AWS CodeBuild):
+
+# Detecta el commit en GitHub.
+
+Descarga el código y el Dataset maestro de S3.
+
+Entrena los 5 modelos (O3, PM10, PM2.5, CO, SO2).
+
+Calcula el error (RMSE).
+
+Guarda los nuevos archivos .json en s3://smability-data-lake/models/.
+
+Resultado: La Lambda de predicción comenzará a usar los nuevos modelos inmediatamente.
