@@ -1,20 +1,36 @@
-# Python
+cat > .gitignore <<EOF
+# --- Python & Sistema ---
 __pycache__/
 *.py[cod]
 *$py.class
 .venv/
 env/
 venv/
-.env
+.DS_Store
 
-# Datos pesados y temporales
+# --- Credenciales y Seguridad (CRÍTICO) ---
+.env
+aws_config.txt
+
+# --- Datos Pesados (Data Lake) ---
+# Los datos viven en S3, nunca en el repo
 *.tif
 *.zip
 *.csv
+/data/
+/training/raw_data/
 /tmp/
 
-# AWS/CloudShell
-.aws/
+# --- Artefactos Generados (Modelos y Logs) ---
+# Ignoramos los modelos para no ensuciar el repo (se guardan en S3)
+model_*.json
+models/
+response.json
+response_live.json
 out.json
 out_f.json
+
+# --- AWS/CloudShell ---
+.aws/
 heavy_source.zip
+EOF
