@@ -380,27 +380,36 @@ def lambda_handler(event, context):
         now_mx = datetime.now(ZoneInfo("America/Mexico_City"))
         grid_df['timestamp'] = now_mx.strftime("%Y-%m-%d %H:%M:%S")
 
-        # H. Exportación Final a S3 (LIMPIEZA DE COLUMNAS FANTASMA)
-        # 1. Definimos las columnas ORIGINALES que queremos extraer
-        cols_to_export = [
-            'timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
-            'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant', 'sources'
-        ]
+        # H. Exportación Final a S3 (GHOST BUSTER)
+        # 1. Creamos una copia del DataFrame para manipular
+        # Solo traemos las columnas base necesarias para evitar ruido
+        base_cols = ['timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
+                     'tmp', 'rh', 'wsp', 'o3', 'pm10', 'pm25', 'ias', 'station', 'risk', 'dominant', 'sources']
         
-        # 2. Creamos un DataFrame NUEVO y LIMPIO con solo esas columnas
-        final_df = grid_df[cols_to_export].copy()
+        final_df = grid_df[base_cols].copy()
         
-        # 3. Renombramos explícitamente las columnas de contaminantes
+        # 2. Renombramos las columnas (Esto transforma 'o3' en 'o3 1h')
         final_df.rename(columns={
             'o3': 'o3 1h',
             'pm10': 'pm10 12h',
             'pm25': 'pm25 12h'
         }, inplace=True)
         
-        # 4. Generamos el JSON final (Sin columnas fantasma, sin nulos)
+        # 3. LISTA BLANCA (VIP): Definimos EXACTAMENTE qué queremos en el JSON final
+        # Usamos los nombres NUEVOS. Cualquier columna antigua (fantasmas) quedará fuera.
+        cols_vip = [
+            'timestamp', 'lat', 'lon', 'mun', 'edo', 'altitude', 'building_vol', 
+            'tmp', 'rh', 'wsp', 'o3 1h', 'pm10 12h', 'pm25 12h', 
+            'ias', 'station', 'risk', 'dominant', 'sources'
+        ]
+        
+        # 4. FILTRADO FINAL: Esto corta cualquier columna que no esté en cols_vip (Adiós o3:0)
+        final_df = final_df[cols_vip]
+        
+        # 5. Generamos el JSON limpio
         final_json = final_df.replace({np.nan: None}).to_json(orient='records')
         
-        # 5. Guardar "Latest" en S3
+        # 6. Guardar "Latest" en S3
         s3_client.put_object(
             Bucket=S3_BUCKET, 
             Key=S3_GRID_OUTPUT_KEY, 
@@ -408,7 +417,7 @@ def lambda_handler(event, context):
             ContentType='application/json'
         )
 
-        # 6. Guardar "Histórico" en S3
+        # 7. Guardar "Histórico" en S3
         timestamp_name = now_mx.strftime("%Y-%m-%d_%H-%M")
         history_key = f"live_grid/grid_{timestamp_name}.json"
         
@@ -419,12 +428,11 @@ def lambda_handler(event, context):
             ContentType='application/json'
         )
         
-        print(f"📦 SUCCESS {VERSION}: Grid generado y guardado correctamente.")
+        print(f"📦 SUCCESS {VERSION}: Grid Limpio Guardado.")
         
-        # Respuesta limpia para la API (Sin devolver el JSON gigante)
         return {
             'statusCode': 200, 
-            'body': json.dumps({'message': f'Predictor {VERSION} OK', 'timestamp': timestamp_name}),
+            'body': json.dumps({'message': 'Grid generado sin fantasmas', 'timestamp': timestamp_name}),
             'headers': {'Content-Type': 'application/json'}
         }
         # --- FIN DEL REEMPLAZO ---
