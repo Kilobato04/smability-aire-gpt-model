@@ -11,9 +11,7 @@ phases:
   pre_build:
     commands:
       - echo "📂 Usando Dataset incluido en el repositorio..."
-      # Verificamos que el archivo exista (para debug)
       - ls -l training/raw_data/dataset_aire_zmcdmx.zip
-      # Descomprimimos el archivo local hacia la carpeta temporal
       - unzip training/raw_data/dataset_aire_zmcdmx.zip -d /tmp/dataset_final
 
   build:
