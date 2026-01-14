@@ -1,0 +1,30 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - echo "📦 Instalando dependencias de Data Science..."
+      # Usamos requirements separados si quieres, o instalamos directo lo necesario
+      - pip install pandas xgboost scikit-learn boto3 numpy requests
+
+  pre_build:
+    commands:
+      - echo "⬇️ Descargando datos crudos y assets..."
+      # Asegúrate de tener el dataset y los edificios disponibles
+      # Si el dataset es muy grande, idealmente debería bajarse de S3, 
+      # pero por ahora asumimos que está en el repo o se descarga aquí.
+      # aws s3 cp s3://smability-data-lake/raw_data/dataset_final.zip /tmp/
+      # unzip /tmp/dataset_final.zip -d /tmp/dataset_final
+
+  build:
+    commands:
+      - echo "🧠 Iniciando Entrenamiento de 5 Contaminantes..."
+      # Ejecutamos el script que afinamos ayer
+      - python train_v5_grand_slam.py
+
+  post_build:
+    commands:
+      - echo "✅ Entrenamiento finalizado."
+      - echo "Los modelos .json han sido subidos a S3 por el script Python."
