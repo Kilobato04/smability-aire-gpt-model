@@ -248,62 +248,108 @@ def lambda_handler(event, context):
             stations_df = pd.DataFrame(columns=['name', 'lat', 'lon', 'o3_real', 'pm10_real', 'pm25_real', 'tmp', 'rh', 'wsp'])
         else:
             stations_df = pd.DataFrame(parsed).dropna(subset=['lat', 'lon'])
-
-        # --- [LÓGICA DE FUENTE DE DATOS Y RESCATE] ---
-        if stations_df.empty or stations_df[['o3_real', 'pm10_real', 'pm25_real']].isnull().all().all():
-            print("🌐 [OPEN-METEO] Intentando rescate de malla climática (20 puntos)...")
-            
-            pts = [(19.43,-99.13),(19.54,-99.20),(19.60,-99.04),(19.63,-99.10),(19.28,-99.17),
-                   (19.25,-99.10),(19.19,-99.02),(19.36,-99.07),(19.40,-98.99),(19.42,-98.94),
-                   (19.36,-99.26),(19.47,-99.23),(19.36,-99.35),(19.64,-98.91),(19.67,-99.18),
-                   (19.26,-98.89),(19.30,-99.24),(19.49,-99.11),(19.35,-99.16),(19.42,-99.09)]
-            
-            lats = ",".join([str(p[0]) for p in pts])
-            lons = ",".join([str(p[1]) for p in pts])
-            url_om = f"https://api.open-meteo.com/v1/forecast?latitude={lats}&longitude={lons}&current=temperature_2m,relative_humidity_2m,wind_speed_10m&wind_speed_unit=ms&timezone=America%2FMexico_City"
-            
-            try:
-                res = requests.get(url_om, timeout=10).json()
-                
-                # Manejo de respuesta (Lista vs Objeto único)
-                if isinstance(res, list):
-                    avg_tmp = np.mean([p['current']['temperature_2m'] for p in res])
-                    avg_rh = np.mean([p['current']['relative_humidity_2m'] for p in res])
-                    avg_wsp = np.mean([p['current']['wind_speed_10m'] for p in res])
-                else:
-                    avg_tmp = res['current']['temperature_2m']
-                    avg_rh = res['current']['relative_humidity_2m']
-                    avg_wsp = res['current']['wind_speed_10m']
-
-                stations_df = pd.DataFrame([{
-                    'name': 'Inercia Climática', 'lat': 19.43, 'lon': -99.13,
-                    'o3_real': None, 'pm10_real': None, 'pm25_real': None,
-                    'co_real': None, 'so2_real': None, 
-                    'tmp': avg_tmp, 'rh': avg_rh, 'wsp': avg_wsp,
-                    'wdr': 90.0
-                }])
-                print(f"✅ [DATOS: OPEN-METEO] Rescate exitoso. Clima promedio: {avg_tmp:.1f}°C, RH: {avg_rh:.0f}%")
-                
-            except Exception as e:
-                print(f"🚨 [ERROR: OPEN-METEO] Falló la API externa: {e}")
-                print("🛠️ [DATOS: REGISTRO MANUAL] Aplicando valores failsafe de emergencia.")
-                stations_df = pd.DataFrame([{
-                    'name': 'Failsafe de Emergencia', 
-                    'lat': 19.43, 'lon': -99.13, 
-                    'o3_real': None, 'pm10_real': None, 'pm25_real': None,
-                    'co_real': None, 'so2_real': None,
-                    'tmp': 18.0, 'rh': 45.0, 'wsp': 2.5,
-                    'wdr': 90.0
-                }])
-        else:
-            print(f"📡 [DATOS: SIMAT] Utilizando {len(stations_df)} estaciones oficiales.")
-
-        # --- [FIN DEL BLOQUE DE RESCATE] ---
+        
         if 'wdr' not in stations_df.columns:
             stations_df['wdr'] = 90.0
 
         # Procesamiento de Malla y Predicción
         grid_df = prepare_grid_features(stations_df)
+
+        # --- [BLOQUE C V58.5: METEOROLOGÍA RESILIENTE (SIMAT + 15 PUNTOS VIRTUALES)] ---
+        
+        # 1. Diagnóstico: ¿Tenemos datos locales reales?
+        met_stations = [s for s in stations_raw if s.get('meteorological')]
+        count_met = len(met_stations)
+        
+        # Umbral: Si hay menos de 3 estaciones activas, activamos el Protocolo OpenMeteo
+        USE_OPENMETEO = count_met < 3
+        
+        x_pts, y_pts = [], []
+        z_temps, z_rhs, z_wsps, z_wdrs = [], [], [], []
+
+        if not USE_OPENMETEO:
+            print(f"\n☀️ MODO DIURNO: Usando {count_met} estaciones SIMAT.")
+            # --- ESTRATEGIA A: DATOS REALES (SIMAT) ---
+            for s in met_stations:
+                met = s['meteorological']
+                # Validamos que existan los 4 datos clave (INCLUYENDO WSP)
+                if all(k in met for k in ['tmp', 'rh', 'wsp', 'wdr']):
+                    x_pts.append(s['location']['lon'])
+                    y_pts.append(s['location']['lat'])
+                    z_temps.append(float(met['tmp']))
+                    z_rhs.append(float(met['rh']))
+                    z_wsps.append(float(met['wsp']))
+                    z_wdrs.append(float(met['wdr']))
+        
+        else:
+            print(f"\n🌙 MODO NOCTURNO/FALLBACK: Descargando 15 Puntos Virtuales (OpenMeteo)...")
+            # --- ESTRATEGIA B: 15 PUNTOS VIRTUALES (OPENMETEO) ---
+            lats = [19.5, 19.5, 19.5, 19.4, 19.4, 19.4, 19.3, 19.3, 19.3, 19.2, 19.2, 19.2, 19.6, 19.1, 19.4]
+            lons = [-99.2, -99.1, -99.0, -99.2, -99.1, -99.0, -99.2, -99.1, -99.0, -99.2, -99.1, -99.0, -99.1, -99.1, -98.9]
+            
+            str_lats = ",".join(map(str, lats))
+            str_lons = ",".join(map(str, lons))
+            om_url = f"https://api.open-meteo.com/v1/forecast?latitude={str_lats}&longitude={str_lons}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m&timezone=auto"
+            
+            try:
+                import urllib.request
+                with urllib.request.urlopen(om_url, timeout=3) as url:
+                    data = json.loads(url.read().decode())
+                    
+                    if isinstance(data, list):
+                        for i, d in enumerate(data):
+                            curr = d.get('current', {})
+                            x_pts.append(lons[i])
+                            y_pts.append(lats[i])
+                            z_temps.append(float(curr.get('temperature_2m', 15)))
+                            z_rhs.append(float(curr.get('relative_humidity_2m', 50)))
+                            z_wsps.append(float(curr.get('wind_speed_10m', 2)) / 3.6) # Importante: WSP está aquí
+                            z_wdrs.append(float(curr.get('wind_direction_10m', 0)))
+                    else:
+                        # Fallback formato simple
+                        curr = data.get('current', {})
+                        t_val = curr.get('temperature_2m', 15)
+                        if isinstance(t_val, list):
+                            z_temps = t_val
+                            z_rhs = curr.get('relative_humidity_2m', [50]*15)
+                            z_wsps = [v/3.6 for v in curr.get('wind_speed_10m', [7.2]*15)]
+                            z_wdrs = curr.get('wind_direction_10m', [0]*15)
+                            x_pts = lons
+                            y_pts = lats
+                        else:
+                            x_pts, y_pts = lons, lats
+                            z_temps = [float(curr.get('temperature_2m', 15))] * 15
+                            z_rhs = [float(curr.get('relative_humidity_2m', 50))] * 15
+                            z_wsps = [float(curr.get('wind_speed_10m', 7.2))/3.6] * 15
+                            z_wdrs = [float(curr.get('wind_direction_10m', 0))] * 15
+                            
+                print(f"   ✅ Datos OpenMeteo obtenidos exitosamente ({len(z_temps)} puntos).")
+                
+            except Exception as e:
+                print(f"   ⚠️ Error OpenMeteo: {e}. Usando valores default.")
+                x_pts, y_pts = lons, lats
+                z_temps = [12.0] * 15
+                z_rhs = [60.0] * 15
+                z_wsps = [1.0] * 15
+                z_wdrs = [0.0] * 15
+
+        # 3. Interpolación Espacial (Sobrescribe grid_df con datos frescos)
+        if len(x_pts) >= 3:
+            grid_df['tmp'] = interpolate_grid(grid_df, x_pts, y_pts, z_temps, method='linear')
+            grid_df['rh']  = interpolate_grid(grid_df, x_pts, y_pts, z_rhs,   method='linear')
+            grid_df['wsp'] = interpolate_grid(grid_df, x_pts, y_pts, z_wsps,  method='linear')
+            
+            # Interpolación vectorial WDR
+            u_vec = [-w * np.sin(np.radians(d)) for w, d in zip(z_wsps, z_wdrs)]
+            v_vec = [-w * np.cos(np.radians(d)) for w, d in zip(z_wsps, z_wdrs)]
+            grid_u = interpolate_grid(grid_df, x_pts, y_pts, u_vec, method='linear')
+            grid_v = interpolate_grid(grid_df, x_pts, y_pts, v_vec, method='linear')
+            grid_df['wdr'] = (np.degrees(np.arctan2(-grid_u, -grid_v))) % 360
+        else:
+            grid_df.fillna({'tmp': 15.0, 'rh': 50.0, 'wsp': 1.0, 'wdr': 0.0}, inplace=True)
+
+        grid_df.fillna({'tmp': 15.0, 'rh': 50.0, 'wsp': 1.0, 'wdr': 0.0}, inplace=True)
+        # --- [FIN BLOQUE C] ---
 
         # --- [BLOQUE MAESTRO V58.3: LOGS PREMIUM + CALIBRACIÓN HÍBRIDA + CLEAN TYPES] ---
 
