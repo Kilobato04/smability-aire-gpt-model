@@ -190,6 +190,8 @@
                     <div class="btn-var btn-air" onclick="setMode('o3', this)">🔴 O3</div>
                     <div class="btn-var btn-air" onclick="setMode('pm10', this)">🟤 PM10</div>
                     <div class="btn-var btn-air" onclick="setMode('pm25', this)">🟣 PM2.5</div>
+                    <div class="btn-var btn-air" onclick="setMode('co', this)">🔵 CO</div>
+                    <div class="btn-var btn-air" onclick="setMode('so2', this)">🟡 SO2</div>
                     <div class="btn-var" onclick="setMode('tmp', this)">🌡️ Temp</div>
                     <div class="btn-var" onclick="setMode('rh', this)">💧 Hum</div>
                     <div class="btn-var" onclick="setMode('wsp', this)">💨 Viento</div>
@@ -253,6 +255,10 @@
             o3: { name: 'Ozono (O3)', unit: 'ppb', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 250], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             pm10: { name: 'Partículas PM10', unit: 'µg/m³', min: 0, max: 215, stops: [0, 45, 75, 130, 215, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             pm25: { name: 'Partículas PM2.5', unit: 'µg/m³', min: 0, max: 150, stops: [0, 25, 45, 80, 147, 200], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
+            // --- NUEVOS GASES ---
+            co: { name: 'Monóxido Carbono', unit: 'ppm', min: 0, max: 15, stops: [0, 9, 11, 13, 15, 20], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
+            so2: { name: 'Dióxido Azufre', unit: 'ppb', min: 0, max: 200, stops: [0, 40, 75, 185, 300, 500], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
+            // --------------------
             tmp: { name: 'Temperatura', unit: '°C', min: 0, max: 35, stops: [0, 10, 20, 30, 35], colors: ['#0000ff', '#00ffff', '#ffff00', '#ff0000', '#800000'] },
             rh: { name: 'Humedad', unit: '%', min: 0, max: 100, stops: [0, 25, 50, 75, 100], colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b'] },
             wsp: { name: 'Viento', unit: 'm/s', min: 0, max: 15, stops: [0, 3, 6, 9, 15], colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c'] },
@@ -389,6 +395,9 @@
                         p.o3 = p['o3 1h'] || p.o3;
                         p.pm10 = p['pm10 12h'] || p.pm10;
                         p.pm25 = p['pm25 12h'] || p.pm25;
+                        // NUEVOS MAPEOSS
+                        p.co = p['co 8h'] || p.co;
+                        p.so2 = p['so2 1h'] || p.so2;
                     });
                     // --- [FIN ADAPTADOR] ---
                     globalData = data;
@@ -599,6 +608,21 @@
                             </span> 
                             <span style="white-space:nowrap;">
                                 ${Number(p.pm25||0).toFixed(1)} µg ${fmtSrc('pm25')}
+                            </span>
+
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">
+                                🔵 CO <span style="font-size:9px; color:#64748b;">(8h)</span>:
+                            </span> 
+                            <span style="white-space:nowrap;">
+                                ${Number(p.co||0).toFixed(2)} ppm ${fmtSrc('co')}
+                            </span>
+
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">
+                                🟡 SO2 <span style="font-size:9px; color:#64748b;">(1h)</span>:
+                            </span>
+                            
+                            <span style="white-space:nowrap;">
+                                ${Number(p.so2||0).toFixed(1)} ppb ${fmtSrc('so2')}
                             </span>
 
                             <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:4px 0;">
