@@ -19,10 +19,11 @@ BIAS_SENSITIVITY = 1.0
 S3_BUCKET = "smability-data-lake"
 # Los modelos ahora viven en: models/model_xxx.json
 MODEL_S3_PREFIX = "models/"
-
 MODEL_PATH_O3 = f"{BASE_PATH}/app/artifacts/model_o3.json"
 MODEL_PATH_PM10 = f"{BASE_PATH}/app/artifacts/model_pm10.json"
 MODEL_PATH_PM25 = f"{BASE_PATH}/app/artifacts/model_pm25.json"
+MODEL_PATH_CO   = f"{BASE_PATH}/app/artifacts/model_co.json"   # <--- NUEVO
+MODEL_PATH_SO2  = f"{BASE_PATH}/app/artifacts/model_so2.json"  # <--- NUEVO
 STATIC_ADMIN_PATH = f"{BASE_PATH}/app/geograficos/grid_admin_info.json"
 SMABILITY_API_URL = "https://y4zwdmw7vf.execute-api.us-east-1.amazonaws.com/prod/api/air-quality/current?type=reference,smaa"
 
@@ -53,22 +54,29 @@ def get_risk_level(ias):
 def load_models():
     """Descarga modelos desde S3 y los carga en XGBoost"""
     models = {}
-    pollutants = ['o3', 'pm10', 'pm25']
+
+    pollutants = ['o3', 'pm10', 'pm25', 'co', 'so2'] 
+    
+    print(f"🔄 Iniciando carga de modelos: {pollutants}")
     
     for p in pollutants:
         s3_key = f"{MODEL_S3_PREFIX}model_{p}.json"
         local_path = f"/tmp/model_{p}.json"
         
         try:
-            print(f"descargando de S3: {s3_key}...")
-            s3_client.download_file(S3_BUCKET, s3_key, local_path)
+            # Optimización Cold Start: Solo descargar si no existe en /tmp
+            if not os.path.exists(local_path):
+                print(f"⬇️ Descargando de S3: {s3_key}...")
+                s3_client.download_file(S3_BUCKET, s3_key, local_path)
             
+            # Cargar en XGBoost
             m = xgb.XGBRegressor()
             m.load_model(local_path)
             models[p] = m
-            print(f"✅ Modelo {p} cargado desde S3.")
+            print(f"✅ Modelo {p} cargado correctamente.")
         except Exception as e:
-            print(f"⚠️ No se pudo cargar el modelo {p} desde S3: {e}")
+            # Si falla (ej. no existe el archivo en S3), avisamos pero no tronamos
+            print(f"⚠️ No se pudo cargar el modelo {p}. Razón: {e}")
             
     return models
 
