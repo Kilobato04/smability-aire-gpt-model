@@ -399,6 +399,16 @@ def lambda_handler(event, context):
                     cell_sources[p] = f"Oficial {window}"
                 else:
                     cell_sources[p] = f"IA {window}"
+
+            # 2. ETIQUETADO DE METEOROLOGÍA (Física)
+            # Agregamos 'wdr' a la lista para que también se etiquete
+            for m in ['tmp', 'rh', 'wsp', 'wdr']: 
+                real_met = st.get(m)
+                if pd.notnull(real_met):
+                    grid_df.at[idx, m] = float(real_met)
+                    cell_sources[m] = "Oficial" 
+                else:
+                    cell_sources[m] = "IA"
             
             grid_df.at[idx, 'sources'] = json.dumps(cell_sources)
 
@@ -422,20 +432,26 @@ def lambda_handler(event, context):
         final_df = pd.DataFrame()
         final_df['timestamp'] = [str_time] * len(grid_df)
         
+        # 1. Columnas directas (Datos base)
         cols_direct = ['lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
                        'tmp', 'rh', 'wsp', 'ias', 'station', 'risk', 'dominant', 'sources']
         for c in cols_direct:
             final_df[c] = grid_df[c]
 
+        # 2. Mapeo de nombres finales (Gases + WDR)
         final_df['o3 1h']    = grid_df['o3']
         final_df['pm10 12h'] = grid_df['pm10']
         final_df['pm25 12h'] = grid_df['pm25']
         final_df['co 8h']    = grid_df['co']
         final_df['so2 1h']   = grid_df['so2']
+        
+        # Aseguramos explícitamente la dirección del viento
+        final_df['wdr'] = grid_df['wdr'] 
 
+        # 3. Orden final estricto
         cols_ordered = [
             'timestamp', 'lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
-            'tmp', 'rh', 'wsp', 
+            'tmp', 'rh', 'wsp', 'wdr', # <--- ¡Aquí aparecerá en el JSON!
             'o3 1h', 'pm10 12h', 'pm25 12h', 'co 8h', 'so2 1h', 
             'ias', 'station', 'risk', 'dominant', 'sources'
         ]
