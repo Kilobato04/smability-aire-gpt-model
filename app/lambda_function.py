@@ -297,12 +297,14 @@ def lambda_handler(event, context):
         # Procesamiento de Malla y Predicción
         grid_df = prepare_grid_features(stations_df)
         
-   
-        # --- [BLOQUE D DEFINITIVO: 5 GASES + LOGS ROBUSTOS + DOBLE HEALTH CHECK] ---
+        # --- [BLOQUE D FINAL: LOGS EXPLÍCITOS + CRON READY] ---
         # E. Predicción y Calibración
         grid_df['station_numeric'] = -1
         target_pollutants = ['o3', 'pm10', 'pm25', 'co', 'so2']
         
+        # Reporte de Salud de la Ingesta (Para saber si llegaron datos)
+        print(f"📊 SALUD API: Total:{len(stations_raw)} | O3:{counts['o3']} | PM10:{counts['pm10']} | CO:{counts['co']} | SO2:{counts['so2']}")
+
         # Inicialización
         for p in target_pollutants:
             grid_df[p] = 0.0
@@ -340,9 +342,9 @@ def lambda_handler(event, context):
                         applied_bias = raw_bias * BIAS_SENSITIVITY
                         grid_df[p] = (grid_df[p] + applied_bias).clip(0)
                         
-                        # --- LOGS DE CALIBRACIÓN (SIEMPRE VISIBLES) ---
+                        # LOGS DE ÉXITO
                         unit = "ppm" if p == "co" else ("ppb" if p in ["o3", "so2"] else "µg/m³")
-                        print(f"\n📊 CALIBRACIÓN: {p.upper()} (Bias: {applied_bias:+.2f} {unit})")
+                        print(f"\n✅ CALIBRACIÓN {p.upper()}: Bias calculado {applied_bias:+.2f} {unit}")
                         header = f"{'Estación':<20} | {'IA':<6} | {'Real':<6} | {'Final':<6}"
                         print(header)
                         print("-" * len(header))
@@ -351,7 +353,8 @@ def lambda_handler(event, context):
                             print(f"{row['name'][:19]:<20} | {row['raw_ai']:<6.2f} | {row[real_col]:<6.2f} | {final_val:<6.2f}")
                         print("-" * len(header))
                     else:
-                        print(f"\n⚠️ CALIBRACIÓN {p.upper()}: No hay datos reales válidos en este corte de hora.")
+                        # LOG DE ADVERTENCIA (Aquí sabremos si faltaron datos)
+                        print(f"\n⚠️ CALIBRACIÓN {p.upper()}: Omitida. No hay estaciones reportando datos reales en este corte.")
             else:
                 grid_df[p] = 0.0
 
@@ -367,7 +370,6 @@ def lambda_handler(event, context):
             cell_sources = {}
             for p in target_pollutants:
                 real_val = st.get(f'{p}_real')
-                # Etiquetas de ventana de tiempo correctas
                 if p == 'co': window = "8h"
                 elif p in ['pm10', 'pm25']: window = "12h"
                 else: window = "1h"
@@ -380,7 +382,7 @@ def lambda_handler(event, context):
             
             grid_df.at[idx, 'sources'] = json.dumps(cell_sources)
 
-        # G. IAS y Riesgo
+        # G. IAS y Riesgo (Lógica Igual)
         def calc_ias_row(row):
             scores = {
                 'O3': get_ias_score(row['o3'], 'o3'), 
@@ -393,7 +395,7 @@ def lambda_handler(event, context):
         grid_df[['ias', 'dominant']] = grid_df.apply(calc_ias_row, axis=1)
         grid_df['risk'] = grid_df['ias'].apply(get_risk_level)
         
-        # H. EXPORTACIÓN NUCLEAR
+        # H. Exportación
         now_mx = datetime.now(ZoneInfo("America/Mexico_City"))
         str_time = now_mx.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -419,13 +421,11 @@ def lambda_handler(event, context):
         ]
         final_df = final_df[cols_ordered]
 
-        # --- [NUEVO] HEALTH CHECK DOBLE (Merced + Villa de las Flores) ---
+        # HEALTH CHECK
         print("\n🏥 HEALTH CHECK COMPLETO:")
         stations_to_check = ["Merced", "Villa de las Flores"]
-        
         for st_name in stations_to_check:
             try:
-                # Búsqueda flexible (contiene texto)
                 row = final_df[final_df['station'].str.contains(st_name, case=False, na=False)]
                 if not row.empty:
                     print(f"--- {st_name.upper()} ---")
@@ -444,7 +444,7 @@ def lambda_handler(event, context):
         history_key = f"live_grid/grid_{timestamp_name}.json"
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=final_json, ContentType='application/json')
         
-        print(f"📦 SUCCESS: Grid Generado V57.2.")
+        print(f"📦 SUCCESS: Grid Generado V57.3 (Logs Corregidos).")
         
         return {
             'statusCode': 200, 
