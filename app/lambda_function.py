@@ -289,109 +289,73 @@ def lambda_handler(event, context):
         # Procesamiento de Malla y Predicción
         grid_df = prepare_grid_features(stations_df)
         
-        # --- INICIO DEL REEMPLAZO (SECCIÓN E y F) ---
+        # --- [INICIO ANCLA D: PREDICCIÓN GRAND SLAM + EXPORTACIÓN NUCLEAR] ---   
         # E. Predicción y Calibración
-        grid_df['station_numeric'] = -1
-        
-        # 1. Aseguramos tipos de datos y pre-inicializamos
-        for p in ['o3', 'pm10', 'pm25']:
+        # Inicializar los 5 contaminantes en 0.0 para evitar errores de tipo
+        target_pollutants = ['o3', 'pm10', 'pm25', 'co', 'so2']
+        for p in target_pollutants:
             grid_df[p] = 0.0
             grid_df[p] = grid_df[p].astype(float)
         
-        feats = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp', 'wdr']
-        if 'wdr' not in grid_df.columns: grid_df['wdr'] = 90.0
+        # LISTA DE FEATURES EXACTA DEL ENTRENAMIENTO V5
+        feats = [
+            'lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 
+            'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 
+            'tmp', 'rh', 'wsp', 'wdr' 
+        ]
         
-        # 2. Bucle de predicción y calibración (Alineación corregida)
-        for p in ['o3', 'pm10', 'pm25']:
+        # Asegurar que wdr exista antes de predecir (Red de seguridad)
+        if 'wdr' not in grid_df.columns: grid_df['wdr'] = 90.0
+
+        # 2. Bucle de predicción y calibración
+        for p in target_pollutants:
             if p in models:
-                # 1. Predicción base de la IA
+                # 1. Predicción base
                 grid_df[p] = models[p].predict(grid_df[feats]).clip(0)
                 
-                # 2. Preparar datos para la Tabla de Auditoría
+                # 2. Calibración (Bias)
                 real_col = f'{p}_real'
-                v_real_all = stations_df[['name', 'lat', 'lon', real_col]].copy()
-                
-                # Comparativa: ¿Qué dijo la IA en la ubicación de la estación?
-                st_preds = []
-                for _, st in v_real_all.iterrows():
-                    dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
-                    idx_closest = dist.idxmin()
-                    st_preds.append(grid_df.at[idx_closest, p])
-                v_real_all['raw_ai'] = st_preds
-                
-                # 3. Cálculo del Bias
-                v_valid = v_real_all.dropna(subset=[real_col])
-                applied_bias = 0  # <--- RED DE SEGURIDAD: Definir por defecto
-                
-                if not v_valid.empty:
-                    # Cálculo del bias base
-                    raw_bias = v_valid[real_col].mean() - v_valid['raw_ai'].mean()
+                if real_col in stations_df.columns:
+                    v_real_all = stations_df[['name', 'lat', 'lon', real_col]].copy()
+                    st_preds = []
+                    # Comparar predicción vs realidad en la ubicación de la estación
+                    for _, st in v_real_all.iterrows():
+                        dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
+                        st_preds.append(grid_df.at[dist.idxmin(), p])
+                    v_real_all['raw_ai'] = st_preds
                     
-                    # APLICACIÓN DE LA PERILLA DE SENSIBILIDAD
-                    applied_bias = raw_bias * BIAS_SENSITIVITY
+                    v_valid = v_real_all.dropna(subset=[real_col])
+                    applied_bias = 0
                     
-                    grid_df[p] = (grid_df[p] + applied_bias).clip(0)
-                    print(f"DEBUG: {p.upper()} - Bias Original: {raw_bias:+.2f} | Aplicado (x{BIAS_SENSITIVITY}): {applied_bias:+.2f}")
-                
-                # 4. REPORTE VISUAL EN LOGS (TABLA)
-                unit = "ppb" if p == "o3" else "µg/m³"
-                
-                # Reportamos claramente qué factor de sensibilidad se usó
-                print(f"\n📊 TABLA DE CALIBRACIÓN: {p.upper()} (Bias Aplicado: {applied_bias:+.2f} {unit} | Sensibilidad: x{BIAS_SENSITIVITY})")
-                header = f"{'Estación':<25} | {'Raw AI':<10} | {'Real':<10} | {'Bias':<10} | {'Final':<10}"
-                print("-" * len(header))
-                print(header)
-                print("-" * len(header))
-                
-                for _, row in v_real_all.iterrows():
-                    real_val = f"{row[real_col]:.2f}" if pd.notnull(row[real_col]) else "N/A"
-                    
-                    # El valor final en la tabla refleja la IA + el bias aplicado
-                    final_val_in_table = row['raw_ai'] + applied_bias
-                    
-                    # Una sola línea de print limpia
-                    print(f"{row['name'][:24]:<25} | {row['raw_ai']:<10.2f} | {real_val:<10} | {applied_bias:<+10.2f} | {max(0, final_val_in_table):<10.2f}")
-                
-                print("-" * len(header))
+                    if not v_valid.empty:
+                        raw_bias = v_valid[real_col].mean() - v_valid['raw_ai'].mean()
+                        applied_bias = raw_bias * BIAS_SENSITIVITY
+                        grid_df[p] = (grid_df[p] + applied_bias).clip(0)
+                        # print(f"DEBUG: {p.upper()} - Bias Aplicado: {applied_bias:+.2f}")
             else:
                 grid_df[p] = 0.0
 
-        # --- [INICIO REEMPLAZO SECCIÓN F: ETIQUETADO DE FUENTES] ---
-        # F. Marcadores y Sobrescritura de Estaciones (Con Trazabilidad)
+        # F. Marcadores y Sobrescritura de Estaciones (Prioridad al dato real)
         grid_df['station'] = None
-        grid_df['sources'] = "{}" # Inicializamos columna para guardar el origen del dato
+        grid_df['sources'] = "{}"
 
         for _, st in stations_df.iterrows():
-            # Encontrar la celda más cercana a la estación real
             dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
             idx = dist.idxmin()
-            
             grid_df.at[idx, 'station'] = st['name']
             
-            # Diccionario para rastrear fuente por contaminante
             cell_sources = {}
-            
-            for p in ['o3', 'pm10', 'pm25']:
+            for p in target_pollutants:
                 real_val = st.get(f'{p}_real')
-                
-                # Definimos la ventana de tiempo según el contaminante (Normativa)
                 window = "12h" if p in ['pm10', 'pm25'] else "1h"
-                
                 if pd.notnull(real_val):
-                    # CASO 1: HAY DATO DE SENSOR
-                    # Sobrescribimos la predicción de la IA con el dato duro
                     grid_df.at[idx, p] = float(real_val)
                     cell_sources[p] = f"Oficial {window}"
                 else:
-                    # CASO 2: NO HAY DATO DE SENSOR (Gap)
-                    # Mantenemos el valor que la IA predijo (ya calculado en Sección E)
                     cell_sources[p] = f"IA {window}"
-            
-            # Guardamos el diccionario como string JSON para que pase al CSV/JSON final
             grid_df.at[idx, 'sources'] = json.dumps(cell_sources)
-        # --- [FIN REEMPLAZO SECCIÓN F] ---
 
-        # G. Cálculo de IAS y Dominante (NOM-172-2024)
+        # G. Cálculo de IAS (Solo principales para riesgo)
         def calc_ias_row(row):
             scores = {
                 'O3': get_ias_score(row['o3'], 'o3'), 
@@ -405,36 +369,47 @@ def lambda_handler(event, context):
         grid_df['risk'] = grid_df['ias'].apply(get_risk_level)
         
         now_mx = datetime.now(ZoneInfo("America/Mexico_City"))
-        grid_df['timestamp'] = now_mx.strftime("%Y-%m-%d %H:%M:%S")
-
-        # H. Exportación Final a S3 (MÉTODO NUCLEAR)
-        print("🔍 [DEBUG] Iniciando construcción explícita del JSON...")
-
-        # 1. Limpieza preventiva: eliminamos columnas duplicadas si existieran
-        grid_df = grid_df.loc[:, ~grid_df.columns.duplicated()]
-
-        # 2. Creamos un DataFrame VACÍO y lo llenamos SOLO con lo que queremos
-        # Esto garantiza que no se cuele NADA del dataframe anterior
+        
+        # H. EXPORTACIÓN FINAL NUCLEAR (Limpieza total)
+        # Creamos un DataFrame NUEVO y VACÍO para evitar columnas fantasma heredadas
         final_df = pd.DataFrame()
 
-        # A) Datos Base (Copiamos directo)
-        cols_base = ['timestamp', 'lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
-                     'tmp', 'rh', 'wsp', 'ias', 'station', 'risk', 'dominant', 'sources']
+        # 1. Llenamos SOLO lo que queremos explícitamente
+        final_df['timestamp']    = now_mx.strftime("%Y-%m-%d %H:%M:%S")
+        final_df['lat']          = grid_df['lat']
+        final_df['lon']          = grid_df['lon']
+        final_df['col']          = grid_df['col']
+        final_df['mun']          = grid_df['mun']
+        final_df['edo']          = grid_df['edo']
+        final_df['pob']          = grid_df['pob']
+        final_df['altitude']     = grid_df['altitude']
+        final_df['building_vol'] = grid_df['building_vol']
         
-        for c in cols_base:
-            final_df[c] = grid_df[c]
-
-        # B) Datos Renombrados (Asignación manual: Dato Viejo -> Columna Nueva)
+        final_df['tmp'] = grid_df['tmp']
+        final_df['rh']  = grid_df['rh']
+        final_df['wsp'] = grid_df['wsp']
+        
+        # 2. Mapeamos los contaminantes a sus nombres finales
         final_df['o3 1h']    = grid_df['o3']
         final_df['pm10 12h'] = grid_df['pm10']
         final_df['pm25 12h'] = grid_df['pm25']
+        final_df['co 1h']    = grid_df['co']   # <--- AQUÍ ESTÁ CO
+        final_df['so2 1h']   = grid_df['so2']  # <--- AQUÍ ESTÁ SO2
+        
+        final_df['ias']      = grid_df['ias']
+        final_df['station']  = grid_df['station']
+        final_df['risk']     = grid_df['risk']
+        final_df['dominant'] = grid_df['dominant']
+        final_df['sources']  = grid_df['sources']
 
-        # 3. Ordenamos las columnas para que el JSON se vea ordenado
+        # 3. FILTRO FINAL: Orden estricto (Esto elimina cualquier otra cosa)
         cols_ordered = [
             'timestamp', 'lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
-            'tmp', 'rh', 'wsp', 'o3 1h', 'pm10 12h', 'pm25 12h', 
+            'tmp', 'rh', 'wsp', 
+            'o3 1h', 'pm10 12h', 'pm25 12h', 'co 1h', 'so2 1h', 
             'ias', 'station', 'risk', 'dominant', 'sources'
         ]
+        # Si alguna columna se coló, este paso la elimina
         final_df = final_df[cols_ordered]
 
         # 4. Generamos el JSON
@@ -442,31 +417,26 @@ def lambda_handler(event, context):
         
         # 5. Guardar "Latest"
         s3_client.put_object(
-            Bucket=S3_BUCKET, 
-            Key=S3_GRID_OUTPUT_KEY, 
-            Body=final_json, 
-            ContentType='application/json'
+            Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, 
+            Body=final_json, ContentType='application/json'
         )
 
         # 6. Guardar "Histórico"
         timestamp_name = now_mx.strftime("%Y-%m-%d_%H-%M")
         history_key = f"live_grid/grid_{timestamp_name}.json"
-        
         s3_client.put_object(
-            Bucket=S3_BUCKET, 
-            Key=history_key, 
-            Body=final_json, 
-            ContentType='application/json'
+            Bucket=S3_BUCKET, Key=history_key, 
+            Body=final_json, ContentType='application/json'
         )
         
-        print(f"📦 SUCCESS {VERSION}: Grid Nuclear Guardado (Sin Fantasmas).")
+        print(f"📦 SUCCESS: Grid Grand Slam Generado (5 Contaminantes + Limpieza).")
         
         return {
             'statusCode': 200, 
-            'body': json.dumps({'message': 'Grid generado sin fantasmas', 'timestamp': timestamp_name}),
+            'body': json.dumps({'message': 'Grid generado Grand Slam', 'timestamp': timestamp_name}),
             'headers': {'Content-Type': 'application/json'}
         }
-        # --- FIN DEL REEMPLAZO ---
+        # --- [FIN ANCLA D] ---
 
     except Exception as e:
         print(f"❌ ERROR FATAL: {e}")
