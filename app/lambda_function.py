@@ -297,8 +297,8 @@ def lambda_handler(event, context):
         # Procesamiento de Malla y Predicción
         grid_df = prepare_grid_features(stations_df)
         
-        # --- [BLOQUE D CONSOLIDADO: 5 GASES + LOGS CALIBRACIÓN + HEALTH CHECK] ---
-
+   
+        # --- [BLOQUE D DEFINITIVO: 5 GASES + LOGS ROBUSTOS + DOBLE HEALTH CHECK] ---
         # E. Predicción y Calibración
         grid_df['station_numeric'] = -1
         target_pollutants = ['o3', 'pm10', 'pm25', 'co', 'so2']
@@ -340,18 +340,18 @@ def lambda_handler(event, context):
                         applied_bias = raw_bias * BIAS_SENSITIVITY
                         grid_df[p] = (grid_df[p] + applied_bias).clip(0)
                         
-                        # --- LOGS DE CALIBRACIÓN (ACTIVADOS) ---
+                        # --- LOGS DE CALIBRACIÓN (SIEMPRE VISIBLES) ---
                         unit = "ppm" if p == "co" else ("ppb" if p in ["o3", "so2"] else "µg/m³")
                         print(f"\n📊 CALIBRACIÓN: {p.upper()} (Bias: {applied_bias:+.2f} {unit})")
                         header = f"{'Estación':<20} | {'IA':<6} | {'Real':<6} | {'Final':<6}"
                         print(header)
                         print("-" * len(header))
-                        # Imprimimos solo las primeras 10 para no saturar, o todas si prefieres
                         for _, row in v_valid.iterrows(): 
                             final_val = max(0, row['raw_ai'] + applied_bias)
                             print(f"{row['name'][:19]:<20} | {row['raw_ai']:<6.2f} | {row[real_col]:<6.2f} | {final_val:<6.2f}")
                         print("-" * len(header))
-                        
+                    else:
+                        print(f"\n⚠️ CALIBRACIÓN {p.upper()}: No hay datos reales válidos en este corte de hora.")
             else:
                 grid_df[p] = 0.0
 
@@ -398,8 +398,6 @@ def lambda_handler(event, context):
         str_time = now_mx.strftime("%Y-%m-%d %H:%M:%S")
 
         final_df = pd.DataFrame()
-        
-        # Timestamp arreglado
         final_df['timestamp'] = [str_time] * len(grid_df)
         
         cols_direct = ['lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
@@ -407,14 +405,12 @@ def lambda_handler(event, context):
         for c in cols_direct:
             final_df[c] = grid_df[c]
 
-        # Contaminantes finales (Nombres Limpios)
         final_df['o3 1h']    = grid_df['o3']
         final_df['pm10 12h'] = grid_df['pm10']
         final_df['pm25 12h'] = grid_df['pm25']
-        final_df['co 8h']    = grid_df['co']   # <--- CO 8h
+        final_df['co 8h']    = grid_df['co']
         final_df['so2 1h']   = grid_df['so2']
 
-        # Filtro estricto
         cols_ordered = [
             'timestamp', 'lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
             'tmp', 'rh', 'wsp', 
@@ -423,30 +419,32 @@ def lambda_handler(event, context):
         ]
         final_df = final_df[cols_ordered]
 
-        # --- [NUEVO] HEALTH CHECK LOG (Merced) ---
-        print("\n🏥 HEALTH CHECK (Estación Merced):")
-        try:
-            # Buscamos la fila que coincida con 'Merced' en la columna station
-            merced_row = final_df[final_df['station'].str.contains("Merced", case=False, na=False)]
-            if not merced_row.empty:
-                # Imprimimos el primer resultado como JSON bonito
-                print(merced_row.iloc[0].to_json(indent=2))
-            else:
-                print("⚠️ No se encontró la estación Merced en el Grid para el check.")
-        except Exception as e:
-            print(f"⚠️ Error en Health Check: {e}")
+        # --- [NUEVO] HEALTH CHECK DOBLE (Merced + Villa de las Flores) ---
+        print("\n🏥 HEALTH CHECK COMPLETO:")
+        stations_to_check = ["Merced", "Villa de las Flores"]
+        
+        for st_name in stations_to_check:
+            try:
+                # Búsqueda flexible (contiene texto)
+                row = final_df[final_df['station'].str.contains(st_name, case=False, na=False)]
+                if not row.empty:
+                    print(f"--- {st_name.upper()} ---")
+                    print(row.iloc[0].to_json(indent=2))
+                else:
+                    print(f"⚠️ {st_name}: No encontrada en el Grid.")
+            except Exception as e:
+                print(f"⚠️ Error check {st_name}: {e}")
         print("-" * 30)
 
         # Guardar
         final_json = final_df.replace({np.nan: None}).to_json(orient='records')
-        
         s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=final_json, ContentType='application/json')
         
         timestamp_name = now_mx.strftime("%Y-%m-%d_%H-%M")
         history_key = f"live_grid/grid_{timestamp_name}.json"
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=final_json, ContentType='application/json')
         
-        print(f"📦 SUCCESS: Grid Generado V57.1 (5 Gases + Logs Completos).")
+        print(f"📦 SUCCESS: Grid Generado V57.2.")
         
         return {
             'statusCode': 200, 
