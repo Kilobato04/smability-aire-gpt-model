@@ -297,13 +297,17 @@ def lambda_handler(event, context):
         # Procesamiento de Malla y Predicción
         grid_df = prepare_grid_features(stations_df)
         
-        # --- [BLOQUE D FINAL: LOGS EXPLÍCITOS + CRON READY] ---
+        # --- [BLOQUE D: REPORTE EJECUTIVO + 5 TABLAS + HEALTH CHECK] ---
         # E. Predicción y Calibración
         grid_df['station_numeric'] = -1
         target_pollutants = ['o3', 'pm10', 'pm25', 'co', 'so2']
         
-        # Reporte de Salud de la Ingesta (Para saber si llegaron datos)
-        print(f"📊 SALUD API: Total:{len(stations_raw)} | O3:{counts['o3']} | PM10:{counts['pm10']} | CO:{counts['co']} | SO2:{counts['so2']}")
+        # --- 1. RESUMEN INICIAL (HEAD) ---
+        print("\n📋 RESUMEN EJECUTIVO V57.4")
+        print("-" * 50)
+        print(f"🔹 Modelos en Memoria: {list(models.keys())}") # <--- AQUÍ VEREMOS SI FALTA CO/SO2
+        print(f"🔹 Salud API (Datos):  {counts}")
+        print("-" * 50)
 
         # Inicialización
         for p in target_pollutants:
@@ -318,16 +322,22 @@ def lambda_handler(event, context):
         
         if 'wdr' not in grid_df.columns: grid_df['wdr'] = 90.0
         
-        # 2. Bucle de predicción y calibración
+        # --- 2. BUCLE DE TABLAS (BODY) ---
         for p in target_pollutants:
+            # HEADER DE LA TABLA
+            unit = "ppm" if p == "co" else ("ppb" if p in ["o3", "so2"] else "µg/m³")
+            print(f"\n🔬 ANALIZANDO {p.upper()} ({unit}):")
+            
             if p in models:
-                # 1. Predicción base
+                # 1. Predicción
                 grid_df[p] = models[p].predict(grid_df[feats]).clip(0)
                 
-                # 2. Calibración (Bias)
+                # 2. Calibración
                 real_col = f'{p}_real'
                 if real_col in stations_df.columns:
                     v_real_all = stations_df[['name', 'lat', 'lon', real_col]].copy()
+                    
+                    # Extraer predicción IA en puntos de estación
                     st_preds = []
                     for _, st in v_real_all.iterrows():
                         dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
@@ -342,21 +352,23 @@ def lambda_handler(event, context):
                         applied_bias = raw_bias * BIAS_SENSITIVITY
                         grid_df[p] = (grid_df[p] + applied_bias).clip(0)
                         
-                        # LOGS DE ÉXITO
-                        unit = "ppm" if p == "co" else ("ppb" if p in ["o3", "so2"] else "µg/m³")
-                        print(f"\n✅ CALIBRACIÓN {p.upper()}: Bias calculado {applied_bias:+.2f} {unit}")
-                        header = f"{'Estación':<20} | {'IA':<6} | {'Real':<6} | {'Final':<6}"
+                        # IMPRIMIR TABLA
+                        print(f"   ✅ Calibrado. Bias: {applied_bias:+.2f} {unit}")
+                        header = f"   {'Estación':<20} | {'IA':<6} | {'Real':<6} | {'Final':<6}"
+                        print("   " + "-" * 48)
                         print(header)
-                        print("-" * len(header))
+                        print("   " + "-" * 48)
                         for _, row in v_valid.iterrows(): 
                             final_val = max(0, row['raw_ai'] + applied_bias)
-                            print(f"{row['name'][:19]:<20} | {row['raw_ai']:<6.2f} | {row[real_col]:<6.2f} | {final_val:<6.2f}")
-                        print("-" * len(header))
+                            print(f"   {row['name'][:19]:<20} | {row['raw_ai']:<6.2f} | {row[real_col]:<6.2f} | {final_val:<6.2f}")
+                        print("   " + "-" * 48)
                     else:
-                        # LOG DE ADVERTENCIA (Aquí sabremos si faltaron datos)
-                        print(f"\n⚠️ CALIBRACIÓN {p.upper()}: Omitida. No hay estaciones reportando datos reales en este corte.")
+                        print("   ⚠️  Sin datos reales para calibrar (Lista vacía).")
+                else:
+                    print(f"   ⚠️  Columna '{real_col}' no existe en el DataFrame de estaciones.")
             else:
                 grid_df[p] = 0.0
+                print(f"   ⛔ MODELO NO CARGADO. Saltando predicción.")
 
         # F. Marcadores y Fuentes
         grid_df['station'] = None
@@ -382,7 +394,7 @@ def lambda_handler(event, context):
             
             grid_df.at[idx, 'sources'] = json.dumps(cell_sources)
 
-        # G. IAS y Riesgo (Lógica Igual)
+        # G. IAS y Riesgo
         def calc_ias_row(row):
             scores = {
                 'O3': get_ias_score(row['o3'], 'o3'), 
@@ -421,8 +433,8 @@ def lambda_handler(event, context):
         ]
         final_df = final_df[cols_ordered]
 
-        # HEALTH CHECK
-        print("\n🏥 HEALTH CHECK COMPLETO:")
+        # --- 3. HEALTH CHECK FINAL (FOOTER) ---
+        print("\n🏥 HEALTH CHECK FINAL (JSON Output):")
         stations_to_check = ["Merced", "Villa de las Flores"]
         for st_name in stations_to_check:
             try:
@@ -431,7 +443,7 @@ def lambda_handler(event, context):
                     print(f"--- {st_name.upper()} ---")
                     print(row.iloc[0].to_json(indent=2))
                 else:
-                    print(f"⚠️ {st_name}: No encontrada en el Grid.")
+                    print(f"⚠️ {st_name}: No encontrada en el Grid final.")
             except Exception as e:
                 print(f"⚠️ Error check {st_name}: {e}")
         print("-" * 30)
@@ -444,7 +456,7 @@ def lambda_handler(event, context):
         history_key = f"live_grid/grid_{timestamp_name}.json"
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=final_json, ContentType='application/json')
         
-        print(f"📦 SUCCESS: Grid Generado V57.3 (Logs Corregidos).")
+        print(f"📦 SUCCESS: Reporte V57.4 Completado.")
         
         return {
             'statusCode': 200, 
