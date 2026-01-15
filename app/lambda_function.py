@@ -215,12 +215,14 @@ def lambda_handler(event, context):
                 'o3_real': safe_val(pol, 'o3', 'o3'),
                 'pm10_real': safe_val(pol, 'pm10', 'pm10'),
                 'pm25_real': safe_val(pol, 'pm25', 'pm25'),
+                # --- NUEVOS CAMPOS (QUÍMICA) ---
+                'co_real': safe_val(pol, 'co', 'co'),     
+                'so2_real': safe_val(pol, 'so2', 'so2'),  
+                # --- METEOROLOGÍA ---
                 'tmp': safe_val(met, 'temperature', 'tmp'),
                 'rh': safe_val(met, 'relative_humidity', 'rh'),
-                'wsp': safe_val(met, 'wind_speed', 'wsp'),
-                'wdr': safe_val(met, 'wind_direction', 'wdr'),
-                'co_real': safe_val(pol, 'co', 'co'),
-                'so2_real': safe_val(pol, 'so2', 'so2')
+                'wsp': safe_val(met, 'wind_speed', 'wsp'),     # API key: wind_speed
+                'wdr': safe_val(met, 'wind_direction', 'wdr')  # API key: wind_direction
             })
         
         print(f"📊 SALUD API: Recibidas {len(stations_raw)} | O3:{counts['o3']} | TMP:{counts['tmp']}")
@@ -260,7 +262,9 @@ def lambda_handler(event, context):
                 stations_df = pd.DataFrame([{
                     'name': 'Inercia Climática', 'lat': 19.43, 'lon': -99.13,
                     'o3_real': None, 'pm10_real': None, 'pm25_real': None,
-                    'tmp': avg_tmp, 'rh': avg_rh, 'wsp': avg_wsp
+                    'co_real': None, 'so2_real': None, 
+                    'tmp': avg_tmp, 'rh': avg_rh, 'wsp': avg_wsp,
+                    'wdr': 90.0
                 }])
                 print(f"✅ [DATOS: OPEN-METEO] Rescate exitoso. Clima promedio: {avg_tmp:.1f}°C, RH: {avg_rh:.0f}%")
                 
@@ -271,12 +275,16 @@ def lambda_handler(event, context):
                     'name': 'Failsafe de Emergencia', 
                     'lat': 19.43, 'lon': -99.13, 
                     'o3_real': None, 'pm10_real': None, 'pm25_real': None,
-                    'tmp': 18.0, 'rh': 45.0, 'wsp': 2.5
+                    'co_real': None, 'so2_real': None,
+                    'tmp': 18.0, 'rh': 45.0, 'wsp': 2.5,
+                    'wdr': 90.0
                 }])
         else:
             print(f"📡 [DATOS: SIMAT] Utilizando {len(stations_df)} estaciones oficiales.")
 
         # --- [FIN DEL BLOQUE DE RESCATE] ---
+        if 'wdr' not in stations_df.columns:
+            stations_df['wdr'] = 90.0
 
         # Procesamiento de Malla y Predicción
         grid_df = prepare_grid_features(stations_df)
