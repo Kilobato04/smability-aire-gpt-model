@@ -152,7 +152,8 @@ def prepare_grid_features(stations_df):
     grid_df['month_sin'] = np.sin(2 * np.pi * now.month / 12)
     grid_df['month_cos'] = np.cos(2 * np.pi * now.month / 12)
 
-    for feat, default in [('tmp', 20.0), ('rh', 40.0), ('wsp', 1.0)]:
+    features_to_interp = [('tmp', 20.0), ('rh', 40.0), ('wsp', 1.0), ('wdr', 90.0)]
+    for feat, default in features_to_interp:
         valid = stations_df.dropna(subset=[feat])
         if not valid.empty:
             grid_df[feat] = inverse_distance_weighting(
@@ -216,7 +217,10 @@ def lambda_handler(event, context):
                 'pm25_real': safe_val(pol, 'pm25', 'pm25'),
                 'tmp': safe_val(met, 'temperature', 'tmp'),
                 'rh': safe_val(met, 'relative_humidity', 'rh'),
-                'wsp': safe_val(met, 'wind_speed', 'wsp')
+                'wsp': safe_val(met, 'wind_speed', 'wsp'),
+                'wdr': safe_val(met, 'wind_direction', 'wdr'),
+                'co_real': safe_val(pol, 'co', 'co'),
+                'so2_real': safe_val(pol, 'so2', 'so2')
             })
         
         print(f"📊 SALUD API: Recibidas {len(stations_raw)} | O3:{counts['o3']} | TMP:{counts['tmp']}")
@@ -286,7 +290,8 @@ def lambda_handler(event, context):
             grid_df[p] = 0.0
             grid_df[p] = grid_df[p].astype(float)
         
-        feats = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp']
+        feats = ['lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 'tmp', 'rh', 'wsp', 'wdr']
+        if 'wdr' not in grid_df.columns: grid_df['wdr'] = 90.0
         
         # 2. Bucle de predicción y calibración (Alineación corregida)
         for p in ['o3', 'pm10', 'pm25']:
