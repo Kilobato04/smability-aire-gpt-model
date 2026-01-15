@@ -183,7 +183,12 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"⚠️ API Error: {e}")
 
-        counts = {"o3": 0, "pm10": 0, "pm25": 0, "co": 0, "so2": 0, "tmp": 0, "rh": 0, "wsp": 0, "wdr": 0}
+        # Agregamos TODAS las llaves para evitar errores de contabilidad
+        counts = {
+            "o3": 0, "pm10": 0, "pm25": 0, 
+            "co": 0, "so2": 0, 
+            "tmp": 0, "rh": 0, "wsp": 0, "wdr": 0
+        }
         parsed = []
 
         for s in stations_raw:
@@ -191,22 +196,25 @@ def lambda_handler(event, context):
             pol = s.get('pollutants') or {}
             met = s.get('meteorological') or {}
             
-# --- INICIO DEL REEMPLAZO (AJUSTE TEMPORAL PMs) ---
+            # --- FUNCIÓN DE EXTRACCIÓN NORMATIVA ---
             def safe_val(d, key, c_key):
                 obj = d.get(key)
                 if isinstance(obj, dict):
-                    # Si es PM10 o PM25, usamos el promedio móvil de 12h de la norma
-                    # Para O3 y Meteorología, seguimos usando el avg_1h
-                    target_window = 'avg_12h' if key in ['pm10', 'pm25'] else 'avg_1h'
+                    # LÓGICA DE VENTANAS DE TIEMPO (NOM-172)
+                    if key == 'co':
+                        target_window = 'avg_8h'   # <--- CO usa 8 horas
+                    elif key in ['pm10', 'pm25']:
+                        target_window = 'avg_12h'  # Partículas usan 12 horas
+                    else:
+                        target_window = 'avg_1h'   # O3, SO2 y Met usan 1 hora
                     
                     inner = obj.get(target_window)
                     if isinstance(inner, dict):
                         val = inner.get('value')
                         if val is not None:
-                            counts[c_key] += 1
+                            if c_key in counts: counts[c_key] += 1
                             return val
                 return None
-            # --- FIN DEL REEMPLAZO ---
 
             parsed.append({
                 'name': s.get('station_name', 'Unknown'),
@@ -289,24 +297,25 @@ def lambda_handler(event, context):
         # Procesamiento de Malla y Predicción
         grid_df = prepare_grid_features(stations_df)
         
-        # --- [INICIO ANCLA D: PREDICCIÓN GRAND SLAM + EXPORTACIÓN NUCLEAR] ---   
+        # --- [BLOQUE D CONSOLIDADO: 5 GASES + LOGS CALIBRACIÓN + HEALTH CHECK] ---
+
         # E. Predicción y Calibración
-        # Inicializar los 5 contaminantes en 0.0 para evitar errores de tipo
+        grid_df['station_numeric'] = -1
         target_pollutants = ['o3', 'pm10', 'pm25', 'co', 'so2']
+        
+        # Inicialización
         for p in target_pollutants:
             grid_df[p] = 0.0
             grid_df[p] = grid_df[p].astype(float)
         
-        # LISTA DE FEATURES EXACTA DEL ENTRENAMIENTO V5
         feats = [
             'lat', 'lon', 'altitude', 'building_vol', 'station_numeric', 
             'hour_sin', 'hour_cos', 'month_sin', 'month_cos', 
             'tmp', 'rh', 'wsp', 'wdr' 
         ]
         
-        # Asegurar que wdr exista antes de predecir (Red de seguridad)
         if 'wdr' not in grid_df.columns: grid_df['wdr'] = 90.0
-
+        
         # 2. Bucle de predicción y calibración
         for p in target_pollutants:
             if p in models:
@@ -318,7 +327,6 @@ def lambda_handler(event, context):
                 if real_col in stations_df.columns:
                     v_real_all = stations_df[['name', 'lat', 'lon', real_col]].copy()
                     st_preds = []
-                    # Comparar predicción vs realidad en la ubicación de la estación
                     for _, st in v_real_all.iterrows():
                         dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
                         st_preds.append(grid_df.at[dist.idxmin(), p])
@@ -331,11 +339,23 @@ def lambda_handler(event, context):
                         raw_bias = v_valid[real_col].mean() - v_valid['raw_ai'].mean()
                         applied_bias = raw_bias * BIAS_SENSITIVITY
                         grid_df[p] = (grid_df[p] + applied_bias).clip(0)
-                        # print(f"DEBUG: {p.upper()} - Bias Aplicado: {applied_bias:+.2f}")
+                        
+                        # --- LOGS DE CALIBRACIÓN (ACTIVADOS) ---
+                        unit = "ppm" if p == "co" else ("ppb" if p in ["o3", "so2"] else "µg/m³")
+                        print(f"\n📊 CALIBRACIÓN: {p.upper()} (Bias: {applied_bias:+.2f} {unit})")
+                        header = f"{'Estación':<20} | {'IA':<6} | {'Real':<6} | {'Final':<6}"
+                        print(header)
+                        print("-" * len(header))
+                        # Imprimimos solo las primeras 10 para no saturar, o todas si prefieres
+                        for _, row in v_valid.iterrows(): 
+                            final_val = max(0, row['raw_ai'] + applied_bias)
+                            print(f"{row['name'][:19]:<20} | {row['raw_ai']:<6.2f} | {row[real_col]:<6.2f} | {final_val:<6.2f}")
+                        print("-" * len(header))
+                        
             else:
                 grid_df[p] = 0.0
 
-        # F. Marcadores y Sobrescritura de Estaciones (Prioridad al dato real)
+        # F. Marcadores y Fuentes
         grid_df['station'] = None
         grid_df['sources'] = "{}"
 
@@ -347,15 +367,20 @@ def lambda_handler(event, context):
             cell_sources = {}
             for p in target_pollutants:
                 real_val = st.get(f'{p}_real')
-                window = "12h" if p in ['pm10', 'pm25'] else "1h"
+                # Etiquetas de ventana de tiempo correctas
+                if p == 'co': window = "8h"
+                elif p in ['pm10', 'pm25']: window = "12h"
+                else: window = "1h"
+                
                 if pd.notnull(real_val):
                     grid_df.at[idx, p] = float(real_val)
                     cell_sources[p] = f"Oficial {window}"
                 else:
                     cell_sources[p] = f"IA {window}"
+            
             grid_df.at[idx, 'sources'] = json.dumps(cell_sources)
 
-        # G. Cálculo de IAS (Solo principales para riesgo)
+        # G. IAS y Riesgo
         def calc_ias_row(row):
             scores = {
                 'O3': get_ias_score(row['o3'], 'o3'), 
@@ -368,72 +393,64 @@ def lambda_handler(event, context):
         grid_df[['ias', 'dominant']] = grid_df.apply(calc_ias_row, axis=1)
         grid_df['risk'] = grid_df['ias'].apply(get_risk_level)
         
+        # H. EXPORTACIÓN NUCLEAR
         now_mx = datetime.now(ZoneInfo("America/Mexico_City"))
-        
-        # H. EXPORTACIÓN FINAL NUCLEAR (Limpieza total)
-        # Creamos un DataFrame NUEVO y VACÍO para evitar columnas fantasma heredadas
-        final_df = pd.DataFrame()
+        str_time = now_mx.strftime("%Y-%m-%d %H:%M:%S")
 
-        # 1. Llenamos SOLO lo que queremos explícitamente
-        final_df['timestamp']    = now_mx.strftime("%Y-%m-%d %H:%M:%S")
-        final_df['lat']          = grid_df['lat']
-        final_df['lon']          = grid_df['lon']
-        final_df['col']          = grid_df['col']
-        final_df['mun']          = grid_df['mun']
-        final_df['edo']          = grid_df['edo']
-        final_df['pob']          = grid_df['pob']
-        final_df['altitude']     = grid_df['altitude']
-        final_df['building_vol'] = grid_df['building_vol']
+        final_df = pd.DataFrame()
         
-        final_df['tmp'] = grid_df['tmp']
-        final_df['rh']  = grid_df['rh']
-        final_df['wsp'] = grid_df['wsp']
+        # Timestamp arreglado
+        final_df['timestamp'] = [str_time] * len(grid_df)
         
-        # 2. Mapeamos los contaminantes a sus nombres finales
+        cols_direct = ['lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
+                       'tmp', 'rh', 'wsp', 'ias', 'station', 'risk', 'dominant', 'sources']
+        for c in cols_direct:
+            final_df[c] = grid_df[c]
+
+        # Contaminantes finales (Nombres Limpios)
         final_df['o3 1h']    = grid_df['o3']
         final_df['pm10 12h'] = grid_df['pm10']
         final_df['pm25 12h'] = grid_df['pm25']
-        final_df['co 1h']    = grid_df['co']   # <--- AQUÍ ESTÁ CO
-        final_df['so2 1h']   = grid_df['so2']  # <--- AQUÍ ESTÁ SO2
-        
-        final_df['ias']      = grid_df['ias']
-        final_df['station']  = grid_df['station']
-        final_df['risk']     = grid_df['risk']
-        final_df['dominant'] = grid_df['dominant']
-        final_df['sources']  = grid_df['sources']
+        final_df['co 8h']    = grid_df['co']   # <--- CO 8h
+        final_df['so2 1h']   = grid_df['so2']
 
-        # 3. FILTRO FINAL: Orden estricto (Esto elimina cualquier otra cosa)
+        # Filtro estricto
         cols_ordered = [
             'timestamp', 'lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
             'tmp', 'rh', 'wsp', 
-            'o3 1h', 'pm10 12h', 'pm25 12h', 'co 1h', 'so2 1h', 
+            'o3 1h', 'pm10 12h', 'pm25 12h', 'co 8h', 'so2 1h', 
             'ias', 'station', 'risk', 'dominant', 'sources'
         ]
-        # Si alguna columna se coló, este paso la elimina
         final_df = final_df[cols_ordered]
 
-        # 4. Generamos el JSON
+        # --- [NUEVO] HEALTH CHECK LOG (Merced) ---
+        print("\n🏥 HEALTH CHECK (Estación Merced):")
+        try:
+            # Buscamos la fila que coincida con 'Merced' en la columna station
+            merced_row = final_df[final_df['station'].str.contains("Merced", case=False, na=False)]
+            if not merced_row.empty:
+                # Imprimimos el primer resultado como JSON bonito
+                print(merced_row.iloc[0].to_json(indent=2))
+            else:
+                print("⚠️ No se encontró la estación Merced en el Grid para el check.")
+        except Exception as e:
+            print(f"⚠️ Error en Health Check: {e}")
+        print("-" * 30)
+
+        # Guardar
         final_json = final_df.replace({np.nan: None}).to_json(orient='records')
         
-        # 5. Guardar "Latest"
-        s3_client.put_object(
-            Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, 
-            Body=final_json, ContentType='application/json'
-        )
-
-        # 6. Guardar "Histórico"
+        s3_client.put_object(Bucket=S3_BUCKET, Key=S3_GRID_OUTPUT_KEY, Body=final_json, ContentType='application/json')
+        
         timestamp_name = now_mx.strftime("%Y-%m-%d_%H-%M")
         history_key = f"live_grid/grid_{timestamp_name}.json"
-        s3_client.put_object(
-            Bucket=S3_BUCKET, Key=history_key, 
-            Body=final_json, ContentType='application/json'
-        )
+        s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=final_json, ContentType='application/json')
         
-        print(f"📦 SUCCESS: Grid Grand Slam Generado (5 Contaminantes + Limpieza).")
+        print(f"📦 SUCCESS: Grid Generado V57.1 (5 Gases + Logs Completos).")
         
         return {
             'statusCode': 200, 
-            'body': json.dumps({'message': 'Grid generado Grand Slam', 'timestamp': timestamp_name}),
+            'body': json.dumps({'message': 'Grid generado', 'timestamp': timestamp_name}),
             'headers': {'Content-Type': 'application/json'}
         }
         # --- [FIN ANCLA D] ---
