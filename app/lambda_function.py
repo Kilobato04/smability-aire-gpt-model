@@ -305,20 +305,19 @@ def lambda_handler(event, context):
         # Procesamiento de Malla y Predicción
         grid_df = prepare_grid_features(stations_df)
 
-        # --- [BLOQUE MAESTRO V58.2: REGRESIÓN HÍBRIDA + TODOS LOS FIXES] ---
+        # --- [BLOQUE MAESTRO V58.3: LOGS PREMIUM + CALIBRACIÓN HÍBRIDA + CLEAN TYPES] ---
 
         # E. Predicción y Calibración
         grid_df['station_numeric'] = -1
         target_pollutants = ['o3', 'pm10', 'pm25', 'co', 'so2']
         
-        # --- CONFIGURACIÓN DE GUARDRAILS (SEGURIDAD MATEMÁTICA) ---
-        MIN_STATIONS_REG = 4   # Mínimo de estaciones para intentar regresión
-        SLOPE_MIN = 0.5        # No permitimos reducir la señal a menos de la mitad
-        SLOPE_MAX = 1.5        # No permitimos amplificar la señal más de 1.5x
-        
-        calib_summary = [] # Almacén para el reporte final
+        # Guardrails
+        MIN_STATIONS_REG = 4
+        SLOPE_MIN = 0.5
+        SLOPE_MAX = 1.5
+        calib_summary = []
 
-        # Inicialización de columnas
+        # Inicialización
         for p in target_pollutants:
             grid_df[p] = 0.0
             grid_df[p] = grid_df[p].astype(float)
@@ -330,34 +329,48 @@ def lambda_handler(event, context):
         ]
         if 'wdr' not in grid_df.columns: grid_df['wdr'] = 90.0
 
-        print(f"\n🚀 INICIANDO CALIBRACIÓN HÍBRIDA V58.2 (Bias vs Regresión)...")
+        # --- [NUEVO ENCABEZADO DE LOGS] ---
+        print("\n📊 REPORTE DE SALUD DEL SISTEMA (V58.3)")
+        print("=" * 70)
+        
+        # 1. Auditoría de Datos de Entrada (Dinámico)
+        # Crea una string bonita con todo lo que traiga counts > 0
+        api_details = " | ".join([f"{k.upper()}:{v}" for k, v in counts.items()])
+        print(f"📡 API SIMAT    : {len(stations_raw)} Estaciones recibidas")
+        print(f"📥 Desglose     : {api_details}")
+        
+        # 2. Auditoría de Modelos
+        loaded_mods = list(models.keys())
+        check_icon = "✅" if len(loaded_mods) == 5 else "⚠️"
+        print(f"🧠 IA Engine    : {check_icon} {len(loaded_mods)}/5 Modelos cargados {loaded_mods}")
+        print("=" * 70 + "\n")
+
+        print(f"🚀 INICIANDO CALIBRACIÓN HÍBRIDA...")
 
         # --- BUCLE PRINCIPAL ---
         for p in target_pollutants:
             unit = "ppm" if p == "co" else ("ppb" if p in ["o3", "so2"] else "µg/m³")
             
             if p in models:
-                # 1. PREDICCIÓN BASE (RAW AI)
-                grid_df[p] = models[p].predict(grid_df[feats]).clip(0)
+                # 1. PREDICCIÓN BASE
+                # FIX: Convertimos a float64 explícitamente para evitar Warnings de Pandas
+                preds = models[p].predict(grid_df[feats]).clip(0)
+                grid_df[p] = preds.astype('float64') 
                 
                 # 2. CALIBRACIÓN INTELIGENTE
                 real_col = f'{p}_real'
-                m_final, b_final = 1.0, 0.0 # Default: Neutral
+                m_final, b_final = 1.0, 0.0
                 strategy = "N/A"
                 r2_score = "N/A"
                 
                 if real_col in stations_df.columns:
-                    # Crear DataFrame temporal para comparar
                     v_real_all = stations_df[['name', 'lat', 'lon', real_col]].copy()
                     st_preds = []
-                    
-                    # Extraer el valor de la IA en la coordenada exacta de cada estación
                     for _, st in v_real_all.iterrows():
                         dist = ((grid_df['lat'] - st['lat'])**2 + (grid_df['lon'] - st['lon'])**2)
                         st_preds.append(grid_df.at[dist.idxmin(), p])
                     v_real_all['raw_ai'] = st_preds
                     
-                    # Filtrar pares válidos
                     v_valid = v_real_all.dropna(subset=[real_col])
                     
                     if not v_valid.empty:
@@ -365,59 +378,45 @@ def lambda_handler(event, context):
                         Y = v_valid[real_col].values
                         n_points = len(X)
                         
-                        # --- [LÓGICA DE DECISIÓN] ---
-                        
-                        # CASO A: ESCASEZ (Usar Solo Bias)
+                        # LÓGICA DE DECISIÓN
                         if n_points < MIN_STATIONS_REG:
                             m_final = 1.0
                             b_final = np.mean(Y - X) 
                             strategy = "Solo Bias (Escasez)"
-                        
-                        # CASO B: SUFICIENCIA (Intentar Regresión)
                         else:
                             try:
-                                # Ajuste lineal de grado 1 (y = mx + b)
                                 m, b = np.polyfit(X, Y, 1)
-                                
-                                # GUARDRAIL 1: Pendiente Negativa (Físicamente imposible)
-                                if m < 0:
+                                if m < 0: 
                                     m_final = 1.0
                                     b_final = np.mean(Y - X)
                                     strategy = "Solo Bias (Slope Neg)"
                                 else:
-                                    # GUARDRAIL 2: Clipping de Pendiente
                                     m_final = np.clip(m, SLOPE_MIN, SLOPE_MAX)
-                                    # Recalcular b para mantener el centroide alineado
                                     b_final = np.mean(Y) - (m_final * np.mean(X))
-                                    
                                     if m != m_final: strategy = "Regresión (Clipped)"
                                     else: strategy = "Regresión Lineal"
                                     
-                                    # Cálculo R2 (Informativo)
+                                    # R2
                                     residuals = Y - ((m_final * X) + b_final)
                                     ss_tot = np.sum((Y - np.mean(Y))**2)
                                     r2 = 1 - (np.sum(residuals**2) / ss_tot) if ss_tot != 0 else 0
                                     r2_score = f"{r2:.2f}"
-                                    
-                            except Exception as e:
-                                print(f"⚠️ Error matemático {p}: {e}. Revertiendo a Bias.")
+                            except:
                                 m_final = 1.0
                                 b_final = np.mean(Y - X)
                                 strategy = "Solo Bias (Error)"
 
-                        # 3. APLICAR ECUACIÓN A TODA LA MALLA
-                        # y_final = (m * y_raw) + b
+                        # APLICAR A MALLA
                         grid_df[p] = (grid_df[p] * m_final) + b_final
-                        grid_df[p] = grid_df[p].clip(0) # Nunca negativos
+                        grid_df[p] = grid_df[p].clip(0)
 
-                        # Guardar resumen
                         calib_summary.append({
                             'gas': p.upper(), 'n': n_points, 'strat': strategy,
                             'eq': f"y={m_final:.2f}x {'+' if b_final >=0 else ''}{b_final:.2f}",
                             'r2': r2_score
                         })
 
-                        # --- LOG DE AUDITORÍA DETALLADO ---
+                        # LOG DETALLADO
                         print(f"\n🔬 DETALLE: {p.upper()} ({strategy}) -> {calib_summary[-1]['eq']}")
                         header = f"{'Estación':<20} | {'IA Raw':<8} | {'Real':<8} | {'Final':<8} | {'Delta':<8}"
                         print("-" * len(header))
@@ -426,7 +425,6 @@ def lambda_handler(event, context):
                         
                         mae_raw = np.mean(np.abs(v_valid['raw_ai'] - v_valid[real_col]))
                         mae_cal = 0
-                        
                         for _, row in v_valid.iterrows(): 
                             final_val = max(0, (row['raw_ai'] * m_final) + b_final)
                             delta = final_val - row[real_col]
@@ -444,8 +442,8 @@ def lambda_handler(event, context):
             else:
                 grid_df[p] = 0.0
 
-        # --- IMPRIMIR REPORTE EJECUTIVO ---
-        print("\n📋 REPORTE DE CALIBRACIÓN DE RED (V58.2)")
+        # IMPRIMIR REPORTE EJECUTIVO
+        print("\n📋 REPORTE DE CALIBRACIÓN DE RED (V58.3)")
         print("-" * 85)
         print(f"{'Gas':<6} | {'N° Est':<6} | {'Estrategia':<20} | {'Ecuación Aplicada':<25} | {'R²':<5}")
         print("-" * 85)
@@ -453,7 +451,7 @@ def lambda_handler(event, context):
             print(f"{row['gas']:<6} | {row['n']:<6} | {row['strat']:<20} | {row['eq']:<25} | {row['r2']:<5}")
         print("-" * 85)
 
-        # F. Marcadores y Fuentes (ETIQUETADO COMPLETO)
+        # F. Marcadores y Fuentes
         grid_df['station'] = None
         grid_df['sources'] = "{}"
 
@@ -463,7 +461,7 @@ def lambda_handler(event, context):
             grid_df.at[idx, 'station'] = st['name']
             
             cell_sources = {}
-            # 1. Química (Gases)
+            # Química
             for p in target_pollutants:
                 real_val = st.get(f'{p}_real')
                 if p == 'co': window = "8h"
@@ -476,7 +474,7 @@ def lambda_handler(event, context):
                 else:
                     cell_sources[p] = f"IA {window}"
             
-            # 2. Meteorología (Temp, Rh, Wsp, Wdr)
+            # Meteorología (Incluyendo WDR)
             for m in ['tmp', 'rh', 'wsp', 'wdr']:
                 real_met = st.get(m)
                 if pd.notnull(real_met):
@@ -500,7 +498,7 @@ def lambda_handler(event, context):
         grid_df[['ias', 'dominant']] = grid_df.apply(calc_ias_row, axis=1)
         grid_df['risk'] = grid_df['ias'].apply(get_risk_level)
         
-        # H. Exportación (INCLUYE WDR Y ORDENAMIENTO)
+        # H. Exportación
         now_mx = datetime.now(ZoneInfo("America/Mexico_City"))
         str_time = now_mx.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -517,8 +515,7 @@ def lambda_handler(event, context):
         final_df['pm25 12h'] = grid_df['pm25']
         final_df['co 8h']    = grid_df['co']
         final_df['so2 1h']   = grid_df['so2']
-        
-        final_df['wdr'] = grid_df['wdr'] # Dirección del viento
+        final_df['wdr']      = grid_df['wdr']
 
         cols_ordered = [
             'timestamp', 'lat', 'lon', 'col', 'mun', 'edo', 'pob', 'altitude', 'building_vol', 
@@ -551,7 +548,7 @@ def lambda_handler(event, context):
         history_key = f"live_grid/grid_{timestamp_name}.json"
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=final_json, ContentType='application/json')
         
-        print(f"📦 SUCCESS: Grid Generado V58.2 (Regresión + Fixes Totales).")
+        print(f"📦 SUCCESS: Grid Generado V58.3 (Logs Premium).")
         
         return {
             'statusCode': 200, 
