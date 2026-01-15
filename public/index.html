@@ -195,6 +195,7 @@
                     <div class="btn-var" onclick="setMode('tmp', this)">🌡️ Temp</div>
                     <div class="btn-var" onclick="setMode('rh', this)">💧 Hum</div>
                     <div class="btn-var" onclick="setMode('wsp', this)">💨 Viento</div>
+                    <div class="btn-var" onclick="setMode('wdr', this)">🧭 Dir.</div>
                     <div class="btn-var" style="grid-column: span 1;" onclick="setMode('alt', this)">⛰️ Alt</div>
                     <div class="btn-var" style="grid-column: span 1;" onclick="setMode('building_vol', this)">🏙️ Urbano</div>
                 </div>
@@ -262,6 +263,8 @@
             tmp: { name: 'Temperatura', unit: '°C', min: 0, max: 35, stops: [0, 10, 20, 30, 35], colors: ['#0000ff', '#00ffff', '#ffff00', '#ff0000', '#800000'] },
             rh: { name: 'Humedad', unit: '%', min: 0, max: 100, stops: [0, 25, 50, 75, 100], colors: ['#8d6e63', '#a5d6a7', '#4dd0e1', '#0288d1', '#01579b'] },
             wsp: { name: 'Viento', unit: 'm/s', min: 0, max: 15, stops: [0, 3, 6, 9, 15], colors: ['#ffffff', '#b3e5fc', '#29b6f6', '#0277bd', '#4a148c'] },
+            // NUEVO CONFIG PARA DIRECCIÓN (0°=N, 90°=E, 180°=S, 270°=O)
+            wdr: { name: 'Dir. Viento', unit: '°', min: 0, max: 360, stops: [0, 90, 180, 270, 360], colors: ['#ff0000', '#ffff00', '#00ff00', '#0000ff', '#ff0000'] },
             alt: { name: 'Altitud', unit: 'm', min: 2230, max: 4000, stops: [2230, 2260, 2400, 2900, 3500, 4000], colors: ['#0d47a1', '#1b5e20', '#8bc34a', '#fbc02d', '#795548', '#eeeeee'] },
             building_vol: { name: 'Densidad Urbana', unit: 'm³', min: 0, max: 1200000, stops: [0, 10000, 100000, 400000, 800000, 1200000], colors: ['#ffffff', '#e0e0e0', '#fca5a5', '#ef4444', '#b91c1c', '#7f1d1d'] }
         };
@@ -627,11 +630,31 @@
 
                             <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:4px 0;">
                             
-                            <span style="color:#475569;">🏙️ Vol:</span> <span>${(bVol/1000).toFixed(0)}k m³</span>
-                            <span style="color:#475569;">🌡️ Temp:</span> <span>${Number(p.tmp||0).toFixed(1)} °C</span>
-                            <span style="color:#475569;">💧 Hum:</span> <span>${Number(p.rh||0).toFixed(0)} %</span>
-                            <span style="color:#475569;">💨 Viento:</span> <span>${Number(p.wsp||0).toFixed(1)} m/s</span>
-                            <span style="color:#475569;">⛰️ Alt:</span> <span>${altVal.toFixed(0)} m</span>
+                            <span style="color:#475569;">🏙️ Vol:</span> 
+                            <span>${(bVol/1000).toFixed(0)}k m³</span>
+
+                            <span style="color:#475569;">🌡️ Temp:</span> 
+                            <span style="white-space:nowrap;">
+                                ${Number(p.tmp||0).toFixed(1)} °C ${fmtSrc('tmp')}
+                            </span>
+
+                            <span style="color:#475569;">💧 Hum:</span> 
+                            <span style="white-space:nowrap;">
+                                ${Number(p.rh||0).toFixed(0)} % ${fmtSrc('rh')}
+                            </span>
+
+                            <span style="color:#475569;">💨 Viento:</span> 
+                            <span style="white-space:nowrap;">
+                                ${Number(p.wsp||0).toFixed(1)} m/s ${fmtSrc('wsp')}
+                            </span>
+
+                            <span style="color:#475569;">🧭 Dir:</span> 
+                            <span style="white-space:nowrap;">
+                                ${Number(p.wdr||0).toFixed(0)}° ${fmtSrc('wdr')}
+                            </span>
+
+                            <span style="color:#475569;">⛰️ Alt:</span> 
+                            <span>${altVal.toFixed(0)} m</span>
                         </div>
                     </div>
                 `);
