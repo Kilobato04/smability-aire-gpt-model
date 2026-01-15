@@ -183,7 +183,7 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"⚠️ API Error: {e}")
 
-        counts = {"o3": 0, "pm10": 0, "pm25": 0, "tmp": 0, "rh": 0, "wsp": 0}
+        counts = {"o3": 0, "pm10": 0, "pm25": 0, "co": 0, "so2": 0, "tmp": 0, "rh": 0, "wsp": 0}
         parsed = []
 
         for s in stations_raw:
