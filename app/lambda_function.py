@@ -50,6 +50,7 @@ def get_risk_level(ias):
     if ias <= 200: return "Muy Alto"
     return "Extremadamente Alto"
 
+
 # --- 3. FUNCIONES DE CARGA Y PROCESAMIENTO ---
 def load_models():
     """Descarga modelos desde S3 y los carga en XGBoost"""
@@ -172,6 +173,39 @@ def prepare_grid_features(stations_df):
     
     grid_df['station_numeric'] = -1
     return grid_df
+
+# --- [ANCLA HELPERS: AGREGAR ANTES DE LAMBDA_HANDLER] ---
+
+from scipy.interpolate import griddata # Asegúrate de que este import esté arriba con los demás
+
+def interpolate_grid(grid_df, x_points, y_points, z_values, method='linear'):
+    """
+    Interpola valores dispersos (x,y,z) sobre la malla completa del grid_df.
+    """
+    # 1. Coordenadas de destino (Toda la malla)
+    grid_coords = (grid_df['lon'], grid_df['lat'])
+    
+    # 2. Interpolación principal (Linear es mejor para evitar 'islas')
+    grid_z = griddata(
+        (x_points, y_points), 
+        z_values, 
+        grid_coords, 
+        method=method
+    )
+    
+    # 3. Relleno de bordes (Extrapolación con 'nearest' para cubrir esquinas vacías)
+    # Si 'linear' deja huecos (NaNs) en los bordes, los llenamos con el valor más cercano
+    if np.isnan(grid_z).any():
+        grid_z_nearest = griddata(
+            (x_points, y_points), 
+            z_values, 
+            grid_coords, 
+            method='nearest'
+        )
+        # Donde sea NaN en linear, usamos nearest
+        grid_z = np.where(np.isnan(grid_z), grid_z_nearest, grid_z)
+        
+    return grid_z
 
 # --- 4. HANDLER PRINCIPAL ---
 def lambda_handler(event, context):
