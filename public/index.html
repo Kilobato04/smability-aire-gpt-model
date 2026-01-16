@@ -161,8 +161,16 @@
     <div class="sidebar" id="sidebar">
         <div class="header">
             <div class="title-group">
-                <h1>Smability AI</h1>
-                <div class="subtitle">Monitor Ambiental ZMVM</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <h1 style="margin:0; font-size:18px; font-weight:600; color:#38bdf8; letter-spacing:-0.5px;">AireGPT</h1>
+                    
+                    <a href="https://t.me/airegptcdmx_bot" target="_blank" title="Abrir Bot en Telegram" style="display:flex; align-items:center; justify-content:center; background:#229ED9; width:24px; height:24px; border-radius:50%; text-decoration:none; transition: transform 0.2s;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20.665 3.717L2.33 10.793C1.08 11.295 1.085 11.993 2.103 12.305L6.8 13.775L17.68 6.905C18.195 6.593 18.665 6.763 18.28 7.105L9.47 15.055L9.46 15.058L9.135 19.95C9.615 19.95 9.825 19.73 10.095 19.47L12.485 17.145L17.455 20.815C18.37 21.32 19.03 21.06 19.255 19.965L22.525 4.57C22.86 3.23 22.015 2.62 20.665 3.717Z" fill="white"/>
+                        </svg>
+                    </a>
+                </div>
+                <div class="subtitle">Modelo Ambiental en tiempo real ZMVM</div>
             </div>
             <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
         </div>
@@ -561,7 +569,7 @@
 
                     // TRUCO DE LIMPIEZA: Quitamos " 1h" o " 12h" del string
                     // Ejemplo: "Oficial 12h" -> "Oficial"
-                    let displayLabel = src.replace(" 1h", "").replace(" 12h", "");
+                    let displayLabel = src.replace(" 1h", "").replace(" 12h", "").replace(" 8h", "");
 
                     const isIA = displayLabel.includes("IA");
                     const color = isIA ? '#94a3b8' : '#0ea5e9'; 
