@@ -153,7 +153,24 @@
         @media (max-width: 600px) {
             .footer-controls { width: 95%; bottom: 15px; padding: 10px 15px; }
         }
-             
+
+        /* Nuevo estilo para el enlace de marca */
+        .link-brand {
+            display: block;
+            font-size: 11px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-decoration: none;
+            margin-top: 2px;
+            transition: color 0.2s ease;
+        }
+        
+        .link-brand:hover {
+            color: #38bdf8; /* Azul cyan al pasar el mouse */
+            text-decoration: none;
+        }
+                     
     </style>
 </head>
 <body>
@@ -170,7 +187,9 @@
                         </svg>
                     </a>
                 </div>
-                <div class="subtitle">Modelo Ambiental en tiempo real ZMVM</div>
+                <a href="https://smability.io" target="_blank" class="subtitle link-brand">
+                    Smability.io ↗
+                </a>
             </div>
             <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
         </div>
