@@ -59,117 +59,62 @@
         .leaflet-popup-tip { background: #ffffff !important; }
         .leaflet-popup-content { margin: 24px 16px 16px 16px; line-height: 1.5; }
 
+        /* --- MANEJO DE BORDES (GHOST MODE) --- */
         .leaflet-interactive {
             shape-rendering: crispEdges;
             stroke: none;
             stroke-width: 0;
             outline: none !important;
+            transition: fill-opacity 0.2s ease, stroke-opacity 0.2s ease, stroke-width 0.1s ease;
         }
         
-        /* Excepción: Permitir que las estaciones mantengan su borde blanco */
+        /* Excepción: Las estaciones sí llevan borde blanco */
         .leaflet-interactive[stroke="#ffffff"], 
         .leaflet-interactive[stroke="white"] {
             stroke: #ffffff !important;
             stroke-width: 2px !important;
             stroke-opacity: 1 !important;
-            shape-rendering: auto; /* Para que el círculo de la estación se vea suave/redondo */
+            shape-rendering: auto; 
         }
         
-        .leaflet-canvas-layer {
-            shape-rendering: crispEdges;
-        }
-        /* Ataca directamente al canvas de Mapbox/Leaflet */
         .leaflet-canvas-layer canvas, 
         canvas.leaflet-zoom-animated {
             image-rendering: -webkit-optimize-contrast;
             image-rendering: crisp-edges;
-            image-rendering: pixelated; /* <--- Esto hace que los cuadros encajen perfecto */
+            image-rendering: pixelated; 
         }      
         
-        /* Asegura que los patentes de Leaflet no tengan borde */
-        .leaflet-interactive {
-            stroke-width: 0 !important;
-            stroke-opacity: 0 !important;
-            outline: none !important;
-        }
-
-        /* --- FOOTER SLIDER CONTAINER --- */
         .footer-controls {
-            position: absolute;
-            bottom: 25px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 2000;
-            width: 90%;
-            max-width: 800px;
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(10px);
-            padding: 12px 20px;
-            border-radius: 100px; /* Estilo píldora moderno */
+            position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%);
+            z-index: 2000; width: 90%; max-width: 800px;
+            background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px);
+            padding: 12px 20px; border-radius: 100px;
             border: 1px solid rgba(56, 189, 248, 0.3);
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            gap: 15px;
+            display: flex; align-items: center; gap: 15px;
         }
         
         .play-btn {
-            background: #38bdf8;
-            border: none;
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            cursor: pointer;
-            color: #0f172a;
-            font-size: 16px;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background: #38bdf8; border: none; width: 35px; height: 35px;
+            border-radius: 50%; cursor: pointer; color: #0f172a; font-size: 16px;
+            flex-shrink: 0; display: flex; align-items: center; justify-content: center;
         }
         
-        .slider-wrapper {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .modern-range {
-            width: 100%;
-            cursor: pointer;
-            accent-color: #38bdf8;
-            margin: 0;
-        }
+        .slider-wrapper { flex-grow: 1; display: flex; flex-direction: column; }
+        .modern-range { width: 100%; cursor: pointer; accent-color: #38bdf8; margin: 0; }
         
         #time-display {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 11px;
-            color: #38bdf8;
-            text-align: center;
-            margin-top: 4px;
-            font-weight: 500;
+            font-family: 'Roboto Mono', monospace; font-size: 11px;
+            color: #38bdf8; text-align: center; margin-top: 4px; font-weight: 500;
         }
         
-        @media (max-width: 600px) {
-            .footer-controls { width: 95%; bottom: 15px; padding: 10px 15px; }
-        }
+        @media (max-width: 600px) { .footer-controls { width: 95%; bottom: 15px; padding: 10px 15px; } }
 
-        /* Nuevo estilo para el enlace de marca */
         .link-brand {
-            display: block;
-            font-size: 11px;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-decoration: none;
-            margin-top: 2px;
-            transition: color 0.2s ease;
+            display: block; font-size: 11px; color: #94a3b8; text-transform: uppercase;
+            letter-spacing: 1px; text-decoration: none; margin-top: 2px; transition: color 0.2s ease;
         }
-        
-        .link-brand:hover {
-            color: #38bdf8; /* Azul cyan al pasar el mouse */
-            text-decoration: none;
-        }
+        .link-brand:hover { color: #38bdf8; text-decoration: none; }
 
         .leaflet-interactive {
             transition: fill-opacity 0.2s ease, stroke-opacity 0.2s ease, stroke-width 0.1s ease;
@@ -263,26 +208,23 @@
     <script>
         const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
 
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     
     <script>
-      
-        // 0. INICIALIZAR MAPA
+        // --- 0. CONFIGURACIÓN INICIAL ---
         const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
         const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiY21rYnJseG1kMDZnczNlb2xrdDhrejE1biJ9.VFEMLEntTg5fDXDefQTnFA';
 
-        // 1. INICIALIZAR MAPA
+        // --- 1. INICIALIZAR MAPA CON LÍMITES ---
         const map = L.map('map', { 
             zoomControl: false, 
             preferCanvas: true,
             renderer: L.canvas({ padding: 0.5 }),
-            
-            // --- AQUÍ ESTÁN LOS LÍMITES ---
-            minZoom: 9,   // Vista Satelital / ZMVM completa (No pueden alejarse más)
-            maxZoom: 16   // Vista Calle / Colonia (No pueden acercarse más)
+            minZoom: 9,   // Vista Satelital ZMVM
+            maxZoom: 16   // Vista Calle
         });
 
-        // 2. ZOOM AJUSTADO (TIGHT FIT)
+        // 2. ENCUADRE (TIGHT FIT)
         map.fitBounds([
             [19.10, -99.35], // Suroeste
             [19.75, -98.85]  // Noreste
@@ -290,25 +232,21 @@
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // --- DEFINICIÓN DE CAPAS (SÁNDWICH PRO) ---
+        // --- 3. DEFINICIÓN DE CAPAS (SÁNDWICH PRO) ---
         
-        // Nivel 1: Fondo Sólido (Abajo)
-        map.createPane('basePane');   
-        map.getPane('basePane').style.zIndex = 200;
+        // Nivel 1: Fondo (Abajo)
+        map.createPane('basePane');   map.getPane('basePane').style.zIndex = 200;
 
-        // Nivel 2: Tu Modelo de Aire (En medio)
-        map.createPane('gridPane');   
-        map.getPane('gridPane').style.zIndex = 400;
+        // Nivel 2: Tu Modelo (En medio)
+        map.createPane('gridPane');   map.getPane('gridPane').style.zIndex = 400;
 
-        // Nivel 3: Tu Overlay Fantasma (Arriba)
-        map.createPane('labelsPane');
-        map.getPane('labelsPane').style.zIndex = 600;
-        map.getPane('labelsPane').style.pointerEvents = 'none'; // ¡Vital para dar clic al grid!
+        // Nivel 3: Etiquetas y Calles (Arriba)
+        map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 600;
+        map.getPane('labelsPane').style.pointerEvents = 'none'; // Click traspasa
 
-        // --- CARGAR LOS MAPAS ---
+        // --- 4. CARGAR LOS MAPAS ---
 
-        // A. FONDO: CARTO DARK NO LABELS (Negro Puro y Mudo)
-        // Usamos este porque NO trae calles, así evitamos el efecto "doble visión"
+        // A. FONDO: CARTO DARK NO LABELS (Negro Puro)
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
             pane: 'basePane', 
             opacity: 1,
@@ -316,8 +254,7 @@
             attribution: '© OpenStreetMap, © CARTO'
         }).addTo(map);
 
-        // B. TU OVERLAY PERSONALIZADO (Tus calles controladas)
-        // Nota: Mantenemos tu estilo. Cuando quieras quitar lo rojo, borra "&test=rojo"
+        // B. TU OVERLAY PERSONALIZADO (Mapbox: Calles rojas/blancas)
         const labelsLayer = L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}&v=1`, {
             pane: 'labelsPane', 
             opacity: 1, 
