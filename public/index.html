@@ -313,7 +313,8 @@
 
         // B. TU OVERLAY PERSONALIZADO (Calles + Nombres transparentes)
         // Corrección: Asignamos esto a una variable para poder aplicarle el filtro después
-        const labelsLayer = L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, {
+        // Agregué "&test=rojo" al final. Esto obliga al navegador a descargar las nuevas imágenes.
+        const labelsLayer = L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}&test=rojo`, {
             pane: 'labelsPane', 
             opacity: 1, 
             tileSize: 512, zoomOffset: -1, maxZoom: 19
