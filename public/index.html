@@ -170,6 +170,10 @@
             color: #38bdf8; /* Azul cyan al pasar el mouse */
             text-decoration: none;
         }
+
+        .leaflet-interactive {
+            transition: fill-opacity 0.2s ease, stroke-opacity 0.2s ease, stroke-width 0.1s ease;
+        }
                      
     </style>
 </head>
@@ -733,19 +737,34 @@
                 `);
                 // --- [FIN POPUP] ---
                 
+                // --- INICIO EFECTO FOCUS (HOVER) ---
                 rect.on('mouseover', function() {
-                    // Solo aumentamos la opacidad, no agregamos bordes (evita la estela)
-                    this.setStyle({ fillOpacity: 0.9 });
-                    if (isStation) { this.setStyle({ weight: 4 }); }
-                });
-                // Ajuste sugerido para el mouseout
-                rect.on('mouseout', function() {
-                        this.setStyle({ 
-                            fillOpacity: fillOp,
-                            weight: isStation ? 2 : 0,
-                            stroke: isStation 
-                        });
+                    this.setStyle({ 
+                        fillOpacity: 0.9,
+                        // Lógica: Si es estación, borde grueso (4). Si es grid normal, borde fino (1)
+                        weight: isStation ? 4 : 1, 
+                        // Color: Estación = blanco puro. Grid = blanco semi-transparente
+                        color: isStation ? '#ffffff' : 'rgba(255, 255, 255, 0.5)', 
+                        stroke: true 
                     });
+                    
+                    // Truco vital: Traer el cuadro al frente para que el borde no lo tapen los vecinos
+                    if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                        this.bringToFront();
+                    }
+                });
+
+                rect.on('mouseout', function() {
+                    this.setStyle({ 
+                        fillOpacity: fillOp,
+                        // Restauramos estado original:
+                        // Estación = borde 2. Grid = borde 0 (invisible)
+                        weight: isStation ? 2 : 0,
+                        stroke: isStation,
+                        color: '#ffffff'
+                    });
+                });
+                // --- FIN EFECTO FOCUS ---
                 rectangles.push(rect);
             }
             geoLayer = L.layerGroup(rectangles).addTo(map);
