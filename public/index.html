@@ -267,7 +267,7 @@
     
     <script>
       
-        // 1. INICIALIZAR MAPA
+        // 0. INICIALIZAR MAPA
         const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
         const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiY21rYnJseG1kMDZnczNlb2xrdDhrejE1biJ9.VFEMLEntTg5fDXDefQTnFA';
 
@@ -275,7 +275,11 @@
         const map = L.map('map', { 
             zoomControl: false, 
             preferCanvas: true,
-            renderer: L.canvas({ padding: 0.5 }) 
+            renderer: L.canvas({ padding: 0.5 }),
+            
+            // --- AQUÍ ESTÁN LOS LÍMITES ---
+            minZoom: 9,   // Vista Satelital / ZMVM completa (No pueden alejarse más)
+            maxZoom: 16   // Vista Calle / Colonia (No pueden acercarse más)
         });
 
         // 2. ZOOM AJUSTADO (TIGHT FIT)
@@ -314,7 +318,7 @@
 
         // B. TU OVERLAY PERSONALIZADO (Tus calles controladas)
         // Nota: Mantenemos tu estilo. Cuando quieras quitar lo rojo, borra "&test=rojo"
-        const labelsLayer = L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, {
+        const labelsLayer = L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}&v=1`, {
             pane: 'labelsPane', 
             opacity: 1, 
             tileSize: 512, zoomOffset: -1, maxZoom: 19
