@@ -272,7 +272,11 @@
             zoomControl: false, 
             preferCanvas: true,
             renderer: L.canvas({ padding: 0.5 }) 
-        }).setView([19.4326, -99.1332], 10);
+        // Coordenadas [Sur-Oeste, Norte-Este] que cubren toda la mancha urbana y alrededores
+            }).fitBounds([
+                [19.05, -99.35], // Sur-Oeste (Por el Ajusco/Toluca)
+                [19.85, -98.80]  // Norte-Este (Por Tecámac/Texcoco)
+            ]);
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         
