@@ -272,37 +272,49 @@
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         
-        // --- CREACIÓN DE CAPAS (EL SÁNDWICH) ---
+        // --- DEFINICIÓN DE CAPAS (EL SÁNDWICH) ---
 
-        // PANE 1: FONDO (Abajo de todo) - Aquí va el mapa negro sin letras
+        // 1. FONDO (Abajo de todo)
         map.createPane('basePane');
         map.getPane('basePane').style.zIndex = 200;
 
-        // PANE 2: GRID (En medio) - Aquí irá tu modelo de aire
+        // 2. GRID (Tu modelo de aire)
         map.createPane('gridPane');
         map.getPane('gridPane').style.zIndex = 400;
 
-        // PANE 3: ETIQUETAS (Arriba de todo) - Aquí van las calles y nombres
+        // 3. CALLES (Líneas de transporte) - ¡ESTA ES LA NUEVA!
+        map.createPane('roadsPane');
+        map.getPane('roadsPane').style.zIndex = 500;
+        map.getPane('roadsPane').style.pointerEvents = 'none'; // Click traspasa
+
+        // 4. ETIQUETAS (Textos) - (Arriba de todo)
         map.createPane('labelsPane');
         map.getPane('labelsPane').style.zIndex = 600;
-        map.getPane('labelsPane').style.pointerEvents = 'none'; // ¡CLAVE! Para que los clics pasen a través de las letras
+        map.getPane('labelsPane').style.pointerEvents = 'none'; // Click traspasa
 
         // --- CARGAR LOS MAPAS ---
 
-        // Capa Base (Oscura sin etiquetas)
+        // A. Capa Base (Oscura sin etiquetas)
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
             attribution: '© OpenStreetMap, © CARTO',
             pane: 'basePane',
             maxZoom: 19
         }).addTo(map);
 
-        // Capa Etiquetas (Solo texto blanco/gris)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-            pane: 'labelsPane',
-            opacity: 0.9, 
+        // B. Capa Calles y Avenidas (Líneas Claras)
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+            pane: 'roadsPane',
+            opacity: 0.6, // Ajusta esto si las calles brillan demasiado
             maxZoom: 19
         }).addTo(map);
 
+        // C. Capa Etiquetas (Solo texto)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+            pane: 'labelsPane',
+            opacity: 1, 
+            maxZoom: 19
+        }).addTo(map);
+        
         const CONFIG = {
             ias: { name: 'Índice Aire y Salud', unit: 'Pts', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
             o3: { name: 'Ozono (O3)', unit: 'ppb', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 250], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
