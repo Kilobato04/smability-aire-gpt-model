@@ -1,0 +1,21 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - echo "Instalando dependencias para Forecast..."
+      - pip install -r requirements.txt -t .
+  
+  build:
+    commands:
+      - echo "Limpiando archivos innecesarios..."
+      - rm -rf __pycache__ .git
+      - echo "Empaquetando Lambda..."
+      - zip -r forecast_package.zip .
+      
+  post_build:
+    commands:
+      - echo "Desplegando a Lambda: smability-forecast-builder"
+      - aws lambda update-function-code --function-name smability-forecast-builder --zip-file fileb://forecast_package.zip
