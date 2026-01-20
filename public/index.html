@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Smability Dashboard - CDMX</title>
+    <title>Smability AireGPT Model - CDMX</title>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
@@ -188,7 +188,7 @@
                     </a>
                 </div>
                 <a href="https://smability.io" target="_blank" class="subtitle link-brand">
-                    Smability.io ↗
+                    Smability.io
                 </a>
             </div>
             <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
@@ -259,6 +259,11 @@
     <script>
         const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
 
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
+
+        // 1. INICIALIZAR MAPA (Sándwich Config)
         const map = L.map('map', { 
             zoomControl: false, 
             preferCanvas: true,
@@ -267,14 +272,34 @@
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
         
-        // CONFIGURACIÓN MAPBOX
-        const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiY21rYnJseG1kMDZnczNlb2xrdDhrejE1biJ9.VFEMLEntTg5fDXDefQTnFA';
-        const MAPBOX_STYLE = 'mapbox/dark-v11'; // Estilo Dark profesional
-        
-        L.tileLayer(`https://api.mapbox.com/styles/v1/${MAPBOX_STYLE}/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, {
-            attribution: '© Mapbox © OpenStreetMap',
-            tileSize: 512,
-            zoomOffset: -1,
+        // --- CREACIÓN DE CAPAS (EL SÁNDWICH) ---
+
+        // PANE 1: FONDO (Abajo de todo) - Aquí va el mapa negro sin letras
+        map.createPane('basePane');
+        map.getPane('basePane').style.zIndex = 200;
+
+        // PANE 2: GRID (En medio) - Aquí irá tu modelo de aire
+        map.createPane('gridPane');
+        map.getPane('gridPane').style.zIndex = 400;
+
+        // PANE 3: ETIQUETAS (Arriba de todo) - Aquí van las calles y nombres
+        map.createPane('labelsPane');
+        map.getPane('labelsPane').style.zIndex = 600;
+        map.getPane('labelsPane').style.pointerEvents = 'none'; // ¡CLAVE! Para que los clics pasen a través de las letras
+
+        // --- CARGAR LOS MAPAS ---
+
+        // Capa Base (Oscura sin etiquetas)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap, © CARTO',
+            pane: 'basePane',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Capa Etiquetas (Solo texto blanco/gris)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+            pane: 'labelsPane',
+            opacity: 0.9, 
             maxZoom: 19
         }).addTo(map);
 
@@ -532,7 +557,8 @@
                 const strokeColor = isStation ? '#ffffff' : color;
                 const weight = isStation ? 2 : 0;
                 const fillOp = isStation ? 0.9 : 0.65;
-                const rect = L.rectangle(bounds, { 
+                const rect = L.rectangle(bounds, {
+                        pane: 'gridPane',
                         stroke: isStation,      // <--- SÚPER IMPORTANTE: False para la IA
                         color: '#ffffff', 
                         weight: isStation ? 2 : 0, 
