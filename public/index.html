@@ -264,6 +264,7 @@
         const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
 
         <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    
     <script>
         const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
 
@@ -274,18 +275,17 @@
             renderer: L.canvas({ padding: 0.5 }) 
         });
 
-        // 1. ZOOM AJUSTADO (TIGHT FIT)
-        // Encuadre perfecto del Valle de México
+        // 1. ZOOM AJUSTADO
         map.fitBounds([
-            [19.10, -99.35], // Suroeste
-            [19.75, -98.85]  // Noreste
+            [19.10, -99.35], 
+            [19.75, -98.85]
         ]);
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
         // --- DEFINICIÓN DE CAPAS (SOLO 3 NIVELES) ---
         
-        // Nivel 1: Fondo Negro
+        // Nivel 1: Fondo (Mapbox Dark - Alta Definición)
         map.createPane('basePane');   
         map.getPane('basePane').style.zIndex = 200;
 
@@ -293,29 +293,35 @@
         map.createPane('gridPane');   
         map.getPane('gridPane').style.zIndex = 400;
 
-        // Nivel 3: Calles y Nombres (Todo en uno)
-        map.createPane('roadsPane');  
-        map.getPane('roadsPane').style.zIndex = 500;
-        map.getPane('roadsPane').style.pointerEvents = 'none'; // Click traspasa
+        // Nivel 3: Solo Etiquetas (Nombres flotando)
+        map.createPane('labelsPane');
+        map.getPane('labelsPane').style.zIndex = 600;
+        map.getPane('labelsPane').style.pointerEvents = 'none';
 
         // --- CARGAR LOS MAPAS ---
 
-        // A. FONDO (Negro absoluto)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+        // A. FONDO: MAPBOX DARK V11 (Usa tu token)
+        // Este mapa tiene calles muy bien definidas que se verán debajo del grid
+        const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiY21rYnJseG1kMDZnczNlb2xrdDhrejE1biJ9.VFEMLEntTg5fDXDefQTnFA';
+        
+        L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, {
             pane: 'basePane', 
             opacity: 1,
-            maxZoom: 19
+            tileSize: 512,
+            zoomOffset: -1, // Mapbox usa tiles de 512px, esto ajusta la nitidez
+            maxZoom: 19,
+            attribution: '© Mapbox'
         }).addTo(map);
 
-        // B. CALLES Y ETIQUETAS (ESRI - Todo en uno)
-        const roadsLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
-            pane: 'roadsPane',
-            opacity: 0.45, // Opacidad media para que se vea pero no estorbe
+        // B. ETIQUETAS: CARTO (Limpio y sin calles duplicadas)
+        const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+            pane: 'labelsPane',
+            opacity: 1, // Texto blanco brillante
             maxZoom: 19
         }).addTo(map);
         
-        // FILTRO GHOST: Las vuelve gris suave para que se vean elegantes
-        roadsLayer.getContainer().style.filter = "brightness(0.7) grayscale(100%)";
+        // Filtro suave para que el texto no sea tan agresivo (opcional)
+        labelsLayer.getContainer().style.filter = "brightness(0.9)";
         
         const CONFIG = {
             ias: { name: 'Índice Aire y Salud', unit: 'Pts', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
