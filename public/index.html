@@ -266,61 +266,60 @@
         <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     
     <script>
+      
+        // 1. INICIALIZAR MAPA
         const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
+        const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiY21rYnJseG1kMDZnczNlb2xrdDhrejE1biJ9.VFEMLEntTg5fDXDefQTnFA';
 
-        // 1. INICIALIZAR MAPA (Sándwich Config)
+        // 1. INICIALIZAR MAPA
         const map = L.map('map', { 
             zoomControl: false, 
             preferCanvas: true,
             renderer: L.canvas({ padding: 0.5 }) 
         });
 
-        // 1. ZOOM AJUSTADO
+        // 2. ZOOM AJUSTADO (TIGHT FIT)
         map.fitBounds([
-            [19.10, -99.35], 
-            [19.75, -98.85]
+            [19.10, -99.35], // Suroeste
+            [19.75, -98.85]  // Noreste
         ]);
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // --- DEFINICIÓN DE CAPAS (SOLO 3 NIVELES) ---
+        // --- DEFINICIÓN DE CAPAS (SÁNDWICH PRO) ---
         
-        // Nivel 1: Fondo (Mapbox Dark - Alta Definición)
+        // Nivel 1: Fondo Sólido (Abajo)
         map.createPane('basePane');   
         map.getPane('basePane').style.zIndex = 200;
 
-        // Nivel 2: Tu Grid (AireGPT)
+        // Nivel 2: Tu Modelo de Aire (En medio)
         map.createPane('gridPane');   
         map.getPane('gridPane').style.zIndex = 400;
 
-        // Nivel 3: Solo Etiquetas (Nombres flotando)
+        // Nivel 3: Tu Overlay Fantasma (Arriba)
         map.createPane('labelsPane');
         map.getPane('labelsPane').style.zIndex = 600;
-        map.getPane('labelsPane').style.pointerEvents = 'none';
+        map.getPane('labelsPane').style.pointerEvents = 'none'; // ¡Vital para dar clic al grid!
 
         // --- CARGAR LOS MAPAS ---
 
-        // A. FONDO: MAPBOX DARK V11 (Usa tu token)
-        // Este mapa tiene calles muy bien definidas que se verán debajo del grid
-        const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiY21rYnJseG1kMDZnczNlb2xrdDhrejE1biJ9.VFEMLEntTg5fDXDefQTnFA';
-        
+        // A. FONDO: Mapbox Dark v11 (Base sólida negra)
         L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, {
             pane: 'basePane', 
             opacity: 1,
-            tileSize: 512,
-            zoomOffset: -1, // Mapbox usa tiles de 512px, esto ajusta la nitidez
-            maxZoom: 19,
+            tileSize: 512, zoomOffset: -1, maxZoom: 19,
             attribution: '© Mapbox'
         }).addTo(map);
 
-        // B. ETIQUETAS: CARTO (Limpio y sin calles duplicadas)
-        const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-            pane: 'labelsPane',
-            opacity: 1, // Texto blanco brillante
-            maxZoom: 19
+        // B. TU OVERLAY PERSONALIZADO (Calles + Nombres transparentes)
+        // Corrección: Asignamos esto a una variable para poder aplicarle el filtro después
+        const labelsLayer = L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, {
+            pane: 'labelsPane', 
+            opacity: 1, 
+            tileSize: 512, zoomOffset: -1, maxZoom: 19
         }).addTo(map);
         
-        // Filtro suave para que el texto no sea tan agresivo (opcional)
+        // Filtro suave: Ahora sí funciona porque 'labelsLayer' existe
         labelsLayer.getContainer().style.filter = "brightness(0.9)";
         
         const CONFIG = {
