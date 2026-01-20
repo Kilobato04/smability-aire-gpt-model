@@ -294,26 +294,34 @@
 
         // --- CARGAR LOS MAPAS ---
 
-        // A. Capa Base (Oscura sin etiquetas)
+        // A. Capa Base (Oscura) - Se queda igual
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
             attribution: '© OpenStreetMap, © CARTO',
             pane: 'basePane',
             maxZoom: 19
         }).addTo(map);
 
-        // B. Capa Calles y Avenidas (Líneas Claras)
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+        // B. CALLES (Ajuste: Ghost Mode)
+        // Bajamos opacidad al 0.30 (30%) para que sean apenas un susurro visual
+        const roadsLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
             pane: 'roadsPane',
-            opacity: 0.6, // Ajusta esto si las calles brillan demasiado
+            opacity: 0.30,  // <--- AQUÍ ESTÁ LA CLAVE (Antes 0.6)
             maxZoom: 19
         }).addTo(map);
 
-        // C. Capa Etiquetas (Solo texto)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+        // Truco CSS para volverlas grises (bajar brillo) en lugar de blancas
+        roadsLayer.getContainer().style.filter = "brightness(0.6) grayscale(100%)";
+
+        // C. ETIQUETAS (Ajuste: Gris Suave)
+        // Bajamos opacidad al 0.7 para que no compitan con los datos
+        const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
             pane: 'labelsPane',
-            opacity: 1, 
+            opacity: 0.7,   // <--- Antes 1.0, ahora más sutil
             maxZoom: 19
         }).addTo(map);
+        
+        // Truco CSS para que el texto sea gris claro, no blanco chillón
+        labelsLayer.getContainer().style.filter = "brightness(0.7)";
         
         const CONFIG = {
             ias: { name: 'Índice Aire y Salud', unit: 'Pts', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
