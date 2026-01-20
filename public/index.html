@@ -303,24 +303,24 @@
 
         // --- CARGAR LOS MAPAS ---
 
-        // A. FONDO: Mapbox Dark v11 (Base sólida negra)
-        L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, {
+        // A. FONDO: CARTO DARK NO LABELS (Negro Puro y Mudo)
+        // Usamos este porque NO trae calles, así evitamos el efecto "doble visión"
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
             pane: 'basePane', 
             opacity: 1,
-            tileSize: 512, zoomOffset: -1, maxZoom: 19,
-            attribution: '© Mapbox'
+            maxZoom: 19,
+            attribution: '© OpenStreetMap, © CARTO'
         }).addTo(map);
 
-        // B. TU OVERLAY PERSONALIZADO (Calles + Nombres transparentes)
-        // Corrección: Asignamos esto a una variable para poder aplicarle el filtro después
-        // Agregué "&test=rojo" al final. Esto obliga al navegador a descargar las nuevas imágenes.
+        // B. TU OVERLAY PERSONALIZADO (Tus calles controladas)
+        // Nota: Mantenemos tu estilo. Cuando quieras quitar lo rojo, borra "&test=rojo"
         const labelsLayer = L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}&test=rojo`, {
             pane: 'labelsPane', 
             opacity: 1, 
             tileSize: 512, zoomOffset: -1, maxZoom: 19
         }).addTo(map);
         
-        // Filtro suave: Ahora sí funciona porque 'labelsLayer' existe
+        // Filtro opcional por si el rojo/blanco brilla demasiado
         labelsLayer.getContainer().style.filter = "brightness(0.9)";
         
         const CONFIG = {
