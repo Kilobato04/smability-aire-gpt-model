@@ -314,14 +314,14 @@
 
         // B. TU OVERLAY PERSONALIZADO (Tus calles controladas)
         // Nota: Mantenemos tu estilo. Cuando quieras quitar lo rojo, borra "&test=rojo"
-        const labelsLayer = L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}&test=gris`, {
+        const labelsLayer = L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`, {
             pane: 'labelsPane', 
             opacity: 1, 
             tileSize: 512, zoomOffset: -1, maxZoom: 19
         }).addTo(map);
         
         // Filtro opcional por si el rojo/blanco brilla demasiado
-        labelsLayer.getContainer().style.filter = "brightness(0.9)";
+        labelsLayer.getContainer().style.filter = "brightness(1)";
         
         const CONFIG = {
             ias: { name: 'Índice Aire y Salud', unit: 'Pts', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
