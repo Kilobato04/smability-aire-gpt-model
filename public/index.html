@@ -272,64 +272,50 @@
             zoomControl: false, 
             preferCanvas: true,
             renderer: L.canvas({ padding: 0.5 }) 
-        // Coordenadas [Sur-Oeste, Norte-Este] que cubren toda la mancha urbana y alrededores
-            }).fitBounds([
-                [19.05, -99.35], // Sur-Oeste (Por el Ajusco/Toluca)
-                [19.85, -98.80]  // Norte-Este (Por Tecámac/Texcoco)
-            ]);
+        });
+
+        // 1. ZOOM AJUSTADO (TIGHT FIT)
+        // Encuadre perfecto del Valle de México
+        map.fitBounds([
+            [19.10, -99.35], // Suroeste
+            [19.75, -98.85]  // Noreste
+        ]);
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
-        
-        // --- DEFINICIÓN DE CAPAS (EL SÁNDWICH) ---
 
-        // 1. FONDO (Abajo de todo)
-        map.createPane('basePane');
+        // --- DEFINICIÓN DE CAPAS (SOLO 3 NIVELES) ---
+        
+        // Nivel 1: Fondo Negro
+        map.createPane('basePane');   
         map.getPane('basePane').style.zIndex = 200;
 
-        // 2. GRID (Tu modelo de aire)
-        map.createPane('gridPane');
+        // Nivel 2: Tu Grid (AireGPT)
+        map.createPane('gridPane');   
         map.getPane('gridPane').style.zIndex = 400;
 
-        // 3. CALLES (Líneas de transporte) - ¡ESTA ES LA NUEVA!
-        map.createPane('roadsPane');
+        // Nivel 3: Calles y Nombres (Todo en uno)
+        map.createPane('roadsPane');  
         map.getPane('roadsPane').style.zIndex = 500;
         map.getPane('roadsPane').style.pointerEvents = 'none'; // Click traspasa
 
-        // 4. ETIQUETAS (Textos) - (Arriba de todo)
-        map.createPane('labelsPane');
-        map.getPane('labelsPane').style.zIndex = 600;
-        map.getPane('labelsPane').style.pointerEvents = 'none'; // Click traspasa
-
         // --- CARGAR LOS MAPAS ---
 
-        // A. Capa Base (Oscura) - Se queda igual
+        // A. FONDO (Negro absoluto)
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap, © CARTO',
-            pane: 'basePane',
+            pane: 'basePane', 
+            opacity: 1,
             maxZoom: 19
         }).addTo(map);
 
-        // B. CALLES (Ajuste: Ghost Mode)
-        // Bajamos opacidad al 0.30 (30%) para que sean apenas un susurro visual
+        // B. CALLES Y ETIQUETAS (ESRI - Todo en uno)
         const roadsLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
             pane: 'roadsPane',
-            opacity: 0.30,  // <--- AQUÍ ESTÁ LA CLAVE (Antes 0.6)
-            maxZoom: 19
-        }).addTo(map);
-
-        // Truco CSS para volverlas grises (bajar brillo) en lugar de blancas
-        roadsLayer.getContainer().style.filter = "brightness(0.6) grayscale(100%)";
-
-        // C. ETIQUETAS (Ajuste: Gris Suave)
-        // Bajamos opacidad al 0.7 para que no compitan con los datos
-        const labelsLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-            pane: 'labelsPane',
-            opacity: 0.7,   // <--- Antes 1.0, ahora más sutil
+            opacity: 0.45, // Opacidad media para que se vea pero no estorbe
             maxZoom: 19
         }).addTo(map);
         
-        // Truco CSS para que el texto sea gris claro, no blanco chillón
-        labelsLayer.getContainer().style.filter = "brightness(0.7)";
+        // FILTRO GHOST: Las vuelve gris suave para que se vean elegantes
+        roadsLayer.getContainer().style.filter = "brightness(0.7) grayscale(100%)";
         
         const CONFIG = {
             ias: { name: 'Índice Aire y Salud', unit: 'Pts', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
