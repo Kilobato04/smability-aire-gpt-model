@@ -1,21 +1,28 @@
 version: 0.2
 
 phases:
-  install:
-    runtime-versions:
-      python: 3.11
+  pre_build:
     commands:
-      - echo "Instalando dependencias para Forecast..."
-      - pip install -r requirements.txt -t .
-  
+      - echo "Validando credenciales..."
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/smability-forecast-repo
+      - echo "Logueándose en Amazon ECR..."
+      - aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=build-$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}')
+      
   build:
     commands:
-      - echo "Limpiando archivos innecesarios..."
-      - rm -rf __pycache__ .git
-      - echo "Empaquetando Lambda..."
-      - zip -r forecast_package.zip .
+      - echo "Construyendo imagen Docker..."
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
       
   post_build:
     commands:
-      - echo "Desplegando a Lambda: smability-forecast-builder"
-      - aws lambda update-function-code --function-name smability-forecast-builder --zip-file fileb://forecast_package.zip
+      - echo "Subiendo imagen a ECR..."
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      
+      - echo "🚀 Actualizando Lambda con la nueva imagen..."
+      - aws lambda update-function-code --function-name smability-forecast-builder --image-uri $REPOSITORY_URI:latest
+      - echo "✅ Despliegue completado."
