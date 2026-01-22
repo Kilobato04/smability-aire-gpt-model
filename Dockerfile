@@ -1,26 +1,35 @@
-FROM public.ecr.aws/lambda/python:3.11
+FROM python:3.11-slim
 
-# 1. Dependencias de Sistema (Necesarias para que XGBoost no falle)
-RUN yum update -y && yum install -y gcc gcc-c++ make cmake libgfortran && yum clean all
+# 1. Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    gfortran \
+    libgomp1 \
+    wget \
+    tar \
+    gzip \
+    openssl \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# 2. Instalación de Python Packages (Optimizada)
-RUN pip install --no-cache-dir --upgrade pip
-COPY requirements.txt ${LAMBDA_TASK_ROOT}
-RUN pip install --no-cache-dir -r requirements.txt
+# 2. Configurar entorno Lambda
+WORKDIR /var/task
+ENV LAMBDA_TASK_ROOT=/var/task
 
-# 3. Código y Estructura (Paradigma GitHub-First)
-# Copiamos la carpeta app que ya tiene subcarpetas: artifacts, geograficos, airegpt_telegram
-COPY app/ ${LAMBDA_TASK_ROOT}/app/
+# 3. Copiar requirements e instalar
+COPY requirements.txt .
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 
-# 4. Punto de Entrada (Ubicamos la lambda principal donde AWS la espera)
-RUN cp ${LAMBDA_TASK_ROOT}/app/lambda_function.py ${LAMBDA_TASK_ROOT}/lambda_function.py
+# --- CAMBIO CRÍTICO AQUÍ ---
+# 4. Copiar TODO el contenido de la carpeta actual al contenedor
+# Esto asegura que 'app/geograficos/*.geojson' y los modelos .json se copien.
+COPY . ${LAMBDA_TASK_ROOT}
 
-# 5. Mapeo de Recursos (Para mantener compatibilidad con tus rutas del código V36)
-# Esto asegura que los archivos existan tanto en la subcarpeta como en la raíz del task
-RUN cp -r ${LAMBDA_TASK_ROOT}/app/geograficos/* ${LAMBDA_TASK_ROOT}/ 2>/dev/null || true
-RUN mkdir -p ${LAMBDA_TASK_ROOT}/artifacts && cp -r ${LAMBDA_TASK_ROOT}/app/artifacts/* ${LAMBDA_TASK_ROOT}/artifacts/ 2>/dev/null || true
+# 5. Instalar RIC (Runtime Interface Client)
+RUN pip install awslambdaric --target "${LAMBDA_TASK_ROOT}"
 
-# 6. Verificación (Para que veas en los logs de CodeBuild que todo está en su lugar)
-RUN ls -la ${LAMBDA_TASK_ROOT} && ls -la ${LAMBDA_TASK_ROOT}/artifacts/
-
-CMD [ "lambda_function.lambda_handler" ]
+# 6. CMD
+ENTRYPOINT [ "/usr/local/bin/python", "-m", "awslambdaric" ]
+CMD [ "lambda_function_forecast.lambda_handler" ]
