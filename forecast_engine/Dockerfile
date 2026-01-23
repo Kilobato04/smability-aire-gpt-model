@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# CAMBIO CLAVE: Usamos el espejo de AWS para evitar el error 429
+FROM public.ecr.aws/docker/library/python:3.11-slim
 
 # 1. Instalar dependencias del sistema
 RUN apt-get update && apt-get install -y \
@@ -22,12 +23,10 @@ COPY requirements.txt .
 RUN pip install --upgrade pip setuptools wheel && \
     pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 
-# --- CAMBIO CRÍTICO AQUÍ ---
-# 4. Copiar TODO el contenido de la carpeta actual al contenedor
-# Esto asegura que 'app/geograficos/*.geojson' y los modelos .json se copien.
+# 4. Copiar TODO (incluyendo app/geograficos que movimos antes)
 COPY . ${LAMBDA_TASK_ROOT}
 
-# 5. Instalar RIC (Runtime Interface Client)
+# 5. Instalar RIC
 RUN pip install awslambdaric --target "${LAMBDA_TASK_ROOT}"
 
 # 6. CMD
