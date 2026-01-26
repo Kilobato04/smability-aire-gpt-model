@@ -22,14 +22,13 @@ COPY requirements.txt .
 RUN pip install --upgrade pip setuptools wheel && \
     pip install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 
-# --- CAMBIO CRÍTICO AQUÍ ---
-# 4. Copiar TODO el contenido de la carpeta actual al contenedor
-# Esto asegura que 'app/geograficos/*.geojson' y los modelos .json se copien.
+# 4. COPIAR PROYECTO
+# Al hacer esto, todo lo que esté en tu carpeta local se copia a la raíz del contenedor.
 COPY . ${LAMBDA_TASK_ROOT}
 
-# 5. Instalar RIC (Runtime Interface Client)
+# 5. Instalar RIC
 RUN pip install awslambdaric --target "${LAMBDA_TASK_ROOT}"
 
-# 6. CMD
+# 6. CMD FINAL (Aquí estaba el error del forecast)
 ENTRYPOINT [ "/usr/local/bin/python", "-m", "awslambdaric" ]
-CMD [ "lambda_function_forecast.lambda_handler" ]
+CMD [ "lambda_function.lambda_handler" ]
