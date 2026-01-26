@@ -118,91 +118,55 @@ def load_static_grid():
         print(f"⚠️ No se pudo cargar DB de Colonias: {e}")
         for c in ['col', 'mun', 'edo', 'pob']: grid_df[c] = None
     
-    # 3. Edificios
-    try:
-        EDIFICIOS_PATH = f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json"
-        with open(EDIFICIOS_PATH, 'r') as f:
-            edificios_df = pd.DataFrame(json.load(f))
-        edificios_df['lat_key'] = edificios_df['lat'].round(5)
-        edificios_df['lon_key'] = edificios_df['lon'].round(5)
-        grid_df['lat_key'] = grid_df['lat'].round(5)
-        grid_df['lon_key'] = grid_df['lon'].round(5)
-        
-        grid_df = pd.merge(grid_df, edificios_df[['lat_key', 'lon_key', 'building_vol']], 
-                           on=['lat_key', 'lon_key'], how='left')
-        grid_df.drop(columns=['lat_key', 'lon_key'], inplace=True)
-    except:
-        grid_df['building_vol'] = 0
-
-    # Limpieza final
-    # 3. Edificios (Lógica Robusta y Diagnóstica)
+    # 3. Edificios (Estrategia de Alias Temporal - SOLUCIÓN FINAL)
     try:
         EDIFICIOS_PATH = f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json"
         
-        # A. Carga segura
         with open(EDIFICIOS_PATH, 'r') as f:
             edificios_data = json.load(f)
-            # Si es GeoJSON, normalizamos. Si es lista plana, directo.
             if isinstance(edificios_data, dict) and 'features' in edificios_data:
-                 import geopandas as gpd # Import local para no cargar memoria antes
-                 # Opción rapida para no depender de geopandas si no es necesario:
-                 edificios_df = pd.json_normalize([f['properties'] for f in edificios_data['features']])
-                 # Ojo: necesitamos lat/lon también si vienen en geometry
+                 edificios_df = pd.DataFrame([f['properties'] for f in edificios_data['features']])
             else:
                 edificios_df = pd.DataFrame(edificios_data)
         
-        # B. DIAGNÓSTICO DE COLUMNAS (¡Esto saldrá en los logs!)
-        print(f"🕵️ COLUMNAS ENCONTRADAS EN EDIFICIOS: {edificios_df.columns.tolist()}")
-        print(f"   Primer renglón: {edificios_df.iloc[0].to_dict() if not edificios_df.empty else 'VACIO'}")
-
-        # C. Estandarización de nombres (Solución de Raíz)
-        # Buscamos columnas candidatas y renombramos a 'building_vol'
-        posibles_nombres = ['vol', 'volume', 'volumen', 'building_volume', 'altura', 'height']
-        for col in edificios_df.columns:
-            if col.lower() in posibles_nombres:
-                print(f"🔧 Renombrando columna '{col}' a 'building_vol'")
-                edificios_df.rename(columns={col: 'building_vol'}, inplace=True)
-                break
-
-        # D. Lógica de Cruce (Merge)
+        # 1. RENOMBRADO SEGURO
         if 'building_vol' in edificios_df.columns:
-            # Redondeo para Fuzzy Match
-            edificios_df['lat_key'] = edificios_df['lat'].round(2)
-            edificios_df['lon_key'] = edificios_df['lon'].round(2)
-            grid_df['lat_key'] = grid_df['lat'].round(2)
-            grid_df['lon_key'] = grid_df['lon'].round(2)
-            
-            print(f"🏗️ Iniciando Merge... (Filas Edificios: {len(edificios_df)})")
-            
-            grid_df = pd.merge(grid_df, edificios_df[['lat_key', 'lon_key', 'building_vol']], 
-                               on=['lat_key', 'lon_key'], how='left')
-            
-            grid_df.drop(columns=['lat_key', 'lon_key'], inplace=True)
-            
-            # Llenar solo los nulos resultantes del merge con 0
-            grid_df['building_vol'] = grid_df['building_vol'].fillna(0)
-            print(f"✅ Datos Urbanos integrados. Max Vol detectado: {grid_df['building_vol'].max()}")
-            
+            edificios_df.rename(columns={'building_vol': 'vol_urbano_temp'}, inplace=True)
         else:
-            print("❌ ERROR CRÍTICO: No se encontró columna 'building_vol' ni alias conocidos.")
-            grid_df['building_vol'] = 0
+            print(f"⚠️ Columnas disponibles: {edificios_df.columns.tolist()}")
+            edificios_df['vol_urbano_temp'] = 0
+
+        # 2. PREPARAR LLAVES (Round 2 para Match)
+        edificios_df['lat_key'] = edificios_df['lat'].round(2)
+        edificios_df['lon_key'] = edificios_df['lon'].round(2)
+        grid_df['lat_key'] = grid_df['lat'].round(2)
+        grid_df['lon_key'] = grid_df['lon'].round(2)
+        
+        print(f"🏗️ Merge Seguro Iniciado... (Grid: {len(grid_df)}, Edificios: {len(edificios_df)})")
+
+        # 3. MERGE
+        grid_df = pd.merge(grid_df, edificios_df[['lat_key', 'lon_key', 'vol_urbano_temp']], 
+                           on=['lat_key', 'lon_key'], how='left')
+        
+        # 4. LIMPIEZA Y ASIGNACIÓN
+        grid_df['building_vol'] = grid_df['vol_urbano_temp'].fillna(0)
+        grid_df.drop(columns=['lat_key', 'lon_key', 'vol_urbano_temp'], inplace=True)
+        
+        print(f"✅ Datos Urbanos integrados. Max Vol: {grid_df['building_vol'].max()}")
 
     except Exception as e:
-        print(f"⚠️ Excepción en carga de Edificios: {str(e)}")
-        grid_df['building_vol'] = 0 # Protección final
+        print(f"⚠️ Error cargando Capa Edificios: {e}")
+        if 'building_vol' not in grid_df.columns:
+             grid_df['building_vol'] = 0
 
-    # --- LIMPIEZA FINAL (Aplica para todo) ---
+    # --- LIMPIEZA FINAL ---
     grid_df['col'] = grid_df['col'].fillna("Zona Federal")
     grid_df['mun'] = grid_df['mun'].fillna("Valle de México")
     grid_df['pob'] = grid_df['pob'].fillna(0)
-    
-    # Aseguramos que la columna exista para evitar KeyError abajo
-    if 'building_vol' not in grid_df.columns:
-        grid_df['building_vol'] = 0
-    else:
-        grid_df['building_vol'] = grid_df['building_vol'].fillna(0)
+    grid_df['building_vol'] = grid_df['building_vol'].fillna(0)
     
     return grid_df
+    
 # --- 4. MOTOR MATEMÁTICO ---
 def interpolate_on_grid(grid_df, x_src, y_src, z_src, method='linear'):
     """Interpolación IDW/Linear robusta"""
