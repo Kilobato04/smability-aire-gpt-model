@@ -213,10 +213,6 @@
     <div id="map"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
-    <script>
-        const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
     
     <script>
         // --- 0. CONFIGURACIÓN INICIAL ---
@@ -446,58 +442,49 @@
             return `${day}/${month} ${hour}:${min}`;
         }
 
-        // --- VINCULACIÓN DEL SLIDER MAESTRO (PASADO-PRESENTE-FUTURO) ---
+        // --- VINCULACIÓN DEL SLIDER ---
         const timeSlider = document.getElementById('time-slider');
         const timeDisplay = document.getElementById('time-display');
         const timeSelect = document.getElementById('time-select');
         
-        // Evento Input (Arrastrar el slider)
         timeSlider.addEventListener('input', (e) => {
             const index = parseInt(e.target.value);
             const options = timeSelect.options;
-            
+            const T = I18N[currentLang];
+
             if (options[index]) {
                 timeSelect.selectedIndex = index;
                 const opt = options[index];
-                const type = opt.dataset.type; // 'past', 'live', 'future'
-                
-                // --- AJUSTE 1: RECUPERAR FECHA Y HORA ---
-                // Usamos opt.text (que trae ej: "🔮 +1h (26/01 14:00)")
-                // y le aplicamos el color según el estado.
+                const type = opt.dataset.type;
                 
                 let color = "#fff";
                 let statusLabel = "";
+                let displayTime = "";
 
                 if (type === 'live') {
-                    color = "#22c55e"; // Verde
-                    statusLabel = "AHORA";
-                    // Para el live, usamos un estilo especial con punto pulsante
-                    timeDisplay.innerHTML = `
-                        <span class="live-dot" style="background:${color}; box-shadow:0 0 6px ${color};"></span> 
-                        <span style="color:${color}; font-weight:bold;">${statusLabel}</span>
-                    `;
-                } else {
-                    if (type === 'future') {
-                        color = "#a855f7"; // Púrpura
-                        statusLabel = "FUTURO";
+                    color = "#22c55e"; 
+                    // Obtener hora del texto o del sistema
+                    if (opt.innerText.includes("-") && opt.innerText.includes(":")) {
+                        displayTime = opt.innerText.split("-").pop(); 
                     } else {
-                        color = "#38bdf8"; // Azul
-                        statusLabel = "PASADO";
+                        const n = new Date();
+                        displayTime = " " + String(n.getHours()).padStart(2,'0') + ":" + String(n.getMinutes()).padStart(2,'0');
                     }
-                    // Combinamos: TIPO (Color) + Texto Detallado (Blanco/Gris)
-                    // opt.text ya trae el emoji y la hora, ej: "⏪ -1h (26/01 11:00)"
-                    timeDisplay.innerHTML = `
-                        <span style="color:${color}; font-weight:bold; margin-right:5px;">${statusLabel}</span> 
-                        <span style="color:#cbd5e1; font-family:'Roboto Mono'; font-size:11px;">${opt.text}</span>
-                    `;
+                    statusLabel = `${T.live_label} ${displayTime}`;
+                    timeDisplay.innerHTML = `<span class="live-dot" style="background:${color}; box-shadow:0 0 6px ${color};"></span> <span style="color:${color}; font-weight:bold;">${statusLabel}</span>`;
+                } else {
+                    if (type === 'future') { color = "#a855f7"; statusLabel = T.future_label; } 
+                    else { color = "#38bdf8"; statusLabel = T.past_label; }
+                    
+                    // Limpiar texto repetido
+                    let cleanText = opt.innerText.replace(T.future_label, "").replace(T.past_label, "").replace("🔮", "").replace("⏪", "").trim();
+                    timeDisplay.innerHTML = `<span style="color:${color}; font-weight:bold; margin-right:5px;">${statusLabel}</span> <span style="color:#cbd5e1; font-family:'Roboto Mono'; font-size:11px;">${cleanText}</span>`;
                 }
-                
-                // Cargar datos
                 loadMapData(opt.value);
             }
         });
 
-        // --- LÓGICA DE REPRODUCCIÓN (RETORNO A LIVE) ---
+        // --- LÓGICA PLAY/PAUSE ---
         let isPlaying = false;
         let playInterval;
 
@@ -509,47 +496,40 @@
             this.innerText = isPlaying ? "⏸" : "▶";
 
             if (isPlaying) {
-                // Si el usuario da play y ya estamos al final, regresamos al INICIO (Pasado)
-                // para que vea la película completa.
                 if (parseInt(timeSlider.value) >= parseInt(timeSlider.max)) {
-                    timeSlider.value = 0;
+                    timeSlider.value = 0; // Rebobinar al inicio del pasado
                     timeSlider.dispatchEvent(new Event('input'));
                 }
-
                 playInterval = setInterval(() => {
                     let nextVal = parseInt(timeSlider.value) + 1;
-                    
                     if (nextVal > parseInt(timeSlider.max)) {
-                        // --- FIN DEL CICLO ---
                         clearInterval(playInterval);
                         isPlaying = false;
-                        this.innerText = "▶"; // Cambiar icono a Play
+                        this.innerText = "▶";
                         
-                        console.log("🏁 Ciclo terminado. Volviendo a EN VIVO.");
-                        
-                        // --- AJUSTE 2: VOLVER A LIVE AUTOMÁTICAMENTE ---
-                        // Buscamos el índice de la opción 'live'
+                        // VOLVER A LIVE AUTOMÁTICAMENTE
                         let liveIndex = 0;
                         for (let i = 0; i < timeSelect.options.length; i++) {
-                            if (timeSelect.options[i].dataset.type === 'live') {
-                                liveIndex = i;
-                                break;
-                            }
+                            if (timeSelect.options[i].dataset.type === 'live') { liveIndex = i; break; }
                         }
-                        // Saltamos al índice Live
                         timeSlider.value = liveIndex;
                         timeSlider.dispatchEvent(new Event('input'));
-
                     } else {
-                        // Avanzar un cuadro
                         timeSlider.value = nextVal;
                         timeSlider.dispatchEvent(new Event('input'));
                     }
-                }, 1500); // Velocidad: 1.5s por cuadro
+                }, 1500);
             } else {
                 clearInterval(playInterval);
             }
         });
+
+        function changeTime() {
+            const select = document.getElementById('time-select');
+            const slider = document.getElementById('time-slider');
+            slider.value = select.selectedIndex;
+            slider.dispatchEvent(new Event('input'));
+        }
         // --- [FIN ANCLA B] ---
 
         function loadMapData(forceTimestamp = null) {
