@@ -231,11 +231,16 @@
                 conn_live: "EN VIVO",
                 conn_hist: "HISTÓRICO",
                 conn_fore: "PRONÓSTICO",
+                stats: { min: "Mínimo", avg: "Promedio", max: "Máximo" },
+                popup: { station: "Estación", risk: "Riesgo", vol: "Vol", dens: "Densidad", inhabitants: "habitantes" },
                 buttons: {
-                    ias: "🚦 IAS", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5",
-                    co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum",
-                    wsp: "💨 Viento", wdr: "🧭 Dir.", alt: "⛰️ Alt", building_vol: "🏙️ Urbano"
-                }
+                    ias: "Índice Aire y Salud", // Usamos nombre completo para Leyenda también
+                    o3: "Ozono (O3)", pm10: "Partículas PM10", pm25: "Partículas PM2.5",
+                    co: "Monóxido Carbono", so2: "Dióxido Azufre", tmp: "Temperatura", rh: "Humedad",
+                    wsp: "Viento", wdr: "Dirección", alt: "Altitud", building_vol: "Densidad Urbana"
+                },
+                // Versiones cortas para botones (opcional, si quieres ahorrar espacio)
+                btn_lbl: { ias: "🚦 IAS", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5", co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum", wsp: "💨 Viento", wdr: "🧭 Dir.", alt: "⛰️ Alt", building_vol: "🏙️ Urbano" }
             },
             en: {
                 live_label: "🔴 NOW",
@@ -245,11 +250,15 @@
                 conn_live: "LIVE",
                 conn_hist: "HISTORICAL",
                 conn_fore: "FORECAST",
+                stats: { min: "Minimum", avg: "Average", max: "Maximum" },
+                popup: { station: "Station", risk: "Risk", vol: "Vol", dens: "Density", inhabitants: "inhabitants" },
                 buttons: {
-                    ias: "🚦 AQI", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5",
-                    co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum",
-                    wsp: "💨 Wind", wdr: "🧭 Dir.", alt: "⛰️ Elev", building_vol: "🏙️ Urban"
-                }
+                    ias: "Air Quality Index",
+                    o3: "Ozone (O3)", pm10: "Particulate PM10", pm25: "Particulate PM2.5",
+                    co: "Carbon Monoxide", so2: "Sulfur Dioxide", tmp: "Temperature", rh: "Humidity",
+                    wsp: "Wind Speed", wdr: "Wind Dir.", alt: "Altitude", building_vol: "Urban Density"
+                },
+                btn_lbl: { ias: "🚦 AQI", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5", co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum", wsp: "💨 Wind", wdr: "🧭 Dir.", alt: "⛰️ Elev", building_vol: "🏙️ Urban" }
             }
         };
 
@@ -535,83 +544,74 @@
         function loadMapData(forceTimestamp = null) {
             const select = document.getElementById('time-select');
             const timestampKey = forceTimestamp || select.value;
-            
-            // Detectar tipo mirando el Dropdown (usamos el dataset que guardamos en el Paso 1)
             const selectedOpt = select.options[select.selectedIndex];
             const type = selectedOpt ? selectedOpt.dataset.type : 'live';
+            const T = I18N[currentLang]; // Textos actuales
 
             document.getElementById('loading').style.display = 'flex';
             document.getElementById('main-content').style.opacity = '0.3';
             
-            // --- SELECTOR DE API ---
             let url = BASE_API_URL;
-            
-            if (type === 'future') {
-                // API FORECAST (Futuro)
-                url += `?mode=forecast_data&timestamp=${timestampKey}`;
-            } else if (type === 'past') {
-                // API HISTÓRICA (Pasado) - Usamos mode=map con timestamp específico
-                url += `?mode=map&timestamp=${timestampKey}`;
-            } else {
-                // API LIVE (Presente)
-                url += `?mode=map`;
-            }
-            
-            url += `&_t=${Date.now()}`; // Cache buster
+            if (type === 'future') { url += `?mode=forecast_data&timestamp=${timestampKey}`; }
+            else if (type === 'past') { url += `?mode=map&timestamp=${timestampKey}`; }
+            else { url += `?mode=map`; }
+            url += `&_t=${Date.now()}`;
 
             fetch(url)
                 .then(response => { if(!response.ok) throw new Error("Datos no encontrados"); return response.json(); })
                 .then(data => {
-                    // --- MAPPING DE VARIABLES (Forecast usa nombres largos, Live usa cortos) ---
                     data.forEach(p => {
-                        p.o3 = p['o3 1h'] || p.o3;
-                        p.pm10 = p['pm10 12h'] || p.pm10;
-                        p.pm25 = p['pm25 12h'] || p.pm25;
-                        p.co = p['co 8h'] || p.co;
-                        p.so2 = p['so2 1h'] || p.so2;
+                        p.o3 = p['o3 1h'] || p.o3; p.pm10 = p['pm10 12h'] || p.pm10;
+                        p.pm25 = p['pm25 12h'] || p.pm25; p.co = p['co 8h'] || p.co; p.so2 = p['so2 1h'] || p.so2;
                     });
-
                     globalData = data;
                     
-                    // --- ACTUALIZAR UI SEGÚN TIPO ---
                     const statusEl = document.getElementById('connection-status');
                     const dotEl = document.getElementById('dot-indicator');
                     const timeEl = document.getElementById('update-time');
+                    const sliderDisplay = document.getElementById('time-display');
 
-                    if (type === 'live') {
-                        fallbackData = data; // Guardamos respaldo
-                        statusEl.innerText = "EN VIVO";
-                        statusEl.style.color = "#22c55e"; // Verde
-                        dotEl.style.backgroundColor = "#22c55e";
-                        dotEl.style.boxShadow = "0 0 6px #22c55e";
-                    } else if (type === 'future') {
-                        statusEl.innerText = "PRONÓSTICO";
-                        statusEl.style.color = "#a855f7"; // Púrpura
-                        dotEl.style.backgroundColor = "#a855f7";
-                        dotEl.style.boxShadow = "0 0 6px #a855f7";
-                    } else {
-                        statusEl.innerText = "HISTÓRICO";
-                        statusEl.style.color = "#38bdf8"; // Azul
-                        dotEl.style.backgroundColor = "#38bdf8";
-                        dotEl.style.boxShadow = "0 0 6px #38bdf8";
+                    // 1. Extraer la HORA REAL del dato (API)
+                    let realTimeStr = "--:--";
+                    if(data.length > 0 && data[0].timestamp) { 
+                        // "2026-01-26 13:20:00" -> "13:20"
+                        realTimeStr = data[0].timestamp.substring(11, 16); 
                     }
+                    timeEl.innerText = realTimeStr;
 
-                    // Extraer hora para mostrar
-                    if(data.length > 0 && data[0].timestamp) {
-                         // Formato esperado: "YYYY-MM-DD HH:MM..."
-                         timeEl.innerText = data[0].timestamp.substring(11, 16);
-                    } else {
-                         timeEl.innerText = "--:--";
+                    // 2. Lógica de UI según Tipo
+                    if (type === 'live') {
+                        fallbackData = data;
+                        statusEl.innerText = T.conn_live; // Traducido
+                        statusEl.style.color = "#22c55e"; dotEl.style.backgroundColor = "#22c55e"; dotEl.style.boxShadow = "0 0 6px #22c55e";
+                        
+                        // FIX HORA SLIDER: Usamos realTimeStr, no la hora del sistema
+                        sliderDisplay.innerHTML = `<span class="live-dot" style="background:#22c55e; box-shadow:0 0 6px #22c55e;"></span> <span style="color:#22c55e; font-weight:bold;">${T.live_label} ${realTimeStr}</span>`;
+                    } 
+                    else if (type === 'future') {
+                        statusEl.innerText = T.conn_fore; // Traducido
+                        statusEl.style.color = "#a855f7"; dotEl.style.backgroundColor = "#a855f7"; dotEl.style.boxShadow = "0 0 6px #a855f7";
+                        // Actualizamos también el slider por si acaso
+                        let label = selectedOpt.innerText.replace(T.future_label, "").replace("🔮", "").trim();
+                        sliderDisplay.innerHTML = `<span style="color:#a855f7; font-weight:bold;">${T.future_label}</span> <span style="color:#cbd5e1; font-family:'Roboto Mono'; font-size:11px;">${label}</span>`;
+                    } 
+                    else {
+                        statusEl.innerText = T.conn_hist; // Traducido
+                        statusEl.style.color = "#38bdf8"; dotEl.style.backgroundColor = "#38bdf8"; dotEl.style.boxShadow = "0 0 6px #38bdf8";
+                        let label = selectedOpt.innerText.replace(T.past_label, "").replace("⏪", "").trim();
+                        sliderDisplay.innerHTML = `<span style="color:#38bdf8; font-weight:bold;">${T.past_label}</span> <span style="color:#cbd5e1; font-family:'Roboto Mono'; font-size:11px;">${label}</span>`;
                     }
                     
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('main-content').style.display = 'block';
                     document.getElementById('main-content').style.opacity = '1';
-                    renderMap();
+                    
+                    renderMap(); // Redibujar mapa con textos traducidos
+                    updateLegendAndStats(); // Actualizar leyenda traducida
                 })
                 .catch(err => {
                     console.error("Error:", err);
-                    document.getElementById('loading').innerHTML = `<div style="color:#ef4444">Datos no disponibles<br>(${type})</div>`;
+                    document.getElementById('loading').innerHTML = `<div style="color:#ef4444">Sin datos (${type})</div>`;
                 });
         }
 
@@ -654,10 +654,11 @@
             if (geoLayer) map.removeLayer(geoLayer);
             
             const conf = CONFIG[currentMetric]; 
+            const T = I18N[currentLang]; // <--- NUEVO: Obtenemos traducciones
+            
             const RECT_SIZE = 0.005;
             const OVERLAP = 1.03;
             const rectangles = []; 
-            const vals = [];
 
             let dataKey = currentMetric;
             if (currentMetric === 'alt') dataKey = 'altitude'; 
@@ -667,27 +668,22 @@
                 let val = p[dataKey];
                 
                 if ((dataKey === 'altitude' || dataKey === 'building_vol') && (!val || val === 0)) {
-                    if (fallbackData && fallbackData[i]) {
-                        val = fallbackData[i][dataKey];
-                    }
+                    if (fallbackData && fallbackData[i]) { val = fallbackData[i][dataKey]; }
                 }
 
                 val = Number(val || 0);
-                vals.push(val);
-
                 const color = getColor(val, currentMetric);
-                // Aplicamos el OVERLAP para que los cuadros se encimen sutilmente y borren la rejilla
+                
+                // Configuración del Rectángulo
                 const bounds = [
                     [p.lat - (RECT_SIZE * OVERLAP), p.lon - (RECT_SIZE * OVERLAP)], 
                     [p.lat + (RECT_SIZE * OVERLAP), p.lon + (RECT_SIZE * OVERLAP)]
                 ];
                 const isStation = p.station ? true : false;
-                const strokeColor = isStation ? '#ffffff' : color;
-                const weight = isStation ? 2 : 0;
                 const fillOp = isStation ? 0.9 : 0.65;
                 const rect = L.rectangle(bounds, {
                         pane: 'gridPane',
-                        stroke: isStation,      // <--- SÚPER IMPORTANTE: False para la IA
+                        stroke: isStation,      
                         color: '#ffffff', 
                         weight: isStation ? 2 : 0, 
                         fillOpacity: fillOp, 
@@ -695,189 +691,115 @@
                         interactive: true
                     });
 
+                // Lógica de Textos y Colores
                 const riskColor = (p.risk === 'Alto' || p.risk === 'Muy Alto' || p.risk === 'Extremadamente Alto') ? '#ef4444' : (p.risk === 'Moderado' ? '#eab308' : '#22c55e');
-                // --- [INICIO NUEVA LÓGICA DE UBICACIÓN Y POBLACIÓN] ---
+                const fmtPob = (n) => { if (!n || n === 0) return ''; if (n >= 1000) return `👥 ${(n/1000).toFixed(1)}k`; return `👥 ${n}`; };
                 
-                // 1. Formateador de Población (4383 -> 4.4k)
-                const fmtPob = (n) => {
-                    if (!n || n === 0) return '';
-                    if (n >= 1000) return `👥 ${(n/1000).toFixed(1)}k`;
-                    return `👥 ${n}`;
-                };
-
-                // 2. Lógica de Título de Ubicación Inteligente
-                let loc_text = `📍 ${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`; // Default
+                let loc_text = `📍 ${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`;
+                if (p.col && p.col !== 'Zona Federal / Sin Colonia') { loc_text = `📍 ${p.col}, ${p.mun}`; } 
+                else if (p.mun && p.mun !== 'Valle de México' && p.mun !== 'ZMVM') { loc_text = `📍 ${p.mun}, ${p.edo || ''}`; }
                 
-                if (p.col && p.col !== 'Zona Federal / Sin Colonia') {
-                    // Caso Ideal: Tenemos Colonia
-                    loc_text = `📍 ${p.col}, ${p.mun}`;
-                } else if (p.mun && p.mun !== 'Valle de México' && p.mun !== 'ZMVM') {
-                    // Caso Respaldo: Solo Municipio
-                    loc_text = `📍 ${p.mun}, ${p.edo || ''}`;
-                }
-
-                // 3. Cadena de Población
-                const pob_text = fmtPob(p.pob);
-                // --- [FIN LÓGICA] ---
+                // Traducción de "habitantes"
+                const pob_text = p.pob ? `${fmtPob(p.pob)} ${T.popup.inhabitants}` : ''; 
                 
-                // --- [INICIO FUSIÓN: DISEÑO ORIGINAL + FUENTES] ---
                 let bVol = Number(p.building_vol || 0);
                 let altVal = Number(p.altitude || 0);
-                // Fallback para datos faltantes en malla
                 if (bVol === 0 && fallbackData && fallbackData[i]) bVol = Number(fallbackData[i].building_vol || 0);
                 if (altVal === 0 && fallbackData && fallbackData[i]) altVal = Number(fallbackData[i].altitude || 0);
 
+                // Traducción de "Estación"
                 let headerHTML = `<div style="font-size:10px; color:#64748b; text-align:right; margin-bottom:4px; font-weight:600;">🕒 ${p.timestamp || 'Live'}</div>`;
-                if (isStation) { headerHTML += `<div style="background:#38bdf8; color:#0f172a; padding:4px 8px; border-radius:4px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:12px;">📡 Estación: ${p.station}</div>`; }
+                if (isStation) { headerHTML += `<div style="background:#38bdf8; color:#0f172a; padding:4px 8px; border-radius:4px; margin-bottom:8px; text-align:center; font-weight:bold; font-size:12px;">📡 ${T.popup.station}: ${p.station}</div>`; }
 
-                // 1. LÓGICA DE FUENTES (NUEVO)
+                // Lógica de Fuentes
                 let sourcesObj = {};
                 try { if (p.sources) sourcesObj = JSON.parse(p.sources); } catch (e) {}
-
                 const fmtSrc = (pol) => {
                     let src = sourcesObj[pol];
-                    
-                    // Si no existe fuente, asumimos IA (sin agregar tiempo, para no ser redundantes)
                     if (!src) src = "IA";
-
-                    // TRUCO DE LIMPIEZA: Quitamos " 1h" o " 12h" del string
-                    // Ejemplo: "Oficial 12h" -> "Oficial"
                     let displayLabel = src.replace(" 1h", "").replace(" 12h", "").replace(" 8h", "");
-
                     const isIA = displayLabel.includes("IA");
                     const color = isIA ? '#94a3b8' : '#0ea5e9'; 
                     const weight = isIA ? '400' : '700';
-
-                    return `<span style="font-size:0.7em; color:${color}; margin-left:3px; font-weight:${weight}; display:inline-block; vertical-align:middle;">
-                                (${displayLabel})
-                            </span>`;
+                    return `<span style="font-size:0.7em; color:${color}; margin-left:3px; font-weight:${weight}; display:inline-block; vertical-align:middle;">(${displayLabel})</span>`;
                 };
 
-                // 4. POPUP ACTUALIZADO
+                // --- POPUP TRADUCIDO ---
                 rect.bindPopup(`
                     <div style="font-family:'Inter'; color:#334155; min-width: 195px;">
                         ${headerHTML}
-                        
                         <div style="margin-bottom:8px; border-bottom:1px solid #e2e8f0; padding-bottom:4px;">
-                            <div style="font-size:11px; font-weight:700; color:#3b82f6; margin-bottom:1px;">
-                                ${loc_text}
-                            </div>
-                            ${pob_text ? `<div style="font-size:10px; color:#64748b;">${pob_text} habitantes</div>` : ''}
+                            <div style="font-size:11px; font-weight:700; color:#3b82f6; margin-bottom:1px;">${loc_text}</div>
+                            ${pob_text ? `<div style="font-size:10px; color:#64748b;">${pob_text}</div>` : ''}
                         </div>
-                        
                         <div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:12px; align-items: center;">
+                            <span style="font-weight:600; color:#000;">🚦 ${T.btn_lbl.ias}:</span> <span style="font-weight:bold;">${Number(p.ias||0).toFixed(0)} pts</span>
+                            <span style="font-weight:600; color:#000;">☢️ ${T.popup.risk}:</span> <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
                             
-                            <span style="font-weight:600; color:#000;">🚦 IAS:</span> 
-                            <span style="font-weight:bold;">${Number(p.ias||0).toFixed(0)} pts</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">${T.btn_lbl.o3} <span style="font-size:9px; color:#64748b;">(1h)</span>${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> 
+                            <span style="white-space:nowrap;">${Number(p.o3||0).toFixed(1)} ppb ${fmtSrc('o3')}</span>
                             
-                            <span style="font-weight:600; color:#000;">☢️ Riesgo:</span> 
-                            <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">${T.btn_lbl.pm10} <span style="font-size:9px; color:#64748b;">(12h)</span>${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> 
+                            <span style="white-space:nowrap;">${Number(p.pm10||0).toFixed(1)} µg ${fmtSrc('pm10')}</span>
                             
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">
-                                🔴 O3 <span style="font-size:9px; color:#64748b;">(1h)</span>${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:
-                            </span> 
-                            <span style="white-space:nowrap;">
-                                ${Number(p.o3||0).toFixed(1)} ppb ${fmtSrc('o3')}
-                            </span>
-                            
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">
-                                🟤 PM10 <span style="font-size:9px; color:#64748b;">(12h)</span>${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:
-                            </span> 
-                            <span style="white-space:nowrap;">
-                                ${Number(p.pm10||0).toFixed(1)} µg ${fmtSrc('pm10')}
-                            </span>
-                            
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">
-                                🟣 PM2.5 <span style="font-size:9px; color:#64748b;">(12h)</span>${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:
-                            </span> 
-                            <span style="white-space:nowrap;">
-                                ${Number(p.pm25||0).toFixed(1)} µg ${fmtSrc('pm25')}
-                            </span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">${T.btn_lbl.pm25} <span style="font-size:9px; color:#64748b;">(12h)</span>${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> 
+                            <span style="white-space:nowrap;">${Number(p.pm25||0).toFixed(1)} µg ${fmtSrc('pm25')}</span>
 
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">
-                                🔵 CO <span style="font-size:9px; color:#64748b;">(8h)</span>:
-                            </span> 
-                            <span style="white-space:nowrap;">
-                                ${Number(p.co||0).toFixed(2)} ppm ${fmtSrc('co')}
-                            </span>
-
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">
-                                🟡 SO2 <span style="font-size:9px; color:#64748b;">(1h)</span>:
-                            </span>
-                            
-                            <span style="white-space:nowrap;">
-                                ${Number(p.so2||0).toFixed(1)} ppb ${fmtSrc('so2')}
-                            </span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">${T.btn_lbl.co}:</span> <span>${Number(p.co||0).toFixed(2)} ppm ${fmtSrc('co')}</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">${T.btn_lbl.so2}:</span> <span>${Number(p.so2||0).toFixed(1)} ppb ${fmtSrc('so2')}</span>
 
                             <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:4px 0;">
                             
-                            <span style="color:#475569;">🏙️ Vol:</span> 
-                            <span>${(bVol/1000).toFixed(0)}k m³</span>
-
-                            <span style="color:#475569;">🌡️ Temp:</span> 
-                            <span style="white-space:nowrap;">
-                                ${Number(p.tmp||0).toFixed(1)} °C ${fmtSrc('tmp')}
-                            </span>
-
-                            <span style="color:#475569;">💧 Hum:</span> 
-                            <span style="white-space:nowrap;">
-                                ${Number(p.rh||0).toFixed(0)} % ${fmtSrc('rh')}
-                            </span>
-
-                            <span style="color:#475569;">💨 Viento:</span> 
-                            <span style="white-space:nowrap;">
-                                ${Number(p.wsp||0).toFixed(1)} m/s ${fmtSrc('wsp')}
-                            </span>
-
-                            <span style="color:#475569;">🧭 Dir:</span> 
-                            <span style="white-space:nowrap;">
-                                ${Number(p.wdr||0).toFixed(0)}° ${fmtSrc('wdr')}
-                            </span>
-
-                            <span style="color:#475569;">⛰️ Alt:</span> 
-                            <span>${altVal.toFixed(0)} m</span>
+                            <span style="color:#475569;">${T.btn_lbl.building_vol}:</span> <span>${(bVol/1000).toFixed(0)}k m³</span>
+                            <span style="color:#475569;">${T.btn_lbl.tmp}:</span> <span>${Number(p.tmp||0).toFixed(1)} °C ${fmtSrc('tmp')}</span>
+                            <span style="color:#475569;">${T.btn_lbl.rh}:</span> <span>${Number(p.rh||0).toFixed(0)} % ${fmtSrc('rh')}</span>
+                            <span style="color:#475569;">${T.btn_lbl.wsp}:</span> <span>${Number(p.wsp||0).toFixed(1)} m/s ${fmtSrc('wsp')}</span>
+                            <span style="color:#475569;">${T.btn_lbl.wdr}:</span> <span>${Number(p.wdr||0).toFixed(0)}° ${fmtSrc('wdr')}</span>
+                            <span style="color:#475569;">${T.btn_lbl.alt}:</span> <span>${altVal.toFixed(0)} m</span>
                         </div>
                     </div>
                 `);
-                // --- [FIN POPUP] ---
-                
-                // --- INICIO EFECTO FOCUS (HOVER) ---
+
+                // Interacción Hover
                 rect.on('mouseover', function() {
-                    this.setStyle({ 
-                        fillOpacity: 0.9,
-                        // Lógica: Si es estación, borde grueso (4). Si es grid normal, borde fino (1)
-                        weight: isStation ? 4 : 1, 
-                        // Color: Estación = blanco puro. Grid = blanco semi-transparente
-                        color: isStation ? '#ffffff' : 'rgba(255, 255, 255, 0.5)', 
-                        stroke: true 
-                    });
-                    
-                    // Truco vital: Traer el cuadro al frente para que el borde no lo tapen los vecinos
-                    if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-                        this.bringToFront();
-                    }
+                    this.setStyle({ fillOpacity: 0.9, weight: isStation ? 4 : 1, color: isStation ? '#ffffff' : 'rgba(255, 255, 255, 0.5)', stroke: true });
+                    if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) { this.bringToFront(); }
                 });
 
                 rect.on('mouseout', function() {
-                    this.setStyle({ 
-                        fillOpacity: fillOp,
-                        // Restauramos estado original:
-                        // Estación = borde 2. Grid = borde 0 (invisible)
-                        weight: isStation ? 2 : 0,
-                        stroke: isStation,
-                        color: '#ffffff'
-                    });
+                    this.setStyle({ fillOpacity: fillOp, weight: isStation ? 2 : 0, stroke: isStation, color: '#ffffff' });
                 });
-                // --- FIN EFECTO FOCUS ---
                 rectangles.push(rect);
             }
             geoLayer = L.layerGroup(rectangles).addTo(map);
-            if (vals.length > 0) updateLegend(conf, Math.min(...vals), Math.max(...vals), vals.reduce((a,b)=>a+b,0)/vals.length);
+            
+            // <--- LLAMADA FINAL A LA NUEVA FUNCIÓN DE LEYENDA
+            updateLegendAndStats(); 
         }
 
-        function updateLegend(conf, min, max, avg) {
-            document.getElementById('legend-name').innerText = conf.name;
+        function updateLegendAndStats() {
+            if (!globalData || globalData.length === 0) return;
+            
+            const conf = CONFIG[currentMetric];
+            const T = I18N[currentLang];
+            
+            // Calcular estadísticas
+            let vals = [];
+            let dataKey = currentMetric === 'alt' ? 'altitude' : currentMetric;
+            for(let i=0; i < globalData.length; i++) {
+                let v = globalData[i][dataKey];
+                if((!v || v===0) && fallbackData && fallbackData[i]) v = fallbackData[i][dataKey];
+                vals.push(Number(v||0));
+            }
+            const min = Math.min(...vals);
+            const max = Math.max(...vals);
+            const avg = vals.reduce((a,b)=>a+b,0)/vals.length;
+
+            // 1. Traducir Título Leyenda (Usamos el nombre largo del diccionario)
+            document.getElementById('legend-name').innerText = T.buttons[currentMetric]; 
             document.getElementById('legend-unit').innerText = conf.unit;
+
+            // 2. Renderizar Barra Color
             let gradStr = 'linear-gradient(to right';
             for(let i=0; i<conf.stops.length; i++) {
                 let pct = ((conf.stops[i] - conf.min) / (conf.max - conf.min)) * 100;
@@ -886,6 +808,13 @@
             gradStr += ')';
             document.getElementById('color-bar').style.background = gradStr;
             document.getElementById('legend-ticks').innerHTML = conf.stops.map(s => `<span>${s}</span>`).join('');
+
+            // 3. Traducir Etiquetas de Estadísticas (Mínimo / Promedio / Máximo)
+            document.querySelector('#stat-min + .stat-lbl').innerText = T.stats.min;
+            document.querySelector('#stat-avg + .stat-lbl').innerText = T.stats.avg;
+            document.querySelector('#stat-max + .stat-lbl').innerText = T.stats.max;
+
+            // 4. Poner valores
             document.getElementById('stat-min').innerText = min.toFixed(1);
             document.getElementById('stat-max').innerText = max.toFixed(1);
             document.getElementById('stat-avg').innerText = avg.toFixed(1);
