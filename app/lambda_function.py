@@ -7,6 +7,7 @@ import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
+from scipy.spatial import cKDTree
 
 # --- 1. CONFIGURACIÓN Y RUTAS ---
 BASE_PATH = os.environ.get('LAMBDA_TASK_ROOT', '/var/task')
@@ -90,11 +91,12 @@ def inverse_distance_weighting(x, y, z, xi, yi):
 
 def prepare_grid_features(stations_df):
     """
-    Carga malla valle, edificios (con Fix Alias) y colonias.
+    Carga malla y cruza datos usando VECINO MÁS CERCANO (Spatial Join).
+    Esto soluciona el problema de coordenadas que no coinciden exactamente.
     """
-    print("🏗️ Preparando Grid Features (Alias Strategy)...")
+    print("🏗️ Preparando Grid Features (Spatial KDTree Strategy)...")
     
-    # 1. Cargar Malla Valle (Geometría Base)
+    # 1. Cargar Malla Valle (Target)
     MALLA_PATH = f"{BASE_PATH}/app/geograficos/malla_valle_mexico_final.geojson"
     with open(MALLA_PATH, 'r') as f:
         malla_data = json.load(f)
@@ -103,65 +105,61 @@ def prepare_grid_features(stations_df):
     for feature in malla_data['features']:
         coords = feature['geometry']['coordinates']
         malla_list.append({
-            'lon': round(coords[0], 5),
-            'lat': round(coords[1], 5),
+            'lon': coords[0],
+            'lat': coords[1],
             'altitude': feature['properties'].get('elevation', 2240)
         })
     grid_df = pd.DataFrame(malla_list)
     
-    # 2. Cargar Colonias
+    # 2. Cargar Bases de Datos (Sources)
+    # A) Colonias
     COLONIAS_PATH = f"{BASE_PATH}/app/geograficos/grid_colonias_db.json"
     try:
         with open(COLONIAS_PATH, 'r') as f:
-            colonias_data = json.load(f)
-        cols_df = pd.DataFrame(colonias_data)
-    except Exception as e:
-        print(f"⚠️ Error cargando grid_colonias_db.json: {e}")
-        cols_df = pd.DataFrame(columns=['lat', 'lon', 'col', 'mun', 'edo', 'pob'])
+            cols_df = pd.DataFrame(json.load(f))
+    except:
+        cols_df = pd.DataFrame()
 
-    # 3. Cargar Edificios (FIX: ALIAS STRATEGY)
-    # Renombramos la columna antes del merge para evitar conflictos silenciosos
-    with open(f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json", 'r') as f:
-        edificios_df = pd.DataFrame(json.load(f))
+    # B) Edificios
+    EDIFICIOS_PATH = f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json"
+    try:
+        with open(EDIFICIOS_PATH, 'r') as f:
+            edificios_df = pd.DataFrame(json.load(f))
+    except:
+        edificios_df = pd.DataFrame()
+
+    # --- FUNCIÓN DE MERGE ESPACIAL (EL FIX REAL) ---
+    def spatial_merge(target, source, cols_to_merge):
+        if source.empty:
+            for c in cols_to_merge: target[c] = 0 if c == 'building_vol' else None
+            return
+
+        # Creamos el árbol espacial con las coordenadas de la FUENTE
+        tree = cKDTree(source[['lat', 'lon']].values)
         
-        # --- EL TRUCO DEL ALIAS ---
-        if 'building_vol' in edificios_df.columns:
-            edificios_df.rename(columns={'building_vol': 'vol_alias'}, inplace=True)
+        # Buscamos el vecino más cercano para cada punto del TARGET (Malla)
+        # k=1 significa "el único más cercano"
+        dists, idxs = tree.query(target[['lat', 'lon']].values, k=1)
         
-    # --- FUSIÓN (MERGE) ESTRATÉGICA ---
-    # Llaves de 5 decimales
-    grid_df['lat_key'] = grid_df['lat'].round(5)
-    grid_df['lon_key'] = grid_df['lon'].round(5)
-    
-    cols_df['lat_key'] = cols_df['lat'].round(5)
-    cols_df['lon_key'] = cols_df['lon'].round(5)
-    
-    edificios_df['lat_key'] = edificios_df['lat'].round(5)
-    edificios_df['lon_key'] = edificios_df['lon'].round(5)
+        # Asignamos valores
+        for c in cols_to_merge:
+            if c in source.columns:
+                target[c] = source.iloc[idxs][c].values
 
-    # A) Pegar Colonias
-    grid_df = pd.merge(grid_df, cols_df[['lat_key', 'lon_key', 'col', 'mun', 'edo', 'pob']], 
-                       on=['lat_key', 'lon_key'], how='left')
-                        
-    # B) Pegar Edificios (Usando el Alias 'vol_alias')
-    grid_df = pd.merge(grid_df, edificios_df[['lat_key', 'lon_key', 'vol_alias']], 
-                       on=['lat_key', 'lon_key'], how='left')
+    # 3. Ejecutar Cruces Espaciales
+    # Cruzar Colonias
+    spatial_merge(grid_df, cols_df, ['col', 'mun', 'edo', 'pob'])
+    
+    # Cruzar Edificios (Asegura que building_vol pase aunque las coords varien milímetros)
+    spatial_merge(grid_df, edificios_df, ['building_vol'])
 
-    # --- LIMPIEZA FINAL ---
-    grid_df.drop(columns=['lat_key', 'lon_key'], inplace=True)
-    
-    # Restaurar nombre oficial y limpiar nulos
-    # Aquí aseguramos que los datos pasen de vol_alias a building_vol
-    grid_df['building_vol'] = grid_df['vol_alias'].fillna(0)
-    grid_df.drop(columns=['vol_alias'], inplace=True) # Borrar el alias temporal
-    
-    # Rellenar vacíos administrativos
+    # 4. Limpieza y Defaults
     grid_df['col'] = grid_df['col'].fillna("Zona Federal / Sin Colonia")
     grid_df['mun'] = grid_df['mun'].fillna("Valle de México")
-    grid_df['edo'] = grid_df['edo'].fillna(np.nan)
     grid_df['pob'] = grid_df['pob'].fillna(0).astype(int)
+    grid_df['building_vol'] = grid_df['building_vol'].fillna(0)
 
-    # 4. Variables Temporales e Interpolación
+    # 5. Variables Temporales
     tz = ZoneInfo("America/Mexico_City")
     now = datetime.now(tz)
     grid_df['hour_sin'] = np.sin(2 * np.pi * now.hour / 24)
@@ -169,6 +167,7 @@ def prepare_grid_features(stations_df):
     grid_df['month_sin'] = np.sin(2 * np.pi * now.month / 12)
     grid_df['month_cos'] = np.cos(2 * np.pi * now.month / 12)
 
+    # 6. Interpolación de Clima (IDW)
     features_to_interp = [('tmp', 20.0), ('rh', 40.0), ('wsp', 1.0), ('wdr', 90.0)]
     for feat, default in features_to_interp:
         valid = stations_df.dropna(subset=[feat])
@@ -181,9 +180,8 @@ def prepare_grid_features(stations_df):
     
     grid_df['station_numeric'] = -1
     
-    # Diagnóstico rápido en logs (para confirmar que funcionó)
-    max_vol = grid_df['building_vol'].max()
-    print(f"✅ Grid Features Listo. Max Vol Edificios detectado: {max_vol}")
+    # Debug en Logs
+    print(f"✅ Spatial Merge Completado. Max Vol: {grid_df['building_vol'].max()}")
     
     return grid_df
 
