@@ -90,8 +90,10 @@ def inverse_distance_weighting(x, y, z, xi, yi):
 
 def prepare_grid_features(stations_df):
     """
-    Carga malla valle, edificios y la NUEVA base de colonias pre-calculada.
+    Carga malla valle, edificios (con Fix Alias) y colonias.
     """
+    print("🏗️ Preparando Grid Features (Alias Strategy)...")
+    
     # 1. Cargar Malla Valle (Geometría Base)
     MALLA_PATH = f"{BASE_PATH}/app/geograficos/malla_valle_mexico_final.geojson"
     with open(MALLA_PATH, 'r') as f:
@@ -107,8 +109,7 @@ def prepare_grid_features(stations_df):
         })
     grid_df = pd.DataFrame(malla_list)
     
-    # --- INICIO INTEGRACIÓN COLONIAS (NUEVO) ---
-    # 2. Cargar Base de Datos de Colonias (Generada en Colab)
+    # 2. Cargar Colonias
     COLONIAS_PATH = f"{BASE_PATH}/app/geograficos/grid_colonias_db.json"
     try:
         with open(COLONIAS_PATH, 'r') as f:
@@ -116,15 +117,19 @@ def prepare_grid_features(stations_df):
         cols_df = pd.DataFrame(colonias_data)
     except Exception as e:
         print(f"⚠️ Error cargando grid_colonias_db.json: {e}")
-        # Fallback de emergencia vacío
         cols_df = pd.DataFrame(columns=['lat', 'lon', 'col', 'mun', 'edo', 'pob'])
 
-    # 3. Cargar Edificios
+    # 3. Cargar Edificios (FIX: ALIAS STRATEGY)
+    # Renombramos la columna antes del merge para evitar conflictos silenciosos
     with open(f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json", 'r') as f:
         edificios_df = pd.DataFrame(json.load(f))
         
+        # --- EL TRUCO DEL ALIAS ---
+        if 'building_vol' in edificios_df.columns:
+            edificios_df.rename(columns={'building_vol': 'vol_alias'}, inplace=True)
+        
     # --- FUSIÓN (MERGE) ESTRATÉGICA ---
-    # Usamos llaves de 5 decimales para asegurar coincidencia perfecta
+    # Llaves de 5 decimales
     grid_df['lat_key'] = grid_df['lat'].round(5)
     grid_df['lon_key'] = grid_df['lon'].round(5)
     
@@ -134,26 +139,29 @@ def prepare_grid_features(stations_df):
     edificios_df['lat_key'] = edificios_df['lat'].round(5)
     edificios_df['lon_key'] = edificios_df['lon'].round(5)
 
-    # A) Pegar Colonias + Municipios + Población
+    # A) Pegar Colonias
     grid_df = pd.merge(grid_df, cols_df[['lat_key', 'lon_key', 'col', 'mun', 'edo', 'pob']], 
                        on=['lat_key', 'lon_key'], how='left')
-                       
-    # B) Pegar Edificios
-    grid_df = pd.merge(grid_df, edificios_df[['lat_key', 'lon_key', 'building_vol']], 
+                        
+    # B) Pegar Edificios (Usando el Alias 'vol_alias')
+    grid_df = pd.merge(grid_df, edificios_df[['lat_key', 'lon_key', 'vol_alias']], 
                        on=['lat_key', 'lon_key'], how='left')
 
     # --- LIMPIEZA FINAL ---
     grid_df.drop(columns=['lat_key', 'lon_key'], inplace=True)
     
-    # Rellenar vacíos para seguridad
+    # Restaurar nombre oficial y limpiar nulos
+    # Aquí aseguramos que los datos pasen de vol_alias a building_vol
+    grid_df['building_vol'] = grid_df['vol_alias'].fillna(0)
+    grid_df.drop(columns=['vol_alias'], inplace=True) # Borrar el alias temporal
+    
+    # Rellenar vacíos administrativos
     grid_df['col'] = grid_df['col'].fillna("Zona Federal / Sin Colonia")
     grid_df['mun'] = grid_df['mun'].fillna("Valle de México")
-    grid_df['edo'] = grid_df['edo'].fillna(np.nan) # Dejar como NaN para que to_json lo haga null
+    grid_df['edo'] = grid_df['edo'].fillna(np.nan)
     grid_df['pob'] = grid_df['pob'].fillna(0).astype(int)
-    grid_df['building_vol'] = grid_df['building_vol'].fillna(0)
-    # --- FIN INTEGRACIÓN ---
 
-    # 4. Variables Temporales e Interpolación (Se mantiene igual)
+    # 4. Variables Temporales e Interpolación
     tz = ZoneInfo("America/Mexico_City")
     now = datetime.now(tz)
     grid_df['hour_sin'] = np.sin(2 * np.pi * now.hour / 24)
@@ -172,6 +180,11 @@ def prepare_grid_features(stations_df):
         else: grid_df[feat] = default
     
     grid_df['station_numeric'] = -1
+    
+    # Diagnóstico rápido en logs (para confirmar que funcionó)
+    max_vol = grid_df['building_vol'].max()
+    print(f"✅ Grid Features Listo. Max Vol Edificios detectado: {max_vol}")
+    
     return grid_df
 
 # --- [ANCLA HELPERS: AGREGAR ANTES DE LAMBDA_HANDLER] ---
