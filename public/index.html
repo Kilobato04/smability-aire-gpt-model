@@ -295,100 +295,133 @@
             const select = document.getElementById('time-select');
             select.innerHTML = ''; 
             
-            // OPCIÓN 0: AHORA (Base)
-            // Mantenemos 'latest' para ver lo que está pasando en este momento
-            const optLatest = document.createElement('option');
-            optLatest.value = 'latest'; 
-            optLatest.innerText = "🔴 Ahora (En Vivo)";
-            select.appendChild(optLatest);
-
-            // OPCIONES 1-24: PRONÓSTICO (Futuro)
             const now = new Date();
+            const options = [];
+
+            // --- A. PASADO (-24 horas) ---
+            // El histórico se suele guardar al minuto 20 (según tu live-grid)
+            let pastStart = new Date(now);
+            pastStart.setMinutes(20); pastStart.setSeconds(0);
             
-            // Lógica: Empezar desde la siguiente hora en punto
-            // Si son 12:30, el primer forecast es 13:00
-            let start = new Date(now);
-            start.setMinutes(0); 
-            start.setSeconds(0);
-            start.setMilliseconds(0);
-            start.setHours(start.getHours() + 1); // +1 hora al futuro
+            for (let i = 24; i > 0; i--) {
+                const d = new Date(pastStart.getTime() - (i * 60 * 60 * 1000));
+                const val = formatDate(d, '20'); // Forzamos minuto 20 para archivos históricos
+                const label = `⏪ -${i}h (${formatLabel(d)})`;
+                options.push({ val, label, type: 'past' });
+            }
+
+            // --- B. PRESENTE (En Vivo) ---
+            options.push({ val: 'latest', label: "🔴 AHORA (En Vivo)", type: 'live' });
+
+            // --- C. FUTURO (+24 horas) ---
+            // El forecast arranca la siguiente hora en punto (minuto 00)
+            let futureStart = new Date(now);
+            futureStart.setMinutes(0); futureStart.setSeconds(0);
+            futureStart.setHours(futureStart.getHours() + 1);
 
             for (let i = 0; i < 24; i++) {
-                // Sumamos horas (Futuro)
-                const d = new Date(start.getTime() + (i * 60 * 60 * 1000));
-                
-                const year = d.getFullYear(); 
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0'); 
-                const hour = String(d.getHours()).padStart(2, '0');
-                
-                // IMPORTANTE: El Forecast siempre genera archivos al minuto 00
-                const min = "00"; 
-                
-                // Formato de archivo que busca la API: YYYY-MM-DD_HH-00
-                const val = `${year}-${month}-${day}_${hour}-${min}`;
-                
-                // Etiqueta bonita para el usuario
-                const label = `🔮 +${i+1}h (${day}/${month} ${hour}:${min})`;
-                
-                const opt = document.createElement('option');
-                opt.value = val; 
-                opt.innerText = label;
-                select.appendChild(opt);
+                const d = new Date(futureStart.getTime() + (i * 60 * 60 * 1000));
+                const val = formatDate(d, '00'); // Forzamos minuto 00 para forecast
+                const label = `🔮 +${i+1}h (${formatLabel(d)})`;
+                options.push({ val, label, type: 'future' });
             }
+
+            // --- RENDERIZAR OPCIONES EN EL HTML ---
+            options.forEach((opt, index) => {
+                const el = document.createElement('option');
+                el.value = opt.val;
+                el.innerText = opt.label;
+                
+                // Guardamos metadatos vitales para el slider
+                el.dataset.type = opt.type; 
+                el.dataset.index = index;   
+                
+                // Seleccionar por defecto el "En Vivo"
+                if(opt.type === 'live') el.selected = true;
+                
+                select.appendChild(el);
+            });
+            
+            // --- AJUSTAR EL SLIDER AL NUEVO TAMAÑO ---
+            const slider = document.getElementById('time-slider');
+            // El máximo ahora es el total de opciones (aprox 49 items)
+            slider.max = options.length - 1;
+            // Ponemos el slider en la posición del "latest" (que está en medio, índice 24)
+            slider.value = 24; 
         }
 
-        // --- VINCULACIÓN DEL SLIDER (MODO FUTURO) ---
+        // --- FUNCIONES AUXILIARES DE FORMATO ---
+        function formatDate(d, forceMin) {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const hour = String(d.getHours()).padStart(2, '0');
+            return `${year}-${month}-${day}_${hour}-${forceMin}`;
+        }
+
+        function formatLabel(d) {
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const hour = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            return `${day}/${month} ${hour}:${min}`;
+        }
+
+        // --- VINCULACIÓN DEL SLIDER MAESTRO (PASADO-PRESENTE-FUTURO) ---
         const timeSlider = document.getElementById('time-slider');
         const timeDisplay = document.getElementById('time-display');
         const timeSelect = document.getElementById('time-select');
         
-        // El slider empieza en 0 (Ahora)
-        timeSlider.value = 0; 
-        
+        // Evento Input (Arrastrar el slider)
         timeSlider.addEventListener('input', (e) => {
-            const val = parseInt(e.target.value);
+            const index = parseInt(e.target.value);
             const options = timeSelect.options;
             
-            // Lógica Directa: 0 = Ahora, 1 = +1h, etc.
-            const index = val; 
-            
             if (options[index]) {
-                const selectedOption = options[index];
                 timeSelect.selectedIndex = index;
-                timeDisplay.innerText = selectedOption.text;
+                const opt = options[index];
                 
-                // Si es 0, mostramos indicador visual
-                if (val === 0) {
-                    timeDisplay.innerHTML = `<span class="live-dot"></span> AHORA`;
+                // Leemos el tipo de dato que guardamos en el Paso 1
+                const type = opt.dataset.type;
+                
+                // Feedback visual inmediato en el slider label
+                if (type === 'live') {
+                    timeDisplay.innerHTML = `<span class="live-dot" style="background:#22c55e; box-shadow:0 0 6px #22c55e;"></span> AHORA`;
+                } else if (type === 'future') {
+                    timeDisplay.innerHTML = `<span style="color:#a855f7;">🔮 FUTURO</span>`;
+                } else {
+                    timeDisplay.innerHTML = `<span style="color:#38bdf8;">⏪ PASADO</span>`;
                 }
                 
-                loadMapData(selectedOption.value);
+                // Cargar datos
+                loadMapData(opt.value);
             }
         });
-        
-        // --- LÓGICA PLAY/PAUSE (HACIA EL FUTURO) ---
+
+        // --- LÓGICA DE REPRODUCCIÓN CONTINUA (VIDEO TOTAL) ---
         let isPlaying = false;
         let playInterval;
-        
+
         document.getElementById('play-btn').addEventListener('click', function() {
             const sidebar = document.getElementById('sidebar');
             if (sidebar && !sidebar.classList.contains('collapsed')) sidebar.classList.add('collapsed');
-        
+
             isPlaying = !isPlaying;
             this.innerText = isPlaying ? "⏸" : "▶";
-            
+
             if (isPlaying) {
-                // Si estamos al final (24), rebobinamos al principio (0)
-                if (parseInt(timeSlider.value) >= 24) {
+                // Si estamos al final de la línea de tiempo, rebobinamos al inicio del PASADO (0)
+                // Usamos .max para que sea dinámico (48 horas aprox)
+                if (parseInt(timeSlider.value) >= parseInt(timeSlider.max)) {
                     timeSlider.value = 0;
                     timeSlider.dispatchEvent(new Event('input'));
                 }
-        
+
                 playInterval = setInterval(() => {
                     let nextVal = parseInt(timeSlider.value) + 1;
                     
-                    if (nextVal > 24) { // Fin del ciclo
+                    // Verificamos contra el máximo dinámico del slider
+                    if (nextVal > parseInt(timeSlider.max)) {
                         clearInterval(playInterval);
                         isPlaying = false;
                         this.innerText = "▶";
@@ -396,7 +429,7 @@
                         timeSlider.value = nextVal;
                         timeSlider.dispatchEvent(new Event('input'));
                     }
-                }, 2000); // 2 segundos por cuadro
+                }, 1500); // 1.5 segundos por cuadro
             } else {
                 clearInterval(playInterval);
             }
@@ -406,62 +439,73 @@
         function loadMapData(forceTimestamp = null) {
             const select = document.getElementById('time-select');
             const timestampKey = forceTimestamp || select.value;
+            
+            // Detectar tipo mirando el Dropdown (usamos el dataset que guardamos en el Paso 1)
+            const selectedOpt = select.options[select.selectedIndex];
+            const type = selectedOpt ? selectedOpt.dataset.type : 'live';
 
             document.getElementById('loading').style.display = 'flex';
             document.getElementById('main-content').style.opacity = '0.3';
             
-            // --- LÓGICA DE ENDPOINT HÍBRIDA ---
+            // --- SELECTOR DE API ---
             let url = BASE_API_URL;
             
-            if (timestampKey === 'latest') {
-                // Para "Ahora", usamos el modo mapa normal (Live Grid)
-                url += "?mode=map"; 
+            if (type === 'future') {
+                // API FORECAST (Futuro)
+                url += `?mode=forecast_data&timestamp=${timestampKey}`;
+            } else if (type === 'past') {
+                // API HISTÓRICA (Pasado) - Usamos mode=map con timestamp específico
+                url += `?mode=map&timestamp=${timestampKey}`;
             } else {
-                // Para "Futuro", usamos el modo forecast (Forecast Grid)
-                url += "?mode=forecast_data&timestamp=" + timestampKey;
+                // API LIVE (Presente)
+                url += `?mode=map`;
             }
-            // Cache buster
-            url += `&_t=${Date.now()}`;
+            
+            url += `&_t=${Date.now()}`; // Cache buster
 
             fetch(url)
                 .then(response => { if(!response.ok) throw new Error("Datos no encontrados"); return response.json(); })
                 .then(data => {
-                    // --- MAPPING DE VARIABLES ---
+                    // --- MAPPING DE VARIABLES (Forecast usa nombres largos, Live usa cortos) ---
                     data.forEach(p => {
-                        // Priorizamos los nombres largos que vienen del Forecast
                         p.o3 = p['o3 1h'] || p.o3;
                         p.pm10 = p['pm10 12h'] || p.pm10;
                         p.pm25 = p['pm25 12h'] || p.pm25;
                         p.co = p['co 8h'] || p.co;
                         p.so2 = p['so2 1h'] || p.so2;
-                        // Nota: building_vol ya viene directo, no necesita mapping
                     });
 
                     globalData = data;
-                    if (timestampKey === 'latest') {
-                        fallbackData = data; 
-                        
-                        // UI para EN VIVO
-                        document.getElementById('connection-status').innerText = "EN VIVO";
-                        document.getElementById('connection-status').style.color = "#22c55e";
-                        document.getElementById('dot-indicator').style.backgroundColor = "#22c55e";
-                        document.getElementById('dot-indicator').style.boxShadow = "0 0 6px #22c55e";
-                        
-                        if(data.length > 0 && data[0].timestamp) {
-                            // Extraer hora HH:MM
-                             document.getElementById('update-time').innerText = data[0].timestamp.substring(11, 16);
-                        }
+                    
+                    // --- ACTUALIZAR UI SEGÚN TIPO ---
+                    const statusEl = document.getElementById('connection-status');
+                    const dotEl = document.getElementById('dot-indicator');
+                    const timeEl = document.getElementById('update-time');
+
+                    if (type === 'live') {
+                        fallbackData = data; // Guardamos respaldo
+                        statusEl.innerText = "EN VIVO";
+                        statusEl.style.color = "#22c55e"; // Verde
+                        dotEl.style.backgroundColor = "#22c55e";
+                        dotEl.style.boxShadow = "0 0 6px #22c55e";
+                    } else if (type === 'future') {
+                        statusEl.innerText = "PRONÓSTICO";
+                        statusEl.style.color = "#a855f7"; // Púrpura
+                        dotEl.style.backgroundColor = "#a855f7";
+                        dotEl.style.boxShadow = "0 0 6px #a855f7";
                     } else {
-                        // UI para PRONÓSTICO
-                        document.getElementById('connection-status').innerText = "PRONÓSTICO";
-                        // Color Morado Futuro
-                        document.getElementById('connection-status').style.color = "#a855f7"; 
-                        document.getElementById('dot-indicator').style.backgroundColor = "#a855f7";
-                        document.getElementById('dot-indicator').style.boxShadow = "0 0 6px #a855f7";
-                        
-                        if(data.length > 0 && data[0].timestamp) {
-                             document.getElementById('update-time').innerText = data[0].timestamp.substring(11, 16);
-                        }
+                        statusEl.innerText = "HISTÓRICO";
+                        statusEl.style.color = "#38bdf8"; // Azul
+                        dotEl.style.backgroundColor = "#38bdf8";
+                        dotEl.style.boxShadow = "0 0 6px #38bdf8";
+                    }
+
+                    // Extraer hora para mostrar
+                    if(data.length > 0 && data[0].timestamp) {
+                         // Formato esperado: "YYYY-MM-DD HH:MM..."
+                         timeEl.innerText = data[0].timestamp.substring(11, 16);
+                    } else {
+                         timeEl.innerText = "--:--";
                     }
                     
                     document.getElementById('loading').style.display = 'none';
@@ -470,8 +514,8 @@
                     renderMap();
                 })
                 .catch(err => {
-                    console.error("Error carga:", err);
-                    document.getElementById('loading').innerHTML = `<div style="color:#ef4444">Sin pronóstico disponible<br>para esta hora.</div>`;
+                    console.error("Error:", err);
+                    document.getElementById('loading').innerHTML = `<div style="color:#ef4444">Datos no disponibles<br>(${type})</div>`;
                 });
         }
 
