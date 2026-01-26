@@ -556,7 +556,19 @@
                 });
         }
 
-        function changeTime() { loadMapData(); }
+        function changeTime() {
+            const select = document.getElementById('time-select');
+            const slider = document.getElementById('time-slider');
+
+            // 1. Mover el punto del Slider a la opción seleccionada
+            slider.value = select.selectedIndex;
+
+            // 2. Disparar manualmente el evento 'input' del Slider
+            // Esto es un truco muy limpio: obliga al slider a ejecutar su lógica,
+            // lo cual actualizará el texto (timeDisplay), los colores (Pasado/Futuro)
+            // y llamará a loadMapData() automáticamente.
+            slider.dispatchEvent(new Event('input'));
+        }
         function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
 
         function getColor(val, metric) {
