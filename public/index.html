@@ -26,6 +26,14 @@
         .header { padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: linear-gradient(to right, rgba(56,189,248,0.1), transparent); display: flex; justify-content: space-between; align-items: center; }
         .title-group h1 { margin: 0; font-size: 18px; font-weight: 600; color: #38bdf8; letter-spacing: -0.5px; }
         .title-group .subtitle { font-size: 11px; color: #94a3b8; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px; }
+        /* Estilo para el Toggle de Idioma */
+        .lang-toggle {
+            font-size: 10px; color: #64748b; font-weight: 600; 
+            margin-top: 4px; cursor: pointer; letter-spacing: 1px;
+        }
+        .lang-opt { transition: color 0.2s; }
+        .lang-opt:hover { color: #fff; }
+        .lang-opt.active { color: #38bdf8; text-decoration: underline; }
         .toggle-btn { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; padding: 5px; outline: none; }
 
         .time-controls { padding: 12px 20px; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.05); }
@@ -129,16 +137,16 @@
             <div class="title-group">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <h1 style="margin:0; font-size:18px; font-weight:600; color:#38bdf8; letter-spacing:-0.5px;">AireGPT</h1>
-                    
-                    <a href="https://t.me/airegptcdmx_bot" target="_blank" title="Abrir Bot en Telegram" style="display:flex; align-items:center; justify-content:center; background:#229ED9; width:24px; height:24px; border-radius:50%; text-decoration:none; transition: transform 0.2s;">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M20.665 3.717L2.33 10.793C1.08 11.295 1.085 11.993 2.103 12.305L6.8 13.775L17.68 6.905C18.195 6.593 18.665 6.763 18.28 7.105L9.47 15.055L9.46 15.058L9.135 19.95C9.615 19.95 9.825 19.73 10.095 19.47L12.485 17.145L17.455 20.815C18.37 21.32 19.03 21.06 19.255 19.965L22.525 4.57C22.86 3.23 22.015 2.62 20.665 3.717Z" fill="white"/>
-                        </svg>
+                    <a href="https://t.me/airegptcdmx_bot" target="_blank" title="Telegram Bot" style="display:flex; align-items:center; justify-content:center; background:#229ED9; width:24px; height:24px; border-radius:50%; text-decoration:none;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20.665 3.717L2.33 10.793C1.08 11.295 1.085 11.993 2.103 12.305L6.8 13.775L17.68 6.905C18.195 6.593 18.665 6.763 18.28 7.105L9.47 15.055L9.46 15.058L9.135 19.95C9.615 19.95 9.825 19.73 10.095 19.47L12.485 17.145L17.455 20.815C18.37 21.32 19.03 21.06 19.255 19.965L22.525 4.57C22.86 3.23 22.015 2.62 20.665 3.717Z" fill="white"/></svg>
                     </a>
                 </div>
-                <a href="https://smability.io" target="_blank" class="subtitle link-brand">
-                    Smability.io
-                </a>
+                <a href="https://smability.io" target="_blank" class="subtitle link-brand">Smability.io</a>
+                
+                <div class="lang-toggle">
+                    <span onclick="setLang('es')" id="lang-es" class="lang-opt active">ES</span> | 
+                    <span onclick="setLang('en')" id="lang-en" class="lang-opt">EN</span>
+                </div>
             </div>
             <button class="toggle-btn" onclick="toggleSidebar()">☰</button>
         </div>
@@ -214,6 +222,77 @@
         // --- 0. CONFIGURACIÓN INICIAL ---
         const BASE_API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/";
         const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiY21rYnJseG1kMDZnczNlb2xrdDhrejE1biJ9.VFEMLEntTg5fDXDefQTnFA';
+
+        // --- DICCIONARIO DE IDIOMAS ---
+        let currentLang = 'es';
+        
+        const I18N = {
+            es: {
+                live_label: "🔴 AHORA",
+                live_opt: "🔴 AHORA (En Vivo)",
+                past_label: "⏪ PASADO",
+                future_label: "🔮 FUTURO",
+                conn_live: "EN VIVO",
+                conn_hist: "HISTÓRICO",
+                conn_fore: "PRONÓSTICO",
+                buttons: {
+                    ias: "🚦 IAS", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5",
+                    co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum",
+                    wsp: "💨 Viento", wdr: "🧭 Dir.", alt: "⛰️ Alt", building_vol: "🏙️ Urbano"
+                }
+            },
+            en: {
+                live_label: "🔴 NOW",
+                live_opt: "🔴 NOW (Live)",
+                past_label: "⏪ PAST",
+                future_label: "🔮 FORECAST",
+                conn_live: "LIVE",
+                conn_hist: "HISTORICAL",
+                conn_fore: "FORECAST",
+                buttons: {
+                    ias: "🚦 AQI", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5",
+                    co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum",
+                    wsp: "💨 Wind", wdr: "🧭 Dir.", alt: "⛰️ Elev", building_vol: "🏙️ Urban"
+                }
+            }
+        };
+
+        function setLang(lang) {
+            currentLang = lang;
+            
+            // 1. Actualizar estilos del toggle
+            document.getElementById('lang-es').className = lang === 'es' ? 'lang-opt active' : 'lang-opt';
+            document.getElementById('lang-en').className = lang === 'en' ? 'lang-opt active' : 'lang-opt';
+
+            // 2. Regenerar lista de tiempos (para traducir Pasado/Futuro)
+            generateLocalTimeOptions();
+            
+            // 3. Traducir Botones de Variables
+            const texts = I18N[lang].buttons;
+            const btnMap = {
+                'ias': 'btn-ias', 'o3': 'o3', 'pm10': 'pm10', 'pm25': 'pm25',
+                'co': 'co', 'so2': 'so2', 'tmp': 'tmp', 'rh': 'rh',
+                'wsp': 'wsp', 'wdr': 'wdr', 'alt': 'alt', 'building_vol': 'building_vol'
+            };
+            
+            // Actualizamos textos de botones
+            // Nota: Buscamos por el onclick o texto, pero lo ideal es mapear directo
+            const btns = document.querySelectorAll('.btn-var');
+            btns.forEach(btn => {
+                // Truco rápido: inferimos la métrica por el onclick="setMode('xxx')"
+                const mode = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
+                if (texts[mode]) btn.innerText = texts[mode];
+            });
+
+            // 4. Actualizar Slider (Disparar evento para refrescar etiqueta)
+            document.getElementById('time-slider').dispatchEvent(new Event('input'));
+            
+            // 5. Actualizar Status Bar
+            const statusEl = document.getElementById('connection-status');
+            if (statusEl.innerText === "EN VIVO" || statusEl.innerText === "LIVE") statusEl.innerText = I18N[lang].conn_live;
+            if (statusEl.innerText === "PRONÓSTICO" || statusEl.innerText === "FORECAST") statusEl.innerText = I18N[lang].conn_fore;
+            if (statusEl.innerText === "HISTÓRICO" || statusEl.innerText === "HISTORICAL") statusEl.innerText = I18N[lang].conn_hist;
+        }
 
         // --- 1. INICIALIZAR MAPA CON LÍMITES ---
         const map = L.map('map', { 
@@ -295,59 +374,59 @@
             const select = document.getElementById('time-select');
             select.innerHTML = ''; 
             
+            // Usamos el diccionario del idioma actual
+            const T = I18N[currentLang]; 
+            
             const now = new Date();
             const options = [];
 
-            // --- A. PASADO (-24 horas) ---
-            // El histórico se suele guardar al minuto 20 (según tu live-grid)
+            // --- A. PASADO (-24h) ---
             let pastStart = new Date(now);
             pastStart.setMinutes(20); pastStart.setSeconds(0);
             
             for (let i = 24; i > 0; i--) {
                 const d = new Date(pastStart.getTime() - (i * 60 * 60 * 1000));
-                const val = formatDate(d, '20'); // Forzamos minuto 20 para archivos históricos
-                const label = `⏪ -${i}h (${formatLabel(d)})`;
+                const val = formatDate(d, '20');
+                // Etiqueta traducida: "⏪ PASADO -xh..."
+                const label = `${T.past_label} -${i}h (${formatLabel(d)})`; 
                 options.push({ val, label, type: 'past' });
             }
 
             // --- B. PRESENTE (En Vivo) ---
-            options.push({ val: 'latest', label: "🔴 AHORA (En Vivo)", type: 'live' });
+            // Etiqueta traducida: "🔴 AHORA (En Vivo)"
+            options.push({ val: 'latest', label: T.live_opt, type: 'live' }); 
 
-            // --- C. FUTURO (+24 horas) ---
-            // El forecast arranca la siguiente hora en punto (minuto 00)
+            // --- C. FUTURO (+24h) ---
             let futureStart = new Date(now);
             futureStart.setMinutes(0); futureStart.setSeconds(0);
             futureStart.setHours(futureStart.getHours() + 1);
-
+            
             for (let i = 0; i < 24; i++) {
                 const d = new Date(futureStart.getTime() + (i * 60 * 60 * 1000));
-                const val = formatDate(d, '00'); // Forzamos minuto 00 para forecast
-                const label = `🔮 +${i+1}h (${formatLabel(d)})`;
+                const val = formatDate(d, '00');
+                // Etiqueta traducida: "🔮 FUTURO +xh..."
+                const label = `${T.future_label} +${i+1}h (${formatLabel(d)})`; 
                 options.push({ val, label, type: 'future' });
             }
 
-            // --- RENDERIZAR OPCIONES EN EL HTML ---
+            // Renderizar en el HTML
             options.forEach((opt, index) => {
                 const el = document.createElement('option');
-                el.value = opt.val;
+                el.value = opt.val; 
                 el.innerText = opt.label;
-                
-                // Guardamos metadatos vitales para el slider
                 el.dataset.type = opt.type; 
-                el.dataset.index = index;   
+                el.dataset.index = index;
                 
-                // Seleccionar por defecto el "En Vivo"
                 if(opt.type === 'live') el.selected = true;
-                
                 select.appendChild(el);
             });
             
-            // --- AJUSTAR EL SLIDER AL NUEVO TAMAÑO ---
+            // Ajustar Slider
             const slider = document.getElementById('time-slider');
-            // El máximo ahora es el total de opciones (aprox 49 items)
             slider.max = options.length - 1;
-            // Ponemos el slider en la posición del "latest" (que está en medio, índice 24)
-            slider.value = 24; 
+            
+            // Mantenemos la posición si es posible, si no, vamos al Live (24)
+            if (slider.value == 0 || slider.value == 24) slider.value = 24;
         }
 
         // --- FUNCIONES AUXILIARES DE FORMATO ---
