@@ -135,10 +135,46 @@ def load_static_grid():
         grid_df['building_vol'] = 0
 
     # Limpieza final
+    # 3. Edificios (Con lógica de Fuzzy Merge por redondeo)
+    try:
+        EDIFICIOS_PATH = f"{BASE_PATH}/app/geograficos/capa_edificios_v2.json"
+        with open(EDIFICIOS_PATH, 'r') as f:
+            edificios_data = json.load(f)
+            edificios_df = pd.DataFrame(edificios_data)
+        
+        # --- FIX DE COORDENADAS ---
+        # La malla tiene lat/lon muy precisos (ej. 19.77186)
+        # El archivo de edificios tiene ruido (ej. -99.349999...)
+        # Usamos round(2) (~1.1km tolerancia) para asegurar el match.
+        
+        # Crear llaves de cruce temporales
+        edificios_df['lat_key'] = edificios_df['lat'].round(2)
+        edificios_df['lon_key'] = edificios_df['lon'].round(2)
+        
+        grid_df['lat_key'] = grid_df['lat'].round(2)
+        grid_df['lon_key'] = grid_df['lon'].round(2)
+        
+        # Debug Log
+        print(f"🏗️ Merge Urbano: Grid Key [{grid_df['lat_key'].iloc[0]}] vs Building Key [{edificios_df['lat_key'].iloc[0]}]")
+
+        # Merge (Left Join)
+        grid_df = pd.merge(grid_df, edificios_df[['lat_key', 'lon_key', 'building_vol']], 
+                           on=['lat_key', 'lon_key'], how='left')
+        
+        # Limpieza de llaves auxiliares
+        grid_df.drop(columns=['lat_key', 'lon_key'], inplace=True)
+        
+        print(f"✅ Datos Urbanos integrados. Max Vol: {grid_df['building_vol'].max()}")
+
+    except Exception as e:
+        print(f"⚠️ Error cargando Capa Edificios: {e}. Se usará 0 por defecto.")
+        # No asignamos 0 aquí, dejamos que el fillna final lo haga
+
+    # --- LIMPIEZA FINAL (Aplica para todo) ---
     grid_df['col'] = grid_df['col'].fillna("Zona Federal")
     grid_df['mun'] = grid_df['mun'].fillna("Valle de México")
     grid_df['pob'] = grid_df['pob'].fillna(0)
-    grid_df['building_vol'] = grid_df['building_vol'].fillna(0)
+    grid_df['building_vol'] = grid_df['building_vol'].fillna(0) # <--- Este atrapa cualquier error previo
     
     return grid_df
 
