@@ -232,14 +232,23 @@
                 conn_hist: "HISTÓRICO",
                 conn_fore: "PRONÓSTICO",
                 stats: { min: "Mínimo", avg: "Promedio", max: "Máximo" },
-                popup: { station: "Estación", risk: "Riesgo", vol: "Vol", dens: "Densidad", inhabitants: "habitantes" },
+                popup: { station: "Estación", risk: "Riesgo", inhabitants: "habitantes" },
+                // AQUI ESTABA EL ERROR: Agregamos emojis a los nombres largos (Para el Menú)
                 buttons: {
-                    ias: "Índice Aire y Salud", // Usamos nombre completo para Leyenda también
-                    o3: "Ozono (O3)", pm10: "Partículas PM10", pm25: "Partículas PM2.5",
-                    co: "Monóxido Carbono", so2: "Dióxido Azufre", tmp: "Temperatura", rh: "Humedad",
-                    wsp: "Viento", wdr: "Dirección", alt: "Altitud", building_vol: "Densidad Urbana"
+                    ias: "🚦 Índice Aire y Salud",
+                    o3: "🔴 Ozono (O3)", 
+                    pm10: "🟤 Partículas PM10", 
+                    pm25: "🟣 Partículas PM2.5",
+                    co: "🔵 Monóxido Carbono", 
+                    so2: "🟡 Dióxido Azufre", 
+                    tmp: "🌡️ Temperatura", 
+                    rh: "💧 Humedad",
+                    wsp: "💨 Viento", 
+                    wdr: "🧭 Dirección", 
+                    alt: "⛰️ Altitud", 
+                    building_vol: "🏙️ Densidad Urbana"
                 },
-                // Versiones cortas para botones (opcional, si quieres ahorrar espacio)
+                // Etiquetas cortas (Para el Popup) - Ya tienen emojis
                 btn_lbl: { ias: "🚦 IAS", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5", co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum", wsp: "💨 Viento", wdr: "🧭 Dir.", alt: "⛰️ Alt", building_vol: "🏙️ Urbano" }
             },
             en: {
@@ -251,12 +260,21 @@
                 conn_hist: "HISTORICAL",
                 conn_fore: "FORECAST",
                 stats: { min: "Minimum", avg: "Average", max: "Maximum" },
-                popup: { station: "Station", risk: "Risk", vol: "Vol", dens: "Density", inhabitants: "inhabitants" },
+                popup: { station: "Station", risk: "Risk", inhabitants: "inhabitants" },
+                // Agregamos emojis al Inglés también
                 buttons: {
-                    ias: "Air Quality Index",
-                    o3: "Ozone (O3)", pm10: "Particulate PM10", pm25: "Particulate PM2.5",
-                    co: "Carbon Monoxide", so2: "Sulfur Dioxide", tmp: "Temperature", rh: "Humidity",
-                    wsp: "Wind Speed", wdr: "Wind Dir.", alt: "Altitude", building_vol: "Urban Density"
+                    ias: "🚦 Air Quality Index",
+                    o3: "🔴 Ozone (O3)", 
+                    pm10: "🟤 Particulate PM10", 
+                    pm25: "🟣 Particulate PM2.5",
+                    co: "🔵 Carbon Monoxide", 
+                    so2: "🟡 Sulfur Dioxide", 
+                    tmp: "🌡️ Temperature", 
+                    rh: "💧 Humidity",
+                    wsp: "💨 Wind Speed", 
+                    wdr: "🧭 Wind Dir.", 
+                    alt: "⛰️ Altitude", 
+                    building_vol: "🏙️ Urban Density"
                 },
                 btn_lbl: { ias: "🚦 AQI", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5", co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum", wsp: "💨 Wind", wdr: "🧭 Dir.", alt: "⛰️ Elev", building_vol: "🏙️ Urban" }
             }
@@ -719,7 +737,7 @@
                     return `<span style="font-size:0.7em; color:${color}; margin-left:3px; font-weight:${weight}; display:inline-block; vertical-align:middle;">(${displayLabel})</span>`;
                 };
 
-                // --- POPUP CON EMOJIS RESTAURADOS ---
+                // --- POPUP LIMPIO (Sin emojis manuales, usa los del diccionario) ---
                 rect.bindPopup(`
                     <div style="font-family:'Inter'; color:#334155; min-width: 195px;">
                         ${headerHTML}
@@ -728,29 +746,29 @@
                             <div style="font-size:10px; color:#64748b;">${pob_text}</div>
                         </div>
                         <div style="display:grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size:12px; align-items: center;">
-                            <span style="font-weight:600; color:#000;">🚦 ${T.btn_lbl.ias}:</span> <span style="font-weight:bold;">${Number(p.ias||0).toFixed(0)} pts</span>
+                            <span style="font-weight:600; color:#000;">${T.btn_lbl.ias}:</span> <span style="font-weight:bold;">${Number(p.ias||0).toFixed(0)} pts</span>
                             <span style="font-weight:600; color:#000;">☢️ ${T.popup.risk}:</span> <span style="font-weight:bold; color:${riskColor};">${p.risk || 'N/A'}</span>
                             
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔴 ${T.btn_lbl.o3} <span style="font-size:9px; color:#64748b;">(1h)</span>${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> 
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">${T.btn_lbl.o3} <span style="font-size:9px; color:#64748b;">(1h)</span>${p.dominant === 'O3' ? ' <b style="color:#ef4444;">(Dom)</b>' : ''}:</span> 
                             <span style="white-space:nowrap;">${Number(p.o3||0).toFixed(1)} ppb ${fmtSrc('o3')}</span>
                             
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟤 ${T.btn_lbl.pm10} <span style="font-size:9px; color:#64748b;">(12h)</span>${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> 
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">${T.btn_lbl.pm10} <span style="font-size:9px; color:#64748b;">(12h)</span>${p.dominant === 'PM10' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> 
                             <span style="white-space:nowrap;">${Number(p.pm10||0).toFixed(1)} µg ${fmtSrc('pm10')}</span>
                             
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟣 ${T.btn_lbl.pm25} <span style="font-size:9px; color:#64748b;">(12h)</span>${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> 
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">${T.btn_lbl.pm25} <span style="font-size:9px; color:#64748b;">(12h)</span>${p.dominant === 'PM2.5' ? ' <b style="color:#a855f7;">(Dom)</b>' : ''}:</span> 
                             <span style="white-space:nowrap;">${Number(p.pm25||0).toFixed(1)} µg ${fmtSrc('pm25')}</span>
 
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🔵 ${T.btn_lbl.co}:</span> <span>${Number(p.co||0).toFixed(2)} ppm ${fmtSrc('co')}</span>
-                            <span style="font-weight:600; color:#000; white-space:nowrap;">🟡 ${T.btn_lbl.so2}:</span> <span>${Number(p.so2||0).toFixed(1)} ppb ${fmtSrc('so2')}</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">${T.btn_lbl.co}:</span> <span>${Number(p.co||0).toFixed(2)} ppm ${fmtSrc('co')}</span>
+                            <span style="font-weight:600; color:#000; white-space:nowrap;">${T.btn_lbl.so2}:</span> <span>${Number(p.so2||0).toFixed(1)} ppb ${fmtSrc('so2')}</span>
 
                             <hr style="grid-column: span 2; border:0; border-top:1px solid #e2e8f0; width:100%; margin:4px 0;">
                             
-                            <span style="color:#475569;">🏙️ ${T.btn_lbl.building_vol}:</span> <span>${(bVol/1000).toFixed(0)}k m³</span>
-                            <span style="color:#475569;">🌡️ ${T.btn_lbl.tmp}:</span> <span>${Number(p.tmp||0).toFixed(1)} °C ${fmtSrc('tmp')}</span>
-                            <span style="color:#475569;">💧 ${T.btn_lbl.rh}:</span> <span>${Number(p.rh||0).toFixed(0)} % ${fmtSrc('rh')}</span>
-                            <span style="color:#475569;">💨 ${T.btn_lbl.wsp}:</span> <span>${Number(p.wsp||0).toFixed(1)} m/s ${fmtSrc('wsp')}</span>
-                            <span style="color:#475569;">🧭 ${T.btn_lbl.wdr}:</span> <span>${Number(p.wdr||0).toFixed(0)}° ${fmtSrc('wdr')}</span>
-                            <span style="color:#475569;">⛰️ ${T.btn_lbl.alt}:</span> <span>${altVal.toFixed(0)} m</span>
+                            <span style="color:#475569;">${T.btn_lbl.building_vol}:</span> <span>${(bVol/1000).toFixed(0)}k m³</span>
+                            <span style="color:#475569;">${T.btn_lbl.tmp}:</span> <span>${Number(p.tmp||0).toFixed(1)} °C ${fmtSrc('tmp')}</span>
+                            <span style="color:#475569;">${T.btn_lbl.rh}:</span> <span>${Number(p.rh||0).toFixed(0)} % ${fmtSrc('rh')}</span>
+                            <span style="color:#475569;">${T.btn_lbl.wsp}:</span> <span>${Number(p.wsp||0).toFixed(1)} m/s ${fmtSrc('wsp')}</span>
+                            <span style="color:#475569;">${T.btn_lbl.wdr}:</span> <span>${Number(p.wdr||0).toFixed(0)}° ${fmtSrc('wdr')}</span>
+                            <span style="color:#475569;">${T.btn_lbl.alt}:</span> <span>${altVal.toFixed(0)} m</span>
                         </div>
                     </div>
                 `);
