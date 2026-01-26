@@ -380,17 +380,37 @@
             if (options[index]) {
                 timeSelect.selectedIndex = index;
                 const opt = options[index];
+                const type = opt.dataset.type; // 'past', 'live', 'future'
                 
-                // Leemos el tipo de dato que guardamos en el Paso 1
-                const type = opt.dataset.type;
+                // --- AJUSTE 1: RECUPERAR FECHA Y HORA ---
+                // Usamos opt.text (que trae ej: "🔮 +1h (26/01 14:00)")
+                // y le aplicamos el color según el estado.
                 
-                // Feedback visual inmediato en el slider label
+                let color = "#fff";
+                let statusLabel = "";
+
                 if (type === 'live') {
-                    timeDisplay.innerHTML = `<span class="live-dot" style="background:#22c55e; box-shadow:0 0 6px #22c55e;"></span> AHORA`;
-                } else if (type === 'future') {
-                    timeDisplay.innerHTML = `<span style="color:#a855f7;">🔮 FUTURO</span>`;
+                    color = "#22c55e"; // Verde
+                    statusLabel = "AHORA";
+                    // Para el live, usamos un estilo especial con punto pulsante
+                    timeDisplay.innerHTML = `
+                        <span class="live-dot" style="background:${color}; box-shadow:0 0 6px ${color};"></span> 
+                        <span style="color:${color}; font-weight:bold;">${statusLabel}</span>
+                    `;
                 } else {
-                    timeDisplay.innerHTML = `<span style="color:#38bdf8;">⏪ PASADO</span>`;
+                    if (type === 'future') {
+                        color = "#a855f7"; // Púrpura
+                        statusLabel = "FUTURO";
+                    } else {
+                        color = "#38bdf8"; // Azul
+                        statusLabel = "PASADO";
+                    }
+                    // Combinamos: TIPO (Color) + Texto Detallado (Blanco/Gris)
+                    // opt.text ya trae el emoji y la hora, ej: "⏪ -1h (26/01 11:00)"
+                    timeDisplay.innerHTML = `
+                        <span style="color:${color}; font-weight:bold; margin-right:5px;">${statusLabel}</span> 
+                        <span style="color:#cbd5e1; font-family:'Roboto Mono'; font-size:11px;">${opt.text}</span>
+                    `;
                 }
                 
                 // Cargar datos
@@ -398,7 +418,7 @@
             }
         });
 
-        // --- LÓGICA DE REPRODUCCIÓN CONTINUA (VIDEO TOTAL) ---
+        // --- LÓGICA DE REPRODUCCIÓN (RETORNO A LIVE) ---
         let isPlaying = false;
         let playInterval;
 
@@ -410,8 +430,8 @@
             this.innerText = isPlaying ? "⏸" : "▶";
 
             if (isPlaying) {
-                // Si estamos al final de la línea de tiempo, rebobinamos al inicio del PASADO (0)
-                // Usamos .max para que sea dinámico (48 horas aprox)
+                // Si el usuario da play y ya estamos al final, regresamos al INICIO (Pasado)
+                // para que vea la película completa.
                 if (parseInt(timeSlider.value) >= parseInt(timeSlider.max)) {
                     timeSlider.value = 0;
                     timeSlider.dispatchEvent(new Event('input'));
@@ -420,16 +440,33 @@
                 playInterval = setInterval(() => {
                     let nextVal = parseInt(timeSlider.value) + 1;
                     
-                    // Verificamos contra el máximo dinámico del slider
                     if (nextVal > parseInt(timeSlider.max)) {
+                        // --- FIN DEL CICLO ---
                         clearInterval(playInterval);
                         isPlaying = false;
-                        this.innerText = "▶";
+                        this.innerText = "▶"; // Cambiar icono a Play
+                        
+                        console.log("🏁 Ciclo terminado. Volviendo a EN VIVO.");
+                        
+                        // --- AJUSTE 2: VOLVER A LIVE AUTOMÁTICAMENTE ---
+                        // Buscamos el índice de la opción 'live'
+                        let liveIndex = 0;
+                        for (let i = 0; i < timeSelect.options.length; i++) {
+                            if (timeSelect.options[i].dataset.type === 'live') {
+                                liveIndex = i;
+                                break;
+                            }
+                        }
+                        // Saltamos al índice Live
+                        timeSlider.value = liveIndex;
+                        timeSlider.dispatchEvent(new Event('input'));
+
                     } else {
+                        // Avanzar un cuadro
                         timeSlider.value = nextVal;
                         timeSlider.dispatchEvent(new Event('input'));
                     }
-                }, 1500); // 1.5 segundos por cuadro
+                }, 1500); // Velocidad: 1.5s por cuadro
             } else {
                 clearInterval(playInterval);
             }
