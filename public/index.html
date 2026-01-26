@@ -165,7 +165,7 @@
 
             <div id="loading">
                 <div class="spinner"></div>
-                <div>Cargando datos...</div>
+                <div id="loading-text">Cargando datos...</div>
             </div>
 
             <div id="main-content" style="display:none;">
@@ -231,6 +231,8 @@
                 conn_live: "EN VIVO",
                 conn_hist: "HISTÓRICO",
                 conn_fore: "PRONÓSTICO",
+                loading: "Cargando datos...", // <--- NUEVO
+                nodata: "Datos no disponibles", // <--- NUEVO (Para errores)
                 stats: { min: "Mínimo", avg: "Promedio", max: "Máximo" },
                 popup: { station: "Estación", risk: "Riesgo", inhabitants: "habitantes" },
                 // AQUI ESTABA EL ERROR: Agregamos emojis a los nombres largos (Para el Menú)
@@ -259,6 +261,8 @@
                 conn_live: "LIVE",
                 conn_hist: "HISTORICAL",
                 conn_fore: "FORECAST",
+                loading: "Loading data...", // <--- NUEVO
+                nodata: "Data not available", // <--- NUEVO
                 stats: { min: "Minimum", avg: "Average", max: "Maximum" },
                 popup: { station: "Station", risk: "Risk", inhabitants: "inhabitants" },
                 // Agregamos emojis al Inglés también
@@ -283,38 +287,36 @@
         function setLang(lang) {
             currentLang = lang;
             
-            // 1. Actualizar estilos del toggle
+            // 1. Actualizar estilos del toggle (ES | EN)
             document.getElementById('lang-es').className = lang === 'es' ? 'lang-opt active' : 'lang-opt';
             document.getElementById('lang-en').className = lang === 'en' ? 'lang-opt active' : 'lang-opt';
 
-            // 2. Regenerar lista de tiempos (para traducir Pasado/Futuro)
+            // 2. Regenerar lista de tiempos (traducir Pasado/Futuro)
             generateLocalTimeOptions();
             
             // 3. Traducir Botones de Variables
             const texts = I18N[lang].buttons;
-            const btnMap = {
-                'ias': 'btn-ias', 'o3': 'o3', 'pm10': 'pm10', 'pm25': 'pm25',
-                'co': 'co', 'so2': 'so2', 'tmp': 'tmp', 'rh': 'rh',
-                'wsp': 'wsp', 'wdr': 'wdr', 'alt': 'alt', 'building_vol': 'building_vol'
-            };
-            
-            // Actualizamos textos de botones
-            // Nota: Buscamos por el onclick o texto, pero lo ideal es mapear directo
-            const btns = document.querySelectorAll('.btn-var');
-            btns.forEach(btn => {
-                // Truco rápido: inferimos la métrica por el onclick="setMode('xxx')"
-                const mode = btn.getAttribute('onclick').match(/'([^']+)'/)[1];
-                if (texts[mode]) btn.innerText = texts[mode];
+            // Eliminamos 'btnMap' porque no se usaba. Usamos el onclick directamente:
+            document.querySelectorAll('.btn-var').forEach(btn => {
+                // Extrae 'ias', 'o3', etc. del atributo onclick="setMode('ias', this)"
+                const match = btn.getAttribute('onclick').match(/'([^']+)'/);
+                if (match && texts[match[1]]) {
+                    btn.innerText = texts[match[1]];
+                }
             });
 
-            // 4. Actualizar Slider (Disparar evento para refrescar etiqueta)
+            // 4. Actualizar Slider y Barra de Estado
             document.getElementById('time-slider').dispatchEvent(new Event('input'));
             
-            // 5. Actualizar Status Bar
             const statusEl = document.getElementById('connection-status');
-            if (statusEl.innerText === "EN VIVO" || statusEl.innerText === "LIVE") statusEl.innerText = I18N[lang].conn_live;
-            if (statusEl.innerText === "PRONÓSTICO" || statusEl.innerText === "FORECAST") statusEl.innerText = I18N[lang].conn_fore;
-            if (statusEl.innerText === "HISTÓRICO" || statusEl.innerText === "HISTORICAL") statusEl.innerText = I18N[lang].conn_hist;
+            // Usamos .includes para detectar el estado actual de forma segura
+            if (statusEl.innerText.includes("VIVO") || statusEl.innerText.includes("LIVE")) statusEl.innerText = I18N[lang].conn_live;
+            else if (statusEl.innerText.includes("PRON") || statusEl.innerText.includes("FORE")) statusEl.innerText = I18N[lang].conn_fore;
+            else statusEl.innerText = I18N[lang].conn_hist;
+
+            // 5. NUEVO: Traducir texto de carga (El fix que faltaba)
+            const loadingText = document.getElementById('loading-text');
+            if(loadingText) loadingText.innerText = I18N[lang].loading;
         }
 
         // --- 1. INICIALIZAR MAPA CON LÍMITES ---
@@ -629,7 +631,8 @@
                 })
                 .catch(err => {
                     console.error("Error:", err);
-                    document.getElementById('loading').innerHTML = `<div style="color:#ef4444">Sin datos (${type})</div>`;
+                    const T = I18N[currentLang];
+                    document.getElementById('loading').innerHTML = `<div style="color:#ef4444">${T.nodata}<br>(${type})</div>`;
                 });
         }
 
