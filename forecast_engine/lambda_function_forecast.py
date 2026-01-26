@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import xgboost as xgb
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from scipy.interpolate import griddata
 import os
 from zoneinfo import ZoneInfo
@@ -161,6 +161,20 @@ def interpolate_on_grid(grid_df, x_src, y_src, z_src, method='linear'):
 # --- 5. HANDLER PRINCIPAL ---
 def lambda_handler(event, context):
     print("🚀 INICIANDO FORECAST ENGINE V2.1 (Full Chemistry)")
+
+    # --- INICIO ANCLA A (Insertar aquí) ---
+    # 1. Definir Vector de Tiempo (T+1 Hora En Punto)
+    # Si son 9:15, el target es 10:00. Si son 9:59, es 10:00.
+    mexico_tz = ZoneInfo("America/Mexico_City")
+    now = datetime.now(mexico_tz)
+    # Calculamos la siguiente hora en punto
+    target_start_time = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
+    # Hacemos el target 'naive' (sin zona horaria) para poder compararlo con el string ISO de Open-Meteo
+    target_start_time_naive = target_start_time.replace(tzinfo=None)
+
+    print(f"⏱️ Hora Ejecución: {now.strftime('%H:%M')}")
+    print(f"🎯 Vector Forecast inicia a las: {target_start_time.strftime('%Y-%m-%d %H:%M')}")
+    # --- FIN ANCLA A ---
     
     try:
         # A. Inicialización
@@ -197,12 +211,28 @@ def lambda_handler(event, context):
         generated_files = []
         print(f"⏳ Procesando {len(hourly_buffer)} horas...")
         
+        files_count = 0
+        
         for t_iso, met_data in hourly_buffer.items():
             current_grid = base_grid_df.copy()
             
             # Parsing Fecha
             dt_obj = datetime.strptime(t_iso, "%Y-%m-%dT%H:%M")
             file_name = dt_obj.strftime("%Y-%m-%d_%H-%M.json")
+
+            # --- INICIO ANCLA B (Filtro y Logs) ---
+            
+            # FILTRO: Si la hora del dato es MENOR a nuestro target (T+1), la saltamos
+            if dt_obj < target_start_time_naive:
+                continue 
+            
+            # LOG INPUT (Solo la primera vez que entra al vector válido)
+            if files_count == 0:
+                print(f"\n🔍 INSPECCIÓN INPUT (Hora {t_iso}):")
+                print(f"   Temp Prom: {np.mean(met_data['tmp']):.1f}°C | Viento Prom: {np.mean(met_data['wsp']):.1f} m/s")
+            
+            # --- FIN ANCLA B (Parte 1) ---
+            
             
             # 1. Interpolación Meteorológica
             current_grid['tmp'] = interpolate_on_grid(current_grid, met_data['lons'], met_data['lats'], met_data['tmp'])
@@ -234,6 +264,17 @@ def lambda_handler(event, context):
                     current_grid[p] = preds
                 else:
                     current_grid[p] = 0.0
+
+            # --- INICIO ANCLA B (Parte 2 - Logs de Salida) ---
+            # LOG OUTPUT (Sanity Check de la predicción)
+            if files_count == 0: # Solo logueamos detallado el primer archivo generado
+                print(f"📊 ESTADÍSTICAS OUTPUT ({t_iso}):")
+                print(f"   PM2.5 -> Min: {current_grid['pm25'].min():.1f} | Max: {current_grid['pm25'].max():.1f} | Mean: {current_grid['pm25'].mean():.1f}")
+                print(f"   O3    -> Min: {current_grid['o3'].min():.1f}   | Max: {current_grid['o3'].max():.1f}")
+                print(f"   Urbano -> Max Vol Edificios: {current_grid['building_vol'].max()} (Si es 0, no cargó edificios)")
+                print("---------------------------------------------------")
+            
+            files_count += 1
 
             # 4. Cálculo de Índices (IAS)
             def calc_ias_row(row):
