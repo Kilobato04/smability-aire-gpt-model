@@ -17,7 +17,7 @@ BASE_PATH = os.environ.get('LAMBDA_TASK_ROOT', '/var/task')
 
 # Endpoint calibrado (Zona Metropolitana del Valle de México)
 # Trae 24h de pronóstico para múltiples puntos clave de la malla
-OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast?latitude=19.15,19.15,19.15,19.15,19.15,19.15,19.276,19.276,19.276,19.276,19.276,19.276,19.402,19.402,19.402,19.402,19.402,19.402,19.528,19.528,19.528,19.528,19.528,19.528,19.654,19.654,19.654,19.654,19.654,19.654,19.78,19.78,19.78,19.78,19.78,19.78&longitude=-99.39,-99.284,-99.178,-99.072,-98.966,-98.86,-99.39,-99.284,-99.178,-99.072,-98.966,-98.86,-99.39,-99.284,-99.178,-99.072,-98.966,-98.86,-99.39,-99.284,-99.178,-99.072,-98.966,-98.86,-99.39,-99.284,-99.178,-99.072,-98.966,-98.86,-99.39,-99.284,-99.178,-99.072,-98.966,-98.86&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m&timezone=America%2FMexico_City&forecast_days=1&wind_speed_unit=ms"
+OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast?latitude=19.15,19.15,19.15,19.15,19.15,19.15,19.276,19.276,19.276,19.276,19.276,19.276,19.402,19.402,19.402,19.402,19.402,19.402,19.528,19.528,19.528,19.528,19.528,19.528,19.654,19.654,19.654,19.654,19.654,19.654,19.78,19.78,19.78,19.78,19.78,19.78&longitude=-99.39,-99.284,-99.178,-99.072,-98.966,-98.86,-99.39,-99.284,-99.178,-99.072,-98.966,-98.86,-99.39,-99.284,-99.178,-99.072,-98.966,-98.86,-99.39,-99.284,-99.178,-99.072,-98.966,-98.86,-99.39,-99.284,-99.178,-99.072,-98.966,-98.86,-99.39,-99.284,-99.178,-99.072,-98.966,-98.86&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m&timezone=America%2FMexico_City&forecast_days=2&wind_speed_unit=ms"
 
 s3_client = boto3.client('s3')
 
@@ -331,6 +331,13 @@ def lambda_handler(event, context):
             s3_key = f"{S3_FORECAST_PREFIX}{file_name}"
             s3_client.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=json_body, ContentType='application/json')
             generated_files.append(file_name)
+
+            # --- INICIO CAMBIO 3: CORTAR A LAS 24 HORAS ---
+            # Como pedimos 48h a Open-Meteo, debemos frenar cuando tengamos el vector completo
+            if len(generated_files) >= 24:
+                print("✅ Se alcanzaron las 24 horas de pronóstico. Deteniendo loop.")
+                break
+            # --- FIN CAMBIO 3 -----------------------------
 
         print(f"✅ FORECAST COMPLETADO: {len(generated_files)} archivos generados.")
         return {'statusCode': 200, 'body': json.dumps({'files': len(generated_files)})}
