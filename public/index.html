@@ -157,6 +157,56 @@
             fill: #64748b; /* Gris un poco más oscuro al hover */
             transform: translateY(-2px); /* Pequeño efecto de "flotar" */
         }
+
+        /* --- Sección About / Pitch Técnico --- */
+        .about-section {
+            margin: 15px 15px 0 15px; /* Margen superior e inferior ajustado */
+            padding: 12px 15px;
+            background: rgba(15, 23, 42, 0.6); /* Fondo oscuro semitransparente */
+            border: 1px solid rgba(56, 189, 248, 0.2); /* Borde sutil cyan */
+            border-radius: 6px;
+            font-size: 11px;
+            color: #94a3b8;
+            line-height: 1.4;
+            backdrop-filter: blur(2px);
+        }
+
+        .about-title {
+            font-size: 10px;
+            font-weight: 800;
+            color: #e2e8f0;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .about-block {
+            margin-bottom: 10px;
+        }
+
+        .about-block strong {
+            display: block;
+            color: #38bdf8; /* Cyan Smability */
+            margin-bottom: 2px;
+            font-size: 11px;
+        }
+
+        .about-block p {
+            margin: 0;
+            opacity: 0.9;
+            text-align: justify; /* Para que se vea cuadrado y técnico */
+        }
+        
+        .about-block p b {
+            color: #cbd5e1; /* Resaltar palabras clave en blanco suave */
+            font-weight: 600;
+        }
+
+        .about-block:last-child {
+            margin-bottom: 0;
+        }
                      
     </style>
 </head>
@@ -230,6 +280,23 @@
                 </div>
             </div>
         </div>
+        <div class="about-section">
+            <div class="about-title" id="txt-about-title">🧬 ECOSISTEMA AIREGPT</div>
+            
+            <div class="about-block">
+                <strong id="txt-model-title">🧠 El Modelo (AireGPT)</strong>
+                <p id="txt-model-desc">
+                    Transformamos la CDMX en una malla neuronal viva. AireGPT ingesta datos de <b>estaciones oficiales</b> en tiempo real, procesándolos con modelos <b>XGBoost</b> y <b>Scikit-Learn</b> en AWS Lambda. No es solo interpolación; es inferencia geoespacial calibrada minuto a minuto.
+                </p>
+            </div>
+
+            <div class="about-block">
+                <strong id="txt-hw-title">📡 Hardware (SMAA)</strong>
+                <p id="txt-hw-desc">
+                    La evolución del <b>Gemelo Digital</b>. Nuestros dispositivos SMAA funcionan como un 'Laboratorio de Calibración Virtual'. Al cruzar su ubicación con el modelo AireGPT, enviamos correcciones matemáticas vía SMS (RCI Loop), logrando sensores que se auto-calibran sin intervención humana.
+                </p>
+            </div>
+        </div>
         <div class="social-footer">
             <a href="https://x.com/SmabilityMX" target="_blank" aria-label="X">
                 <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
@@ -282,6 +349,11 @@
                 nodata: "Datos no disponibles", // <--- NUEVO (Para errores)
                 stats: { min: "Mínimo", avg: "Promedio", max: "Máximo" },
                 popup: { station: "Estación", risk: "Riesgo", inhabitants: "habitantes" },
+                aboutTitle: "🧬 ECOSISTEMA AIREGPT",
+                modelTitle: "🧠 El Modelo (AireGPT)",
+                modelDesc: "Transformamos la CDMX en una malla neuronal viva. AireGPT ingesta datos de <b>estaciones oficiales</b> en tiempo real, procesándolos con modelos <b>XGBoost</b> y <b>Scikit-Learn</b> en AWS Lambda. No es solo interpolación; es inferencia geoespacial calibrada minuto a minuto.",
+                hwTitle: "📡 Hardware (SMAA)",
+                hwDesc: "La evolución del <b>Gemelo Digital</b>. Nuestros dispositivos SMAA funcionan como un 'Laboratorio de Calibración Virtual'. Al cruzar su ubicación con el modelo AireGPT, enviamos correcciones matemáticas vía SMS (RCI Loop), logrando sensores que se auto-calibran sin intervención humana.",
                 // AQUI ESTABA EL ERROR: Agregamos emojis a los nombres largos (Para el Menú)
                 buttons: {
                     ias: "🚦 Índice Aire y Salud",
@@ -312,6 +384,11 @@
                 nodata: "Data not available", // <--- NUEVO
                 stats: { min: "Minimum", avg: "Average", max: "Maximum" },
                 popup: { station: "Station", risk: "Risk", inhabitants: "inhabitants" },
+                aboutTitle: "🧬 AIREGPT ECOSYSTEM",
+                modelTitle: "🧠 The Model (AireGPT)",
+                modelDesc: "We transform CDMX into a living neural mesh. AireGPT ingests real-time data from <b>official stations</b>, processing it with <b>XGBoost</b> and <b>Scikit-Learn</b> models on AWS Lambda. It is not just interpolation; it is geospatial inference calibrated minute by minute.",
+                hwTitle: "📡 Hardware (SMAA)",
+                hwDesc: "The <b>Digital Twin</b> evolution. Our SMAA devices act as a 'Virtual Calibration Laboratory'. By cross-referencing their location with AireGPT, we send mathematical corrections via SMS (RCI Loop), achieving self-calibrating sensors without human intervention.",
                 // Agregamos emojis al Inglés también
                 buttons: {
                     ias: "🚦 Air Quality Index",
@@ -351,6 +428,13 @@
                     btn.innerText = texts[match[1]];
                 }
             });
+
+            // Actualizar Textos del Pitch
+            document.getElementById('txt-about-title').innerText = I18N[lang].aboutTitle;
+            document.getElementById('txt-model-title').innerText = I18N[lang].modelTitle;
+            document.getElementById('txt-model-desc').innerHTML = I18N[lang].modelDesc; // Nota: innerHTML para respetar las negritas <b>
+            document.getElementById('txt-hw-title').innerText = I18N[lang].hwTitle;
+            document.getElementById('txt-hw-desc').innerHTML = I18N[lang].hwDesc;     // Nota: innerHTML para respetar las negritas <b>
 
             // 4. Actualizar Slider y Barra de Estado
             document.getElementById('time-slider').dispatchEvent(new Event('input'));
