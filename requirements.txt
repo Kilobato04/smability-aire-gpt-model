@@ -7,3 +7,4 @@ openai>=1.50.0
 httpx>=0.27.0
 python-telegram-bot
 scipy==1.11.4
+boto3>=1.34.0  
