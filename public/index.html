@@ -240,6 +240,57 @@
         .about-block:last-child {
             margin-bottom: 0;
         }
+
+        /* --- AJUSTES MOVIL (Scroll Unificado) --- */
+        @media (max-width: 768px) {
+            .sidebar {
+                /* 1. Permitir que TODO el sidebar tenga scroll */
+                overflow-y: auto !important;
+                display: block !important; /* Romper el layout flexible rígido */
+                padding-bottom: 40px; /* Espacio extra al final */
+            }
+
+            .header {
+                /* 2. Mantener el título y botón menú pegados arriba */
+                position: sticky;
+                top: 0;
+                z-index: 50;
+                background: rgba(15, 23, 42, 0.98); /* Fondo sólido para que no se trasluzca */
+                border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+            }
+
+            .time-controls {
+                /* 3. El selector de tiempo también se pega justo debajo del header */
+                position: sticky;
+                top: 50px; /* Altura aprox del header */
+                z-index: 49;
+                background: rgba(15, 23, 42, 0.98);
+                margin-top: 0;
+            }
+
+            .dashboard-fixed {
+                /* 4. Liberar el panel de botones para que fluya */
+                height: auto !important;
+                flex: none !important;
+            }
+
+            .scroll-content {
+                /* 5. Liberar el contenido inferior */
+                height: auto !important;
+                overflow: visible !important;
+                flex: none !important;
+            }
+            
+            /* Ajuste extra: achicar un poco los botones en móvil para ganar espacio */
+            .controls {
+                gap: 6px;
+                grid-template-columns: repeat(2, 1fr); /* Asegurar 2 columnas */
+            }
+            .btn-var {
+                padding: 10px 8px;
+                font-size: 11px;
+            }
+        }
                      
     </style>
 </head>
@@ -499,21 +550,29 @@
             if(loadingText) loadingText.innerText = I18N[lang].loading;
         }
 
-        // --- 1. INICIALIZAR MAPA CON LÍMITES ---
+        // 1. INICIALIZAR MAPA
         const map = L.map('map', { 
             zoomControl: false, 
             preferCanvas: true,
             renderer: L.canvas({ padding: 0.5 }),
-            minZoom: 9,   // Vista Satelital ZMVM
-            maxZoom: 16   // Vista Calle
+            minZoom: 9, 
+            maxZoom: 16 
         });
 
-        // 2. ENCUADRE (SUPER TIGHT - SOLO ZONA URBANA)
-        // Al reducir el área, forzamos un zoom mayor (más cerca)
-        map.fitBounds([
-            [19.25, -99.28], // Suroeste (Subimos esto para cortar montañas del sur)
-            [19.68, -98.98]  // Noreste (Bajamos esto para cortar campos del norte)
-        ]);
+        // 2. ENCUADRE INTELIGENTE (PC vs MÓVIL)
+        const isMobile = window.innerWidth < 768;
+
+        if (isMobile) {
+            // MÓVIL: Usamos setView directo con Zoom 11 (Más cerca)
+            // Centrado en el corazón de la CDMX (Reforma/Centro)
+            map.setView([19.42, -99.14], 11); 
+        } else {
+            // PC: Usamos fitBounds ajustado (Tu configuración "Tight" de ayer)
+            map.fitBounds([
+                [19.25, -99.28], // Suroeste
+                [19.68, -98.98]  // Noreste
+            ]);
+        }
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
