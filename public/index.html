@@ -1114,30 +1114,6 @@
         }
         scheduleNextUpdate();
         // --- HASTA AQUÍ ---
-        // --- FUNCIÓN COMPARTIR APP ---
-        function shareApp() {
-            const shareData = {
-                title: 'AireGPT CDMX',
-                text: 'Monitoreo de Calidad del Aire y Gemelo Digital en Tiempo Real. 🚦🌎',
-                url: window.location.href
-            };
-        
-            // 1. Intentar Share Nativo (Mobile)
-            if (navigator.share) {
-                navigator.share(shareData)
-                    .then(() => console.log('Compartido con éxito'))
-                    .catch((error) => console.log('Error compartiendo:', error));
-            } 
-            // 2. Fallback: Copiar al Portapapeles (Desktop)
-            else {
-                navigator.clipboard.writeText(window.location.href).then(() => {
-                    // Un pequeño feedback visual (alert temporal)
-                    alert("📋 ¡Enlace copiado al portapapeles!");
-                }).catch(err => {
-                    console.error('Error al copiar:', err);
-                });
-            }
-        }
     </script>
 </body>
 </html>
