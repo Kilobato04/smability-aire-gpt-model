@@ -384,32 +384,35 @@
                 conn_live: "EN VIVO",
                 conn_hist: "HISTÓRICO",
                 conn_fore: "PRONÓSTICO",
-                loading: "Cargando datos...", // <--- NUEVO
-                nodata: "Datos no disponibles", // <--- NUEVO (Para errores)
+                loading: "Cargando datos...",
+                nodata: "Datos no disponibles",
                 stats: { min: "Mínimo", avg: "Promedio", max: "Máximo" },
                 popup: { station: "Estación", risk: "Riesgo", inhabitants: "habitantes" },
+                
+                // Textos del Pitch (Sin cambios)
                 aboutTitle: "🧬 ECOSISTEMA AIREGPT",
                 modelTitle: "🧠 El Modelo (AireGPT)",
                 modelDesc: "Transformamos la CDMX en una malla neuronal viva. AireGPT ingesta datos de <b>estaciones oficiales</b> en tiempo real, procesándolos con modelos <b>XGBoost</b> y <b>Scikit-Learn</b> en AWS Lambda. No es solo interpolación; es inferencia geoespacial calibrada minuto a minuto.",
                 hwTitle: "📡 Hardware (SMAA)",
                 hwDesc: "La evolución del <b>Gemelo Digital</b>. Nuestros dispositivos SMAA funcionan como un 'Laboratorio de Calibración Virtual'. Al cruzar su ubicación con el modelo AireGPT, enviamos correcciones matemáticas vía SMS (RCI Loop), logrando sensores que se auto-calibran sin intervención humana.",
                 specSheet: "Ver Spec Sheet (SMAA V1.1)",
-                // AQUI ESTABA EL ERROR: Agregamos emojis a los nombres largos (Para el Menú)
+        
+                // --- CORRECCIÓN AQUÍ: BOTONES SIEMPRE ABREVIADOS ---
                 buttons: {
-                    ias: "🚦 Índice Aire y Salud",
-                    o3: "🔴 Ozono (O3)", 
-                    pm10: "🟤 Partículas PM10", 
-                    pm25: "🟣 Partículas PM2.5",
-                    co: "🔵 Monóxido Carbono", 
-                    so2: "🟡 Dióxido Azufre", 
-                    tmp: "🌡️ Temperatura", 
-                    rh: "💧 Humedad",
+                    ias: "🚦 IAS",
+                    o3: "🔴 O3", 
+                    pm10: "🟤 PM10", 
+                    pm25: "🟣 PM2.5",
+                    co: "🔵 CO", 
+                    so2: "🟡 SO2", 
+                    tmp: "🌡️ Temp", 
+                    rh: "💧 Hum",
                     wsp: "💨 Viento", 
-                    wdr: "🧭 Dirección", 
-                    alt: "⛰️ Altitud", 
-                    building_vol: "🏙️ Densidad Urbana"
+                    wdr: "🧭 Dir.", 
+                    alt: "⛰️ Alt", 
+                    building_vol: "🏙️ Urbano"
                 },
-                // Etiquetas cortas (Para el Popup) - Ya tienen emojis
+                // Etiquetas para popups (se mantienen cortas)
                 btn_lbl: { ias: "🚦 IAS", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5", co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum", wsp: "💨 Viento", wdr: "🧭 Dir.", alt: "⛰️ Alt", building_vol: "🏙️ Urbano" }
             },
             en: {
@@ -420,32 +423,36 @@
                 conn_live: "LIVE",
                 conn_hist: "HISTORICAL",
                 conn_fore: "FORECAST",
-                loading: "Loading data...", // <--- NUEVO
-                nodata: "Data not available", // <--- NUEVO
+                loading: "Loading data...",
+                nodata: "Data not available",
                 stats: { min: "Minimum", avg: "Average", max: "Maximum" },
                 popup: { station: "Station", risk: "Risk", inhabitants: "inhabitants" },
+        
+                // Textos del Pitch (Sin cambios)
                 aboutTitle: "🧬 AIREGPT ECOSYSTEM",
                 modelTitle: "🧠 The Model (AireGPT)",
                 modelDesc: "We transform CDMX into a living neural mesh. AireGPT ingests real-time data from <b>official stations</b>, processing it with <b>XGBoost</b> and <b>Scikit-Learn</b> models on AWS Lambda. It is not just interpolation; it is geospatial inference calibrated minute by minute.",
                 hwTitle: "📡 Hardware (SMAA)",
                 hwDesc: "The <b>Digital Twin</b> evolution. Our SMAA devices act as a 'Virtual Calibration Laboratory'. By cross-referencing their location with AireGPT, we send mathematical corrections via SMS (RCI Loop), achieving self-calibrating sensors without human intervention.",
                 specSheet: "View Spec Sheet (SMAA V1.1)",
-                // Agregamos emojis al Inglés también
+        
+                // --- CORRECCIÓN AQUÍ: BOTONES SIEMPRE ABREVIADOS ---
                 buttons: {
-                    ias: "🚦 Air Quality Index",
-                    o3: "🔴 Ozone (O3)", 
-                    pm10: "🟤 Particulate PM10", 
-                    pm25: "🟣 Particulate PM2.5",
-                    co: "🔵 Carbon Monoxide", 
-                    so2: "🟡 Sulfur Dioxide", 
-                    tmp: "🌡️ Temperature", 
-                    rh: "💧 Humidity",
-                    wsp: "💨 Wind Speed", 
-                    wdr: "🧭 Wind Dir.", 
-                    alt: "⛰️ Altitude", 
-                    building_vol: "🏙️ Urban Density"
+                    ias: "🚦 AQI",           // AQI es el estándar corto para Air Quality Index
+                    o3: "🔴 O3", 
+                    pm10: "🟤 PM10", 
+                    pm25: "🟣 PM2.5",
+                    co: "🔵 CO", 
+                    so2: "🟡 SO2", 
+                    tmp: "🌡️ Temp", 
+                    rh: "💧 Hum",
+                    wsp: "💨 Wind",          // "Wind" cabe mejor que "Wind Speed"
+                    wdr: "🧭 Dir.", 
+                    alt: "⛰️ Alt", 
+                    building_vol: "🏙️ Urban" // "Urban" cabe mejor que "Urban Density"
                 },
-                btn_lbl: { ias: "🚦 AQI", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5", co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum", wsp: "💨 Wind", wdr: "🧭 Dir.", alt: "⛰️ Elev", building_vol: "🏙️ Urban" }
+                // Etiquetas para popups
+                btn_lbl: { ias: "🚦 AQI", o3: "🔴 O3", pm10: "🟤 PM10", pm25: "🟣 PM2.5", co: "🔵 CO", so2: "🟡 SO2", tmp: "🌡️ Temp", rh: "💧 Hum", wsp: "💨 Wind", wdr: "🧭 Dir.", alt: "⛰️ Alt", building_vol: "🏙️ Urban" }
             }
         };
 
