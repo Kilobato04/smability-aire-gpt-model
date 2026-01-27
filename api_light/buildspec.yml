@@ -1,0 +1,33 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: "us-east-1"
+    REPO_NAME: "smability-api-light"
+    LAMBDA_FUNC_NAME: "Smability-API-Light"
+
+phases:
+  pre_build:
+    commands:
+      - echo 📂 Entrando al directorio de API Light...
+      - cd api_light
+      - echo 🔑 Iniciando sesión en Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $CODEBUILD_BUILD_ARN
+      # Nota: El login anterior puede variar según la versión de CodeBuild, 
+      # usamos la forma estándar compatible con la mayoría de las imágenes:
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - echo 🆔 Account ID: $(aws sts get-caller-identity --query Account --output text)
+
+  build:
+    commands:
+      - echo 🔨 Construyendo imagen Docker...
+      - docker build -t $REPO_NAME .
+      - docker tag $REPO_NAME:latest $(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPO_NAME:latest
+
+  post_build:
+    commands:
+      - echo ⬆️ Subiendo imagen a ECR...
+      - docker push $(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPO_NAME:latest
+      - echo 🔄 Actualizando función Lambda...
+      - aws lambda update-function-code --function-name $LAMBDA_FUNC_NAME --image-uri $(aws sts get-caller-identity --query Account --output text).dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPO_NAME:latest --publish
+      - echo ✅ ¡Despliegue completado desde CodeBuild!
