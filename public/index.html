@@ -508,10 +508,11 @@
             maxZoom: 16   // Vista Calle
         });
 
-        // 2. ENCUADRE (TIGHT FIT)
+        // 2. ENCUADRE (TIGHT FIT - AJUSTADO)
+        // Recortamos las coordenadas para forzar al mapa a acercarse más
         map.fitBounds([
-            [19.10, -99.35], // Suroeste
-            [19.75, -98.85]  // Noreste
+            [19.22, -99.32], // Suroeste (Más arriba, cortando zona rural sur)
+            [19.62, -98.92]  // Noreste (Más abajo, cortando zona rural norte)
         ]);
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
