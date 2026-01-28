@@ -674,43 +674,50 @@
             const now = new Date();
             const options = [];
 
-            // --- A. PASADO (Estrictamente < Ahora) ---
-            // Lógica: Tomamos la hora actual, restamos 1 hora y fijamos minuto 20.
-            // Así, si son 10:20, el pasado arranca en 09:20.
-            let pDate = new Date(now);
-            pDate.setHours(pDate.getHours() - 1); 
-            pDate.setMinutes(20); pDate.setSeconds(0); pDate.setMilliseconds(0);
+            // --- 1. DEFINIR EL "ANCLA" (LIVE TIME) ---
+            // Esta es la única verdad. Todo gira en torno a esta fecha.
+            let anchorDate = new Date(now);
+            
+            // Si estamos en el minuto 0-19, el archivo live es de la hora anterior.
+            // Ej: Si son 10:15, el live es 09:20. Si son 10:25, el live es 10:20.
+            if (anchorDate.getMinutes() < 20) {
+                anchorDate.setHours(anchorDate.getHours() - 1);
+            }
+            // Fijamos al minuto 20 siempre
+            anchorDate.setMinutes(20); 
+            anchorDate.setSeconds(0); 
+            anchorDate.setMilliseconds(0);
 
-            // Generamos temporalmente al revés (del más reciente al más antiguo)
+            // --- 2. PASADO (Anchor - 1h, -2h...) ---
             let tempPast = [];
-            for (let i = 0; i < 24; i++) {
-                const d = new Date(pDate.getTime() - (i * 60 * 60 * 1000));
+            for (let i = 1; i <= 24; i++) { // Empezamos en 1 para que sea estrictamente anterior
+                const d = new Date(anchorDate.getTime() - (i * 60 * 60 * 1000));
                 const val = formatDate(d, '20');
-                // Calculamos "hace X horas"
-                const diff = Math.ceil((now - d) / (3600 * 1000));
-                const label = `${T.past_label} -${diff}h (${formatLabel(d)})`;
+                const label = `${T.past_label} -${i}h (${formatLabel(d)})`;
                 tempPast.push({ val, label, type: 'past' });
             }
-            // Los invertimos para que en el dropdown aparezca primero el más antiguo (-24h) y baje hasta -1h
+            // Invertimos para que el dropdown muestre arriba lo más antiguo
             tempPast.reverse().forEach(opt => options.push(opt));
 
 
-            // --- B. PRESENTE (En Vivo) ---
+            // --- 3. PRESENTE (En Vivo) ---
+            // Usamos el anchorDate calculado
             options.push({ val: 'latest', label: T.live_opt, type: 'live' }); 
 
 
-            // --- C. FUTURO (Estrictamente > Ahora) ---
-            // Lógica: Tomamos la hora actual, fijamos minuto 00 y SUMAMOS 1 hora.
-            // Así, si son 10:20, el futuro arranca en 11:00.
-            let fDate = new Date(now);
+            // --- 4. FUTURO (Anchor -> Siguiente hora en punto) ---
+            // Si el Anchor es 10:20, el primer futuro DEBE SER 11:00.
+            let fDate = new Date(anchorDate);
             fDate.setMinutes(0); fDate.setSeconds(0); fDate.setMilliseconds(0);
-            fDate.setHours(fDate.getHours() + 1);
+            fDate.setHours(fDate.getHours() + 1); // Avanzamos a la siguiente hora en punto
 
             for (let i = 0; i < 24; i++) {
                 const d = new Date(fDate.getTime() + (i * 60 * 60 * 1000));
                 const val = formatDate(d, '00');
-                // Calculamos "en X horas"
-                const diff = Math.floor((d - now) / (3600 * 1000)) + 1;
+                
+                // Calculamos diferencia visual contra el Anchor
+                // (Ojo: +1h visualmente desde el live, aunque sean 40 min reales)
+                const diff = i + 1; 
                 const label = `${T.future_label} +${diff}h (${formatLabel(d)})`;
                 options.push({ val, label, type: 'future' });
             }
