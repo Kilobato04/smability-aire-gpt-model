@@ -24,6 +24,7 @@ git pull origin main - push despues de commit en github
 cd api_light
 ./deploy_api_light.sh - ajustes a lamda-api ligera
 ./deploy_bot.sh - ajustes a bot telegram
+cd app/airegpt_telegram
 ./deploy_training.sh - correr el entrenamiento
 ```
 
