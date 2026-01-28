@@ -1,0 +1,33 @@
+version: 0.2
+
+env:
+  variables:
+    ECR_REPO_NAME: "smability-chatbot"
+    LAMBDA_FUNC_NAME: "Smability-Chatbot"
+    AWS_REGION: "us-east-1"
+    # AWS_ACCOUNT_ID se inyecta automáticamente en CodeBuild, 
+    # pero si falla, puedes ponerlo aquí o en variables de entorno de la consola.
+
+phases:
+  pre_build:
+    commands:
+      - echo "🤖 Iniciando Build del Bot..."
+      - echo "🔑 Logueando en Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME
+      - IMAGE_TAG=latest
+
+  build:
+    commands:
+      - echo "📂 Entrando al directorio del Bot..."
+      - cd app/airegpt_telegram
+      - echo "🐳 Construyendo imagen Docker..."
+      - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
+
+  post_build:
+    commands:
+      - echo "⬆️ Subiendo imagen a ECR..."
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo "🔄 Actualizando función Lambda..."
+      - aws lambda update-function-code --function-name $LAMBDA_FUNC_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG
+      - echo "✅ ¡Despliegue completado con éxito!"
