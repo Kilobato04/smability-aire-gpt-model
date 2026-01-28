@@ -670,39 +670,48 @@
         function generateLocalTimeOptions() {
             const select = document.getElementById('time-select');
             select.innerHTML = ''; 
-            
-            // Usamos el diccionario del idioma actual
             const T = I18N[currentLang]; 
-            
             const now = new Date();
             const options = [];
 
-            // --- A. PASADO (-24h) ---
-            let pastStart = new Date(now);
-            pastStart.setMinutes(20); pastStart.setSeconds(0);
-            
-            for (let i = 24; i > 0; i--) {
-                const d = new Date(pastStart.getTime() - (i * 60 * 60 * 1000));
+            // --- A. PASADO (Estrictamente < Ahora) ---
+            // Lógica: Tomamos la hora actual, restamos 1 hora y fijamos minuto 20.
+            // Así, si son 10:20, el pasado arranca en 09:20.
+            let pDate = new Date(now);
+            pDate.setHours(pDate.getHours() - 1); 
+            pDate.setMinutes(20); pDate.setSeconds(0); pDate.setMilliseconds(0);
+
+            // Generamos temporalmente al revés (del más reciente al más antiguo)
+            let tempPast = [];
+            for (let i = 0; i < 24; i++) {
+                const d = new Date(pDate.getTime() - (i * 60 * 60 * 1000));
                 const val = formatDate(d, '20');
-                // Etiqueta traducida: "⏪ PASADO -xh..."
-                const label = `${T.past_label} -${i}h (${formatLabel(d)})`; 
-                options.push({ val, label, type: 'past' });
+                // Calculamos "hace X horas"
+                const diff = Math.ceil((now - d) / (3600 * 1000));
+                const label = `${T.past_label} -${diff}h (${formatLabel(d)})`;
+                tempPast.push({ val, label, type: 'past' });
             }
+            // Los invertimos para que en el dropdown aparezca primero el más antiguo (-24h) y baje hasta -1h
+            tempPast.reverse().forEach(opt => options.push(opt));
+
 
             // --- B. PRESENTE (En Vivo) ---
-            // Etiqueta traducida: "🔴 AHORA (En Vivo)"
             options.push({ val: 'latest', label: T.live_opt, type: 'live' }); 
 
-            // --- C. FUTURO (+24h) ---
-            let futureStart = new Date(now);
-            futureStart.setMinutes(0); futureStart.setSeconds(0);
-            futureStart.setHours(futureStart.getHours() + 1);
-            
+
+            // --- C. FUTURO (Estrictamente > Ahora) ---
+            // Lógica: Tomamos la hora actual, fijamos minuto 00 y SUMAMOS 1 hora.
+            // Así, si son 10:20, el futuro arranca en 11:00.
+            let fDate = new Date(now);
+            fDate.setMinutes(0); fDate.setSeconds(0); fDate.setMilliseconds(0);
+            fDate.setHours(fDate.getHours() + 1);
+
             for (let i = 0; i < 24; i++) {
-                const d = new Date(futureStart.getTime() + (i * 60 * 60 * 1000));
+                const d = new Date(fDate.getTime() + (i * 60 * 60 * 1000));
                 const val = formatDate(d, '00');
-                // Etiqueta traducida: "🔮 FUTURO +xh..."
-                const label = `${T.future_label} +${i+1}h (${formatLabel(d)})`; 
+                // Calculamos "en X horas"
+                const diff = Math.floor((d - now) / (3600 * 1000)) + 1;
+                const label = `${T.future_label} +${diff}h (${formatLabel(d)})`;
                 options.push({ val, label, type: 'future' });
             }
 
@@ -722,8 +731,9 @@
             const slider = document.getElementById('time-slider');
             slider.max = options.length - 1;
             
-            // Mantenemos la posición si es posible, si no, vamos al Live (24)
-            if (slider.value == 0 || slider.value == 24) slider.value = 24;
+            // Centrar slider en "Live"
+            const liveIndex = options.findIndex(o => o.type === 'live');
+            slider.value = liveIndex;
         }
 
         // --- FUNCIONES AUXILIARES DE FORMATO ---
