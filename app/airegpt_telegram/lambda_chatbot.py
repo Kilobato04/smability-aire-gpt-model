@@ -4,7 +4,6 @@ import requests
 import boto3
 from datetime import datetime, timedelta
 from openai import OpenAI
-import lambda_api_light 
 import bot_content
 import cards
 import prompts
@@ -12,6 +11,8 @@ import prompts
 # --- CONFIG ---
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+# ¡NUEVO! La URL de tu API Light (la pondremos en variables de entorno)
+API_LIGHT_URL = os.environ.get('API_LIGHT_URL', 'https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/')
 DYNAMODB_TABLE = 'SmabilityUsers'
 
 client = OpenAI(api_key=OPENAI_API_KEY, timeout=20.0)
@@ -22,7 +23,7 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 def format_forecast_block(timeline):
     if not timeline or not isinstance(timeline, list): return "➡️ Estable"
     block = ""
-    cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extrema"}
+    # Mapeo de seguridad por si el API falla, pero idealmente usamos lo que viene
     emoji_map = {"Bajo": "🟢", "Moderado": "🟡", "Alto": "🟠", "Muy Alto": "🔴", "Extremadamente Alto": "🟣"}
     count = 0
     for t in timeline:
@@ -30,13 +31,17 @@ def format_forecast_block(timeline):
         hora = t.get('hora', '--:--')
         riesgo = t.get('riesgo', 'Bajo')
         ias = t.get('ias', 0)
-        block += f"`{hora}` | {emoji_map.get(riesgo,'🟢')} {ias} {cat_map.get(riesgo,'Buena')}\n"
+        # Usamos el emoji del mapa local o un default
+        emoji = emoji_map.get(riesgo, "⚪")
+        block += f"`{hora}` | {emoji} {ias} pts\n"
         count += 1
     return block.strip()
 
-def get_official_report_time():
+def get_official_report_time(ts_str):
+    # Intentamos usar el TS que viene del API, si no, calculamos
+    if ts_str: return ts_str[11:16] # "2026-01-28 14:20:12" -> "14:20"
     now = datetime.utcnow() - timedelta(hours=6)
-    return (now.replace(minute=20) if now.minute >= 20 else now.replace(minute=20) - timedelta(hours=1)).strftime("%H:%M")
+    return now.strftime("%H:%M")
 
 def get_time_greeting():
     h = (datetime.utcnow() - timedelta(hours=6)).hour
@@ -44,7 +49,7 @@ def get_time_greeting():
 
 def get_maps_url(lat, lon): return f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
 
-# --- DB ---
+# --- DB (Sin cambios) ---
 def get_user_profile(user_id):
     try: return table.get_item(Key={'user_id': str(user_id)}, ConsistentRead=True).get('Item', {})
     except: return {}
@@ -58,7 +63,7 @@ def save_interaction_and_draft(user_id, first_name, lat=None, lon=None):
     try: table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=update_expr, ExpressionAttributeValues=vals)
     except Exception as e: print(f"DB WRITE ERROR: {e}")
 
-# --- TOOLS ---
+# --- TOOLS (Sin cambios mayores) ---
 def confirm_saved_location(user_id, tipo):
     try:
         user = get_user_profile(user_id)
@@ -103,38 +108,62 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora):
         return f"✅ **Recordatorio:** Reporte diario de **{key.capitalize()}** a las {hora}."
     except: return "Error guardando recordatorio."
 
-# --- REPORT CARD ---
+# --- REPORT CARD (AQUÍ ESTÁ LA MAGIA 🌟) ---
 def generate_report_card(user_name, location_name, lat, lon):
-    print(f"🔍 [DEBUG API] Coords enviadas: {lat}, {lon}")
+    print(f"🔍 [DEBUG API] Consultando API Light para: {lat}, {lon}")
     try:
-        mock = {'queryStringParameters': {'lat': str(lat), 'lon': str(lon), 'mode': 'live'}}
-        res = lambda_api_light.lambda_handler(mock, None)
+        # CAMBIO: Usamos HTTP REQUEST a la API Light en lugar de importar localmente
+        # Esto usa el endpoint 'bot' o 'map' (usaremos mode=bot implícito con lat/lon)
+        url = f"{API_LIGHT_URL}?lat={lat}&lon={lon}"
+        r = requests.get(url, timeout=5)
         
-        if res['statusCode'] != 200: return f"⚠️ Error técnico ({res['statusCode']})."
+        if r.status_code != 200: return f"⚠️ Error de red ({r.status_code})."
             
-        data = json.loads(res['body'])
+        data = r.json()
         
         # Validar si estamos fuera de rango
         if data.get('status') == 'out_of_bounds':
             return f"📍 **Ubicación fuera de rango.**\nEl modelo solo cubre el Valle de México. Tus coordenadas ({lat:.2f}, {lon:.2f}) están fuera."
 
+        # Extraemos la data del Nuevo JSON Homologado
         qa = data.get('aire', {})
         meteo = data.get('meteo', {})
+        ubic = data.get('ubicacion', {})
+        
+        # ORO MOLIDO: Usamos los textos pre-cocinados del API
+        ias_val = qa.get('ias', 0)
+        calidad = qa.get('calidad', 'Regular')
+        color_emoji = cards.get_emoji_for_quality(calidad) # Helper en cards
+        mensaje_corto = qa.get('mensaje_corto', 'Sin datos.')
+        tendencia = qa.get('tendencia', 'Estable')
+        
         forecast_block = format_forecast_block(data.get('pronostico_timeline', []))
         
-        cat_bot = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala"}.get(qa.get('riesgo'), "Regular")
-        info = cards.IAS_INFO.get(cat_bot, cards.IAS_INFO['Regular'])
-        
+        # El municipio viene mejor del API ahora
+        region_str = f"{ubic.get('mun', 'ZMVM')}, {ubic.get('edo', 'CDMX')}"
+
         return cards.CARD_REPORT.format(
-            user_name=user_name, greeting=get_time_greeting(), location_name=location_name,
-            maps_url=get_maps_url(lat, lon), region="ZMVM", report_time=get_official_report_time(),
-            ias_value=qa.get('ias', 0), risk_category=cat_bot, risk_circle=info['emoji'], natural_message=info['msg'],
-            forecast_block=forecast_block, health_recommendation=cards.get_health_advice(cat_bot),
-            temp=meteo.get('tmp', 0), humidity=meteo.get('rh', 0), wind_speed=meteo.get('wsp', 0), footer=cards.BOT_FOOTER
+            user_name=user_name, 
+            greeting=get_time_greeting(), 
+            location_name=location_name,
+            maps_url=get_maps_url(lat, lon), 
+            region=region_str, 
+            report_time=get_official_report_time(data.get('ts')),
+            ias_value=ias_val, 
+            risk_category=calidad, 
+            risk_circle=color_emoji, 
+            natural_message=mensaje_corto, # ¡Directo del API!
+            forecast_block=forecast_block, 
+            trend_arrow=tendencia, # ¡Directo del API!
+            health_recommendation=cards.get_health_advice(calidad),
+            temp=meteo.get('tmp', 0), 
+            humidity=meteo.get('rh', 0), 
+            wind_speed=meteo.get('wsp', 0), 
+            footer=cards.BOT_FOOTER
         )
     except Exception as e: return f"⚠️ Error visual: {str(e)}"
 
-# --- SENDING ---
+# --- SENDING (Sin cambios) ---
 def get_inline_markup(tag):
     if tag == "CONFIRM_HOME": return {"inline_keyboard": [[{"text": "✅ Sí, es Casa", "callback_data": "SAVE_HOME"}], [{"text": "🔄 Cambiar", "callback_data": "RESET"}]]}
     if tag == "CONFIRM_WORK": return {"inline_keyboard": [[{"text": "✅ Sí, es Trabajo", "callback_data": "SAVE_WORK"}], [{"text": "🔄 Cambiar", "callback_data": "RESET"}]]}
@@ -153,7 +182,7 @@ def send_telegram(chat_id, text, markup=None):
             requests.post(url, json=payload)
     except Exception as e: print(f"NET ERROR: {e}")
 
-# --- HANDLER ---
+# --- HANDLER (Sin cambios mayores) ---
 def lambda_handler(event, context):
     try:
         body = json.loads(event.get('body', '{}'))
@@ -208,7 +237,7 @@ def lambda_handler(event, context):
             if not has_casa: system_extra = "ONBOARDING 1: Pide CASA"
             elif not has_trabajo: system_extra = "ONBOARDING 2: Pide TRABAJO"
 
-        gpt_msgs = [{"role": "system", "content": prompts.get_system_prompt(memoria_str, system_extra, first_name, get_official_report_time())}, {"role": "user", "content": user_content}]
+        gpt_msgs = [{"role": "system", "content": prompts.get_system_prompt(memoria_str, system_extra, first_name, get_official_report_time(None))}, {"role": "user", "content": user_content}]
         res = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_msgs, tools=bot_content.TOOLS_SCHEMA, tool_choice="auto", temperature=0.3)
         ai_msg = res.choices[0].message
         
@@ -219,29 +248,22 @@ def lambda_handler(event, context):
                 fn = tc.function.name
                 args = json.loads(tc.function.arguments)
                 r = ""
-                # Dispatcher
                 if fn == "confirmar_guardado": r = "Usa los botones."
                 elif fn == "consultar_calidad_aire":
-                    # --- FIX AUTOCORRECTOR ---
                     in_lat = args.get('lat', 0)
                     in_lon = args.get('lon', 0)
                     in_name = args.get('nombre_ubicacion', 'Ubicación')
                     
-                    # Si el LLM manda basura (0,0), buscamos en DB
                     if in_lat == 0 or in_lon == 0:
-                        print(f"⚠️ [AUTOCORRECT] LLM envió 0,0 para '{in_name}'. Buscando en DB...")
                         key = resolve_location_key(user_id, in_name)
                         if key and key in locs:
                             in_lat = float(locs[key]['lat'])
                             in_lon = float(locs[key]['lon'])
-                            print(f"✅ [AUTOCORRECT] Corregido a: {in_lat}, {in_lon}")
                         else:
                             r = "⚠️ No encontré coordenadas válidas para esa ubicación."
                     
-                    # Solo llamamos si tenemos coordenadas reales
                     if in_lat != 0 and in_lon != 0:
                         r = generate_report_card(first_name, in_name, in_lat, in_lon)
-                    # -------------------------
                     
                 elif fn == "configurar_alerta_ias": r = configure_ias_alert(user_id, args['nombre_ubicacion'], args['umbral_ias'])
                 elif fn == "configurar_recordatorio": r = configure_schedule_alert(user_id, args['nombre_ubicacion'], args['hora'])
