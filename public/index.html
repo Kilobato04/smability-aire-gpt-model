@@ -838,20 +838,34 @@
             const timestampKey = forceTimestamp || select.value;
             const selectedOpt = select.options[select.selectedIndex];
             const type = selectedOpt ? selectedOpt.dataset.type : 'live';
-            const T = I18N[currentLang]; // Textos actuales
+            const T = I18N[currentLang]; 
 
             document.getElementById('loading').style.display = 'flex';
             document.getElementById('main-content').style.opacity = '0.3';
             
             let url = BASE_API_URL;
-            if (type === 'future') { url += `?mode=forecast_data&timestamp=${timestampKey}`; }
-            else if (type === 'past') { url += `?mode=map&timestamp=${timestampKey}`; }
-            else { url += `?mode=map`; }
-            url += `&_t=${Date.now()}`;
+            
+            // --- CORRECCIÓN DE RUTAS ---
+            if (type === 'future') { 
+                // Carril 2: Pronóstico
+                url += `?mode=forecast_data&timestamp=${timestampKey}`; 
+            }
+            else if (type === 'past') { 
+                // Carril 1: Historial (Aquí estaba el error, antes decía mode=map)
+                url += `?mode=history&timestamp=${timestampKey}`; 
+            }
+            else { 
+                // Carril 0: En Vivo
+                url += `?mode=map`; 
+            }
+            // ---------------------------
+
+            url += `&_t=${Date.now()}`; // Anti-caché
 
             fetch(url)
                 .then(response => { if(!response.ok) throw new Error("Datos no encontrados"); return response.json(); })
                 .then(data => {
+                    // Normalización de llaves (Tu lógica actual)
                     data.forEach(p => {
                         p.o3 = p['o3 1h'] || p.o3; p.pm10 = p['pm10 12h'] || p.pm10;
                         p.pm25 = p['pm25 12h'] || p.pm25; p.co = p['co 8h'] || p.co; p.so2 = p['so2 1h'] || p.so2;
@@ -863,10 +877,9 @@
                     const timeEl = document.getElementById('update-time');
                     const sliderDisplay = document.getElementById('time-display');
 
-                    // 1. Extraer la HORA REAL del dato (API)
+                    // 1. Extraer la HORA REAL del dato
                     let realTimeStr = "--:--";
                     if(data.length > 0 && data[0].timestamp) { 
-                        // "2026-01-26 13:20:00" -> "13:20"
                         realTimeStr = data[0].timestamp.substring(11, 16); 
                     }
                     timeEl.innerText = realTimeStr;
@@ -874,21 +887,18 @@
                     // 2. Lógica de UI según Tipo
                     if (type === 'live') {
                         fallbackData = data;
-                        statusEl.innerText = T.conn_live; // Traducido
+                        statusEl.innerText = T.conn_live;
                         statusEl.style.color = "#22c55e"; dotEl.style.backgroundColor = "#22c55e"; dotEl.style.boxShadow = "0 0 6px #22c55e";
-                        
-                        // FIX HORA SLIDER: Usamos realTimeStr, no la hora del sistema
                         sliderDisplay.innerHTML = `<span class="live-dot" style="background:#22c55e; box-shadow:0 0 6px #22c55e;"></span> <span style="color:#22c55e; font-weight:bold;">${T.live_label} ${realTimeStr}</span>`;
                     } 
                     else if (type === 'future') {
-                        statusEl.innerText = T.conn_fore; // Traducido
+                        statusEl.innerText = T.conn_fore;
                         statusEl.style.color = "#a855f7"; dotEl.style.backgroundColor = "#a855f7"; dotEl.style.boxShadow = "0 0 6px #a855f7";
-                        // Actualizamos también el slider por si acaso
                         let label = selectedOpt.innerText.replace(T.future_label, "").replace("🔮", "").trim();
                         sliderDisplay.innerHTML = `<span style="color:#a855f7; font-weight:bold;">${T.future_label}</span> <span style="color:#cbd5e1; font-family:'Roboto Mono'; font-size:11px;">${label}</span>`;
                     } 
                     else {
-                        statusEl.innerText = T.conn_hist; // Traducido
+                        statusEl.innerText = T.conn_hist;
                         statusEl.style.color = "#38bdf8"; dotEl.style.backgroundColor = "#38bdf8"; dotEl.style.boxShadow = "0 0 6px #38bdf8";
                         let label = selectedOpt.innerText.replace(T.past_label, "").replace("⏪", "").trim();
                         sliderDisplay.innerHTML = `<span style="color:#38bdf8; font-weight:bold;">${T.past_label}</span> <span style="color:#cbd5e1; font-family:'Roboto Mono'; font-size:11px;">${label}</span>`;
@@ -898,8 +908,8 @@
                     document.getElementById('main-content').style.display = 'block';
                     document.getElementById('main-content').style.opacity = '1';
                     
-                    renderMap(); // Redibujar mapa con textos traducidos
-                    updateLegendAndStats(); // Actualizar leyenda traducida
+                    renderMap(); 
+                    updateLegendAndStats(); 
                 })
                 .catch(err => {
                     console.error("Error:", err);
