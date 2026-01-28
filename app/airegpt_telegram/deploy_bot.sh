@@ -1,31 +1,56 @@
 #!/bin/bash
+# ---------------------------------------------------------
+# SMABILITY BOT TRIGGER (CARRIL 3)
+# ---------------------------------------------------------
 
 # CONFIGURACIÓN
-ECR_REPO_NAME="smability-chatbot"
-AWS_REGION="us-east-1"
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:latest"
-LAMBDA_FUNC_NAME="Smability-Chatbot"
+PROJECT_NAME="Smability-Bot-Builder"
+REGION="us-east-1"
 
-echo "🚀 Iniciando despliegue de AIreGPT Bot..."
+# Colores para output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
-# 1. Login ECR
-aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+echo -e "${GREEN}🚀 INICIANDO GESTIÓN DE DESPLIEGUE - AIRE GPT BOT${NC}"
 
-# 2. Crear repo si no existe
-aws ecr describe-repositories --repository-names ${ECR_REPO_NAME} || aws ecr create-repository --repository-name ${ECR_REPO_NAME}
+# 1. VERIFICACIÓN DE SEGURIDAD (GIT)
+# Como CodeBuild lee de GitHub, verificamos si tienes cambios sin subir.
+echo "🔍 Verificando estado del repositorio..."
+git fetch origin main > /dev/null 2>&1
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main)
 
-# 3. Build & Push Docker
-docker build -t ${ECR_REPO_NAME} .
-docker tag ${ECR_REPO_NAME}:latest ${IMAGE_URI}
-docker push ${IMAGE_URI}
+if [ "$LOCAL" != "$REMOTE" ]; then
+    echo -e "${YELLOW}⚠️  ADVERTENCIA: Tu código local es DISTINTO al de GitHub.${NC}"
+    echo "   Si acabas de hacer cambios y no has hecho 'git push', CodeBuild construirá la versión VIEJA."
+    echo "   ¿Deseas continuar de todos modos? (s/n)"
+    read -r response
+    if [[ "$response" != "s" ]]; then
+        echo -e "${RED}🛑 Despliegue cancelado. Haz git push primero.${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}✅ Sincronización correcta. GitHub tiene tu última versión.${NC}"
+fi
 
-# 4. Actualizar Lambda
-echo "🔄 Actualizando función Lambda..."
-aws lambda update-function-code --function-name ${LAMBDA_FUNC_NAME} --image-uri ${IMAGE_URI}
+# 2. DISPARAR CODEBUILD
+echo "📡 Contactando a AWS CodeBuild..."
+BUILD_ID=$(aws codebuild start-build --project-name $PROJECT_NAME --query 'build.id' --output text)
 
-# 5. Esperar update
-echo "⏳ Esperando update..."
-aws lambda wait function-updated --function-name ${LAMBDA_FUNC_NAME}
+if [ -z "$BUILD_ID" ] || [ "$BUILD_ID" == "None" ]; then
+    echo -e "${RED}❌ Error al iniciar el build. Verifica que el proyecto '$PROJECT_NAME' exista.${NC}"
+    exit 1
+fi
 
-echo "✅ ¡Despliegue completado! El Bot está vivo."
+# 3. GENERAR LINK DE TRANSPARENCIA
+LINK="https://$REGION.console.aws.amazon.com/codesuite/codebuild/projects/$PROJECT_NAME/build/$BUILD_ID/?region=$REGION"
+
+echo "------------------------------------------------------------"
+echo -e "${GREEN}✅ ORDEN DE CONSTRUCCIÓN ENVIADA${NC}"
+echo "🆔 Build ID: $BUILD_ID"
+echo "------------------------------------------------------------"
+echo "👇 HAZ CLIC AQUÍ PARA VER LOS LOGS EN VIVO:"
+echo -e "${YELLOW}$LINK${NC}"
+echo "------------------------------------------------------------"
