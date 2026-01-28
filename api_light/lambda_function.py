@@ -16,7 +16,6 @@ MAX_DISTANCE_KM = 10.0
 CACHED_GRID = None
 
 def get_s3_json(key):
-    """Helper para bajar JSON de S3 de forma segura"""
     try:
         obj = s3.get_object(Bucket=S3_BUCKET, Key=key)
         return json.loads(obj['Body'].read())
@@ -29,7 +28,8 @@ def get_grid_data():
     data = get_s3_json(GRID_KEY)
     if data:
         CACHED_GRID = pd.DataFrame(data)
-        # Asegurar columnas mínimas
+        # Aseguramos columnas. Si faltan, ponemos 'N/A' (texto) o 0 (numeros)
+        # Para evitar líos, usaremos N/A y el safe_float lo limpiará después
         cols_needed = ['mun', 'edo', 'station', 'dominant', 'so2', 'co']
         for col in cols_needed:
             if col not in CACHED_GRID.columns: CACHED_GRID[col] = "N/A"
@@ -43,11 +43,25 @@ def haversine_vectorized(lon1, lat1, df):
     a = np.sin(dlat/2.0)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2.0)**2
     return 6367 * (2 * np.arcsin(np.sqrt(a)))
 
-# --- NUEVO: Generador de Mensajes y Color ---
+# --- HELPERS SEGUROS (NUEVOS) 🛡️ ---
+def safe_float(val, precision=1):
+    """Convierte a float de forma segura. Si falla (ej 'N/A'), devuelve 0.0"""
+    try:
+        return round(float(val), precision)
+    except (ValueError, TypeError):
+        return 0.0
+
+def safe_int(val):
+    """Convierte a int de forma segura. Si falla, devuelve 0"""
+    try:
+        return int(float(val))
+    except (ValueError, TypeError):
+        return 0
+
 def get_contexto_aire(ias):
     """Devuelve calidad, color y mensaje corto basado en el IAS"""
     try:
-        val = int(ias)
+        val = safe_int(ias)
         if val <= 50: 
             return "Buena", "Verde", "Disfruta el aire libre, condiciones ideales."
         if val <= 100: 
@@ -70,11 +84,7 @@ def lambda_handler(event, context):
         if mode == 'map':
             if CACHED_GRID is None: get_grid_data()
             if CACHED_GRID is not None:
-                return {
-                    'statusCode': 200, 
-                    'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-                    'body': CACHED_GRID.to_json(orient='records')
-                }
+                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': CACHED_GRID.to_json(orient='records')}
             else:
                 return {'statusCode': 503, 'body': 'Error cargando Live Grid'}
 
@@ -82,30 +92,22 @@ def lambda_handler(event, context):
         elif mode == 'forecast_data':
             ts = params.get('timestamp')
             if not ts: return {'statusCode': 400, 'body': json.dumps({'error': 'Falta timestamp'})}
-            
             file_key = f"forecast/{ts}.json"
             data = get_s3_json(file_key)
-            
-            if data:
-                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': json.dumps(data)}
-            else:
-                return {'statusCode': 404, 'body': json.dumps({'error': 'Forecast no encontrado'})}
+            if data: return {'statusCode': 200, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': json.dumps(data)}
+            else: return {'statusCode': 404, 'body': json.dumps({'error': 'Forecast no encontrado'})}
 
         # 3. MODO HISTORY
         elif mode == 'history':
             ts = params.get('timestamp')
             if not ts: return {'statusCode': 400, 'body': json.dumps({'error': 'Falta timestamp'})}
-            
             file_key = f"live_grid/grid_{ts}.json"
             data = get_s3_json(file_key)
-            
-            if data:
-                return {'statusCode': 200, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': json.dumps(data)}
-            else:
-                return {'statusCode': 404, 'body': json.dumps({'error': 'Historial no encontrado'})}
+            if data: return {'statusCode': 200, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': json.dumps(data)}
+            else: return {'statusCode': 404, 'body': json.dumps({'error': 'Historial no encontrado'})}
 
         # ==========================================
-        # 4. MODO BOT / GEOCERCA (Optimizado) 🤖
+        # 4. MODO BOT / GEOCERCA 🤖
         # ==========================================
         if 'lat' not in params or 'lon' not in params:
             return {'statusCode': 400, 'body': json.dumps({'error': 'Faltan lat/lon'})}
@@ -123,7 +125,7 @@ def lambda_handler(event, context):
         dist = distances[idx]
         p = CACHED_GRID.iloc[idx].replace({np.nan: None}).to_dict()
 
-        # Pronóstico
+        # Pronostico
         current_ts_str = p.get('timestamp', '')
         timeline_raw = get_s3_json(FORECAST_KEY) or []
         future_forecast = []
@@ -132,7 +134,7 @@ def lambda_handler(event, context):
                 future_forecast = [
                     {
                         "hora": f.get('timestamp', '')[11:16],
-                        "ias": int(f.get('ias_mean', 0)),
+                        "ias": safe_int(f.get('ias_mean', 0)), # USAMOS SAFE_INT
                         "riesgo": f.get('risk', 'N/A'),
                         "dominante": f.get('dominant', 'N/A')
                     }
@@ -142,14 +144,13 @@ def lambda_handler(event, context):
             except: pass
 
         # Tendencia
-        current_ias = int(p.get('ias', 0))
+        current_ias = safe_int(p.get('ias', 0)) # USAMOS SAFE_INT
         trend = "Estable ➡️"
         if future_forecast:
             next_ias = future_forecast[0]['ias']
             if next_ias > current_ias + 5: trend = "Subiendo ↗️"
             elif next_ias < current_ias - 5: trend = "Bajando ↘️"
 
-        # Calidad, Color y Mensaje Corto
         calidad, color, mensaje_corto = get_contexto_aire(current_ias)
 
         response = {
@@ -167,29 +168,27 @@ def lambda_handler(event, context):
                 "calidad": calidad,
                 "color": color,
                 "tendencia": trend,
-                "mensaje_corto": mensaje_corto, # <--- AQUÍ ESTÁ EL ORO 🥇
+                "mensaje_corto": mensaje_corto,
                 "dominante": p.get('dominant', 'PM10'),
                 "contaminantes": {
-                    "o3": round(float(p.get('o3', 0)), 1),
-                    "pm10": round(float(p.get('pm10', 0)), 1),
-                    "pm25": round(float(p.get('pm25', 0)), 1),
-                    "so2": round(float(p.get('so2', 0)), 1),
-                    "co": round(float(p.get('co', 0)), 2)
+                    "o3": safe_float(p.get('o3')),    # BLINDADO 🛡️
+                    "pm10": safe_float(p.get('pm10')), # BLINDADO 🛡️
+                    "pm25": safe_float(p.get('pm25')), # BLINDADO 🛡️
+                    "so2": safe_float(p.get('so2')),   # BLINDADO 🛡️
+                    "co": safe_float(p.get('co'), 2)   # BLINDADO 🛡️
                 }
             },
             "meteo": {
-                "tmp": round(float(p.get('tmp', 0)), 1),
-                "rh": round(float(p.get('rh', 0)), 1),
-                "wsp": round(float(p.get('wsp', 0)), 1)
+                "tmp": safe_float(p.get('tmp')), # BLINDADO 🛡️
+                "rh": safe_float(p.get('rh')),   # BLINDADO 🛡️
+                "wsp": safe_float(p.get('wsp'))  # BLINDADO 🛡️
             },
             "pronostico_timeline": future_forecast
         }
         
-        return {
-            'statusCode': 200, 
-            'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
-            'body': json.dumps(response)
-        }
+        return {'statusCode': 200, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': json.dumps(response)}
 
     except Exception as e:
+        # Imprimir el error exacto en los logs de CloudWatch para debug futuro
+        print(f"🔥 ERROR FATAL: {str(e)}")
         return {'statusCode': 500, 'body': json.dumps({'error': str(e)})}
