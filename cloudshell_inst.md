@@ -23,7 +23,7 @@ git pull origin main - push despues de commit en github
 ./deploy_heavy.sh - ajustes a lambdas modelo pesado
 cd api_light
 ./deploy_api_light.sh - ajustes a lamda-api ligera
-./remote_deploy_bot.sh - ajustes a bot telegram
+./deploy_bot.sh - ajustes a bot telegram
 ./deploy_training.sh - correr el entrenamiento
 ```
 
