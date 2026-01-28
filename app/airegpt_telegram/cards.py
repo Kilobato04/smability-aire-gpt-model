@@ -1,5 +1,5 @@
 # app/cards.py
-BOT_VERSION = "v0.5.8 (Onboarding + Forecast)"
+BOT_VERSION = "v0.6.0 (Live API Connect)"
 BOT_FOOTER = f"🤖 AIreGPT {BOT_VERSION}"
 
 IAS_INFO = {
@@ -10,6 +10,11 @@ IAS_INFO = {
     "Extremadamente Mala": {"msg": "¡Peligro!", "rec": "Urgencia médica si hay síntomas.", "emoji": "🟣"}
 }
 
+# --- NUEVO HELPER (Requerido por v0.6.0) ---
+def get_emoji_for_quality(calidad):
+    """Extrae el emoji de forma segura para el chatbot"""
+    return IAS_INFO.get(calidad, {}).get("emoji", "⚪")
+
 def get_health_advice(category, user_condition=None):
     base_rec = IAS_INFO.get(category, IAS_INFO["Regular"])["rec"]
     if not user_condition or user_condition.lower() == "ninguno": return base_rec
@@ -19,6 +24,8 @@ def get_health_advice(category, user_condition=None):
         return f"ℹ️ **Por tu {user_condition}:** Considera reducir el esfuerzo físico."
     else:
         return f"✅ **Buena noticia:** El aire es seguro para tu **{user_condition}**."
+
+# --- PLANTILLAS DE TARJETAS ---
 
 CARD_ONBOARDING = """👋 **¡Bienvenido a AIreGPT!**
 Para protegerte, necesito configurar tus dos bases principales. Así podré avisarte antes de que respires aire malo.
@@ -37,11 +44,13 @@ Ahora, envíame la ubicación de tu **TRABAJO** (o escuela) para activar las ale
 *(Toca el clip 📎 y selecciona "Ubicación")*
 {footer}"""
 
+# ACTUALIZADA: Se agregó {trend_arrow} para aprovechar el dato de la nueva API
 CARD_REPORT = """👋 **{greeting} {user_name}**
 📍 **[{location_name}]({maps_url})** | {region}
 🕒 {report_time}
 
 {risk_circle} **{ias_value} puntos IAS** ({risk_category})
+📈 Tendencia: {trend_arrow}
 
 🔮 **Pronóstico Próximas 4h:**
 {forecast_block}
@@ -89,5 +98,5 @@ CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
 🛑 **Restricciones:** Doble Hoy No Circula activo.
 🛡️ **Acción:** Cierra ventanas y evita salir.
 
-_Fuente: CAMe / SIMAT_
+_Fuente: SIMAT /Smability_
 {footer}"""
