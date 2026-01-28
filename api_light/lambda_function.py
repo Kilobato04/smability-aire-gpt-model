@@ -75,7 +75,7 @@ def lambda_handler(event, context):
             # Construimos la ruta del archivo. 
             # NOTA: Asumimos que viven en la carpeta 'forecasts/' con el nombre exacto del timestamp
             # Si tu estructura es diferente, ajusta esta línea:
-            file_key = f"forecasts/{ts}.json" 
+            file_key = f"forecast/{ts}.json" 
             
             data = get_s3_json(file_key)
             
