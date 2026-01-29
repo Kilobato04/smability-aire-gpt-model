@@ -29,6 +29,7 @@ cd api_light
 ./deploy_bot.sh - ajustes a bot telegram
 cd app/airegpt_telegram
 ./deploy_training.sh - correr el entrenamiento
+./deploy_scheduler.sh - corre el scheduler
 ```
 
 ## 3. Borrar todos los zips y scripts viejos
