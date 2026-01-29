@@ -1,33 +1,29 @@
 #!/bin/bash
-# ---------------------------------------------------------
-# CARRIL 4: CRM API DEPLOYER
-# ---------------------------------------------------------
+# Despliegue CRM API (Carril 4)
 
-# CONFIGURACIÓN
-ECR_REPO_NAME="smability-crm"
-LAMBDA_FUNC_NAME="Smability-CRM-API" # <--- ¡NUEVA LAMBDA!
-AWS_REGION="us-east-1"
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}:latest"
+# Configuración
+ECR_REPO="smability-crm"
+LAMBDA_NAME="Smability-CRM-API"
+REGION="us-east-1"
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+URI="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPO}:latest"
 
-echo "📊 INICIANDO DESPLIEGUE DEL CRM API..."
+echo "🏁 INICIANDO DESPLIEGUE LIMPIO DE CRM..."
 
-# 1. Login
-aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+# 1. Login ECR
+aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $URI
 
-# 2. Crear Repo ECR si no existe
-aws ecr describe-repositories --repository-names ${ECR_REPO_NAME} > /dev/null 2>&1 || aws ecr create-repository --repository-name ${ECR_REPO_NAME}
+# 2. Build (Usando el Dockerfile ligero de esta carpeta)
+echo "🏗️ Construyendo Imagen Docker..."
+docker build -t $ECR_REPO .
 
-# 3. Build & Push
-echo "🐳 Construyendo Docker..."
-docker build -t ${ECR_REPO_NAME} .
-docker tag ${ECR_REPO_NAME}:latest ${IMAGE_URI}
-docker push ${IMAGE_URI}
+# 3. Tag & Push
+echo "⬆️ Subiendo a ECR..."
+docker tag $ECR_REPO:latest $URI
+docker push $URI
 
-# 4. Actualizar Lambda (O crearla si no existe - aquí solo actualizamos código)
-# NOTA: La primera vez tendrás que crear la Lambda en la consola manualmente 
-# o usar AWS CLI para crearla. Asumiremos que la creas en consola para asignar roles fácil.
-echo "🔄 Actualizando Código Lambda..."
-aws lambda update-function-code --function-name ${LAMBDA_FUNC_NAME} --image-uri ${IMAGE_URI}
+# 4. Actualizar Lambda
+echo "🔄 Conectando Lambda con la nueva imagen..."
+aws lambda update-function-code --function-name $LAMBDA_NAME --image-uri $URI --publish
 
-echo "✅ CRM API Desplegada."
+echo "✅ ¡ÉXITO! CRM Desplegado."
