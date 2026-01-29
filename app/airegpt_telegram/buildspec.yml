@@ -10,7 +10,7 @@ env:
 phases:
   pre_build:
     commands:
-      - echo "🤖 Iniciando Build UNIFICADO (Bot + Scheduler)..."
+      - echo "🤖 Iniciando Build UNIFICADO..."
       - echo "🆔 Obteniendo Account ID..."
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - echo "🔑 Logueando en ECR..."
@@ -18,29 +18,31 @@ phases:
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME
       - IMAGE_TAG=latest
 
-      # 🆕 CAMBIO CRÍTICO: CREACIÓN AUTOMÁTICA DEL REPO
-      - echo "🔍 Verificando/Creando Repositorio ECR..."
+      # Verificar/Crear Repo (Ya lo hiciste manual, pero dejamos esto por seguridad futura)
       - aws ecr describe-repositories --repository-names $ECR_REPO_NAME || aws ecr create-repository --repository-name $ECR_REPO_NAME
-      # ------------------------------------------------
 
       - echo "🔄 Sincronizando API Light..."
       - cp api_light/lambda_function.py app/airegpt_telegram/lambda_api_light.py
-      - echo "✅ Dependencia copiada."
 
   build:
     commands:
       - echo "📂 Entrando a carpeta del módulo..."
       - cd app/airegpt_telegram
       
-      - echo "🐳 Construyendo Docker Maestro..."
+      # 🆕 FIX: Limpiamos el Build ID para quitar los dos puntos prohibidos (:)
+      - CLEAN_TAG=$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}')
+      - echo "🏷️ Tag limpio generado: $CLEAN_TAG"
+      
+      - echo "🐳 Construyendo Docker..."
       - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
-      - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:build-$CODEBUILD_BUILD_ID
+      # Usamos el tag limpio
+      - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:build-$CLEAN_TAG
 
   post_build:
     commands:
       - echo "⬆️ Subiendo a ECR..."
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - docker push $REPOSITORY_URI:build-$CODEBUILD_BUILD_ID
+      - docker push $REPOSITORY_URI:build-$CLEAN_TAG
       
       - echo "🔄 Actualizando Lambda BOT ($LAMBDA_BOT_NAME)..."
       - aws lambda update-function-code --function-name $LAMBDA_BOT_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG > /dev/null
@@ -48,4 +50,4 @@ phases:
       - echo "🔄 Actualizando Lambda SCHEDULER ($LAMBDA_SCHEDULER_NAME)..."
       - aws lambda update-function-code --function-name $LAMBDA_SCHEDULER_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG > /dev/null
       
-      - echo "✅ Despliegue DOBLE completado exitosamente."
+      - echo "✅ Despliegue DOBLE completado."
