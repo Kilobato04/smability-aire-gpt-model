@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smability CRM | Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <style>
+        body { margin: 0; padding: 0; background: #0f172a; font-family: 'Inter', sans-serif; color: #e2e8f0; height: 100vh; overflow: hidden; display: flex; }
+        
+        /* --- SIDEBAR DE NAVEGACIÓN --- */
+        .sidebar-nav {
+            width: 260px; background: rgba(15, 23, 42, 0.95); 
+            border-right: 1px solid rgba(56, 189, 248, 0.2);
+            display: flex; flex-direction: column; padding: 20px;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5); z-index: 10;
+        }
+
+        .brand { 
+            font-size: 18px; font-weight: 700; color: #38bdf8; 
+            letter-spacing: -0.5px; margin-bottom: 30px; 
+            display: flex; align-items: center; gap: 10px;
+        }
+        .brand span { color: #fff; opacity: 0.5; font-size: 12px; font-weight: 400; border: 1px solid #475569; padding: 2px 6px; border-radius: 4px; }
+
+        .metric-card {
+            background: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255,255,255,0.05);
+            padding: 15px; border-radius: 8px; margin-bottom: 10px;
+        }
+        .metric-val { font-family: 'Roboto Mono'; font-size: 24px; color: #fff; font-weight: 600; }
+        .metric-lbl { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; }
+
+        /* --- ÁREA PRINCIPAL --- */
+        .main-content { flex: 1; padding: 30px; overflow-y: auto; position: relative; }
+        
+        .header-dash { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .page-title { font-size: 22px; font-weight: 600; color: #fff; }
+        .refresh-btn {
+            background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
+            transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+        }
+        .refresh-btn:hover { background: rgba(56, 189, 248, 0.2); box-shadow: 0 0 10px rgba(56, 189, 248, 0.2); }
+
+        /* --- TABLA DE USUARIOS --- */
+        .users-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+
+        .user-card {
+            background: #1e293b; border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 10px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s;
+            display: flex; flex-direction: column;
+        }
+        .user-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.3); border-color: rgba(56, 189, 248, 0.3); }
+
+        .uc-header {
+            padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; align-items: flex-start;
+            background: linear-gradient(to right, rgba(56,189,248,0.05), transparent);
+        }
+        .uc-name { font-size: 14px; font-weight: 600; color: #fff; display: block; }
+        .uc-id { font-family: 'Roboto Mono'; font-size: 10px; color: #64748b; margin-top: 2px; display: block; }
+        
+        .badge { font-size: 9px; padding: 3px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; }
+        .badge.premium { background: rgba(34, 197, 94, 0.1); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.2); }
+        .badge.free { background: rgba(148, 163, 184, 0.1); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); }
+
+        .uc-body { padding: 15px; flex: 1; font-size: 11px; color: #cbd5e1; }
+        
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 4px; }
+        .stat-row:last-child { border: none; }
+        .stat-key { color: #94a3b8; }
+        .stat-val { font-family: 'Roboto Mono'; color: #fff; }
+
+        .section-title { font-size: 10px; font-weight: 700; color: #38bdf8; text-transform: uppercase; margin: 12px 0 6px 0; letter-spacing: 0.5px; }
+
+        .loc-tag { 
+            display: inline-block; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);
+            padding: 4px 8px; border-radius: 4px; margin-right: 4px; margin-bottom: 4px;
+        }
+        .loc-name { display: block; font-weight: 600; color: #e2e8f0; margin-bottom: 2px; }
+        .loc-detail { display: block; font-size: 9px; color: #94a3b8; }
+        .alert-active { color: #f59e0b; font-weight: 700; }
+
+        /* LOADING */
+        #loader {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0f172a; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; z-index: 100;
+        }
+        .spinner {
+            width: 30px; height: 30px; border: 3px solid rgba(56,189,248,0.3); 
+            border-top: 3px solid #38bdf8; border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        @media (max-width: 768px) {
+            body { flex-direction: column; overflow: auto; }
+            .sidebar-nav { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; padding: 10px 20px; }
+            .metric-card { display: none; }
+            .brand { margin: 0; }
+            .users-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <p style="margin-top: 15px; font-size: 12px; color: #64748b;">Cargando usuarios...</p>
+    </div>
+
+    <div class="sidebar-nav">
+        <div class="brand">Smability <span>CRM</span></div>
+        
+        <div class="metric-card">
+            <div class="metric-val" id="total-users">-</div>
+            <div class="metric-lbl">Total Usuarios</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-val" id="active-alerts">-</div>
+            <div class="metric-lbl">Alertas Activas</div>
+        </div>
+
+        <div class="metric-card">
+            <div class="metric-val" id="premium-count" style="color: #4ade80;">-</div>
+            <div class="metric-lbl">Usuarios Premium</div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="header-dash">
+            <div class="page-title">Gestión de Usuarios</div>
+            <button class="refresh-btn" onclick="fetchData()">
+                🔄 Actualizar
+            </button>
+        </div>
+
+        <div id="users-container" class="users-grid">
+            </div>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN
+        // ⚠️ REEMPLAZA ESTO CON TU URL REAL DE API LIGHT
+        const API_URL = "https://3s2niqf45lksfqfmrc2cg2ivpi0fealf.lambda-url.us-east-1.on.aws/?action=list_users&key=02Kilobaterias";
+
+        async function fetchData() {
+            const loader = document.getElementById('loader');
+            const container = document.getElementById('users-container');
+            
+            loader.style.display = 'flex';
+            container.innerHTML = ''; // Limpiar
+
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+
+                // Validar respuesta
+                if (!data.users) throw new Error("Formato de API inválido");
+
+                // Calcular Métricas Globales
+                const users = data.users;
+                const totalUsers = data.count || users.length;
+                let totalAlerts = 0;
+                let premiumUsers = 0;
+
+                users.forEach(u => {
+                    // Renderizar Card de Usuario
+                    const card = createUserCard(u);
+                    container.appendChild(card);
+
+                    // Sumar métricas
+                    totalAlerts += (u.quotas?.alerts?.used || 0);
+                    if (u.status === 'PREMIUM') premiumUsers++;
+                });
+
+                // Actualizar Sidebar
+                document.getElementById('total-users').innerText = totalUsers;
+                document.getElementById('active-alerts').innerText = totalAlerts;
+                document.getElementById('premium-count').innerText = premiumUsers;
+
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = `<div style="color: #ef4444; padding: 20px;">❌ Error cargando datos: ${error.message}</div>`;
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        function createUserCard(u) {
+            const div = document.createElement('div');
+            div.className = 'user-card';
+
+            const isPremium = u.status === 'PREMIUM';
+            const statusClass = isPremium ? 'premium' : 'free';
+            const statusLabel = isPremium ? 'PREMIUM' : 'FREE';
+
+            // Parsear Ubicaciones para HTML
+            let locsHTML = '';
+            if (u.locations_snapshot && u.locations_snapshot.length > 0) {
+                u.locations_snapshot.forEach(loc => {
+                    let alertInfo = '';
+                    if (loc.config.schedule_report) alertInfo += `⏰ ${loc.config.schedule_report} `;
+                    if (loc.config.threshold_alert) alertInfo += `🚨 ${loc.config.threshold_alert}`;
+                    
+                    if (!alertInfo) alertInfo = 'Sin alertas';
+                    else alertInfo = `<span class="alert-active">${alertInfo}</span>`;
+
+                    locsHTML += `
+                        <div class="loc-tag">
+                            <span class="loc-name">${loc.name}</span>
+                            <span class="loc-detail">${alertInfo}</span>
+                        </div>
+                    `;
+                });
+            } else {
+                locsHTML = '<span style="color:#64748b; font-style:italic;">Sin ubicaciones</span>';
+            }
+
+            // Parsear Fechas (Formato amigable)
+            const lastSeen = u.crm_metrics.last_seen ? u.crm_metrics.last_seen.split(' ')[0] : 'N/A';
+
+            div.innerHTML = `
+                <div class="uc-header">
+                    <div>
+                        <span class="uc-name">${u.name}</span>
+                        <span class="uc-id">ID: ${u.user_id}</span>
+                    </div>
+                    <span class="badge ${statusClass}">${statusLabel}</span>
+                </div>
+                <div class="uc-body">
+                    <div class="stat-row">
+                        <span class="stat-key">Última vez:</span>
+                        <span class="stat-val">${lastSeen}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">Alertas Usadas:</span>
+                        <span class="stat-val">${u.quotas.alerts.used} / ${u.quotas.alerts.limit}</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-key">Contingencia:</span>
+                        <span class="stat-val" style="color:${u.global_config.contingency_enabled ? '#4ade80' : '#ef4444'}">
+                            ${u.global_config.contingency_enabled ? 'ACTIVADA' : 'OFF'}
+                        </span>
+                    </div>
+
+                    <div class="section-title">Ubicaciones & Config</div>
+                    <div>${locsHTML}</div>
+                </div>
+            `;
+            return div;
+        }
+
+        // Cargar al inicio
+        fetchData();
+    </script>
+</body>
+</html>
