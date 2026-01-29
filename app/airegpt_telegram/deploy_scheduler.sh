@@ -2,30 +2,50 @@
 set -e
 
 # --- CONFIGURACIÓN ---
-ECR_REPO="smability-scheduler"  # Nombre del repo en ECR (se creará si no existe)
-LAMBDA_NAME="Smability-Scheduler" # ⚠️ Nombre EXACTO de tu función en AWS Lambda
+ECR_REPO="smability-scheduler"
+LAMBDA_NAME="Smability-Scheduler"
 REGION="us-east-1"
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 URI="${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${ECR_REPO}:latest"
+
+# 📍 RUTA EXACTA DEL ARCHIVO MAESTRO (Desde donde estamos ejecutando el script)
+# Estamos en: app/airegpt_telegram/
+# Vamos a:    ../../api_light/lambda_function.py
+SOURCE_FILE="../../api_light/lambda_function.py"
+DEST_FILE="lambda_api_light.py"
 
 echo "⏰ INICIANDO DESPLIEGUE DEL SCHEDULER..."
 
 # 1. Login ECR
 aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $URI
 
-# 2. Crear Repo ECR si no existe (por si es la primera vez)
-aws ecr describe-repositories --repository-names $ECR_REPO > /dev/null 2>&1 || \
-    aws ecr create-repository --repository-name $ECR_REPO > /dev/null
+# --- 🚀 PASO DE SINCRONIZACIÓN Y RENOMBRADO ---
+echo "🔄 Buscando API Light en: $SOURCE_FILE"
 
-# 3. Build & Push
+if [ -f "$SOURCE_FILE" ]; then
+    # Copiamos Y Renombramos al mismo tiempo
+    cp "$SOURCE_FILE" "./$DEST_FILE"
+    echo "✅ Archivo copiado y renombrado a $DEST_FILE exitosamente."
+else
+    echo "❌ ERROR CRÍTICO: No encuentro el archivo en $SOURCE_FILE"
+    echo "   Verifica que la carpeta 'api_light' exista en la raíz del repo."
+    exit 1
+fi
+# -----------------------------------------------
+
+# 2. Build & Push
 echo "🏗️  Construyendo Docker..."
 docker build -t $ECR_REPO .
+
 echo "⬆️  Subiendo a la nube..."
 docker tag $ECR_REPO:latest $URI
 docker push $URI
 
-# 4. Actualizar Lambda
-echo "🔄 Actualizando función Lambda..."
+# 3. Actualizar Lambda
+echo "🔄 Actualizando Lambda..."
 aws lambda update-function-code --function-name $LAMBDA_NAME --image-uri $URI --publish > /dev/null
 
-echo "✅ SCHEDULER ACTUALIZADO CORRECTAMENTE"
+# Opcional: Limpiar el archivo copiado para no ensuciar tu carpeta local
+# rm $DEST_FILE 
+
+echo "✅ DESPLIEGUE COMPLETADO"
