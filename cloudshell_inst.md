@@ -26,10 +26,9 @@ cd crm_api
 ./deploy_heavy.sh - ajustes a lambdas modelo pesado
 cd api_light
 ./deploy_api_light.sh - ajustes a lamda-api ligera
-./deploy_bot.sh - ajustes a bot telegram
+./deploy_scheduler_bot.sh - ajustes a bot telegram y al scheduler
 cd app/airegpt_telegram
 ./deploy_training.sh - correr el entrenamiento
-./deploy_scheduler.sh - corre el scheduler
 ```
 
 ## 3. Borrar todos los zips y scripts viejos
