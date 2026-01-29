@@ -2,6 +2,8 @@ import json
 import boto3
 import os
 from decimal import Decimal
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 # --- CONFIGURACIÓN ---
 TABLE_NAME = 'SmabilityUsers'
@@ -10,75 +12,187 @@ ADMIN_API_KEY = os.environ.get('CRM_API_KEY', 'smability-secret-admin')
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
 
-# --- PLANTILLA MAESTRA (Homologación) ---
-# Esto define qué campos se verán SIEMPRE, aunque no existan en la DB.
-def normalize_user(db_item):
-    # 1. Estructura Base (Defaults)
-    user = {
-        "user_id": db_item.get('user_id'),
-        "first_name": db_item.get('first_name', 'Usuario Sin Nombre'),
-        "email": db_item.get('email', None),  # ✅ Aparecerá como null si no existe
-        "created_at": db_item.get('created_at', None),
-        "last_interaction": db_item.get('last_interaction', None),
+# --- 🧠 REGLAS DE NEGOCIO (QUOTAS) ---
+# Deben coincidir con las del Bot para consistencia
+BUSINESS_RULES = {
+    "FREE": {
+        "loc_limit": 2, 
+        "alert_limit": 0, 
+        "can_contingency": False,
+        "price": {"amount": 0, "freq": "N/A", "name": "Básico"}
+    },
+    "PREMIUM_MONTHLY": {
+        "loc_limit": 3, 
+        "alert_limit": 10, 
+        "can_contingency": True,
+        "price": {"amount": 49.00, "freq": "Mensual", "name": "Premium Mensual"}
+    },
+    "PREMIUM_ANNUAL": {
+        "loc_limit": 3, 
+        "alert_limit": 10, 
+        "can_contingency": True,
+        "price": {"amount": 329.00, "freq": "Anual", "name": "Premium Anual"}
+    }
+}
+
+# --- HELPERS DE TIEMPO ---
+def to_mexico_time(iso_str):
+    if not iso_str: return None
+    try:
+        dt = datetime.fromisoformat(str(iso_str).replace('Z', '+00:00'))
+        return dt.astimezone(ZoneInfo("America/Mexico_City")).strftime("%Y-%m-%d %I:%M %p")
+    except: return str(iso_str)
+
+def days_between(date_iso):
+    """Calcula días pasados desde la fecha dada hasta hoy"""
+    if not date_iso: return 0
+    try:
+        dt = datetime.fromisoformat(str(date_iso).replace('Z', '+00:00'))
+        now = datetime.now(timezone.utc)
+        delta = now - dt
+        return abs(delta.days)
+    except: return 0
+
+# --- LÓGICA DE ENRIQUECIMIENTO (EL CEREBRO DEL CRM) ---
+def enrich_user_data(item):
+    # 1. Extracción Segura
+    sub_raw = item.get('subscription', {})
+    profile_raw = item.get('profile', {})
+    locs_raw = item.get('locations', {})
+    alerts_raw = item.get('alerts', {})
+    metrics_raw = item.get('metrics', {}) # Contadores históricos
+
+    # 2. Identificar Plan y Reglas
+    status = sub_raw.get('status', 'FREE')
+    # Intentamos buscar el tier específico (ej. PREMIUM_ANNUAL), si no, fallback al status
+    tier_key = sub_raw.get('tier', status)
+    
+    # Obtener reglas (Buscamos tier exacto -> Status general -> Fallback a Free)
+    rules = BUSINESS_RULES.get(tier_key, BUSINESS_RULES.get(status, BUSINESS_RULES.get('FREE')))
+    
+    # Fallback de seguridad por si rules es None (raro)
+    if not rules: rules = BUSINESS_RULES['FREE']
         
-        # 💰 MONETIZACIÓN (STRIPE)
-        # Si existe en DB lo usa, si no, pone defaults
-        "subscription": {
-            "status": "FREE",
-            "tier": "basic_v1",
-            "stripe_customer_id": None,
-            "valid_until": None,
-            "auto_renew": False
-        },
+    pricing = rules.get('price', {"amount": 0, "freq": "N/A", "name": "Desconocido"})
+
+    # 3. Calcular Uso (Quotas Used)
+    locs_used = len(locs_raw)
+    
+    # Contar alertas activas reales (Schedule + Threshold)
+    alerts_used = 0
+    for place in locs_raw:
+        if alerts_raw.get('schedule', {}).get(place, {}).get('active'): alerts_used += 1
+        if alerts_raw.get('threshold', {}).get(place, {}).get('active'): alerts_used += 1
+
+    # 4. Construcción de Locations Snapshot (Merge de Ubicación + Config)
+    locations_snapshot = []
+    for place_name, coords in locs_raw.items():
+        # Extraer configs específicas para este lugar
+        sched_cfg = alerts_raw.get('schedule', {}).get(place_name, {})
+        thresh_cfg = alerts_raw.get('threshold', {}).get(place_name, {})
         
-        # 🩺 PERFIL & TAGS
-        "profile": {
-            "tags": [],          # Lista vacía para agregar tags después
-            "device_os": None,
-            "language": "es"
-        },
-        
-        # 📊 MÉTRICAS CRM
-        "metrics": {
-            "total_requests": 0,
-            "alerts_received": 0,
-            "days_active": 0
+        # Formatear valor umbral para display
+        thresh_val = thresh_cfg.get('umbral')
+        thresh_display = f"> {thresh_val} IMA" if thresh_val else None
+
+        locations_snapshot.append({
+            "name": place_name,
+            "coords": {"lat": coords.get('lat'), "lon": coords.get('lon')},
+            "is_active": coords.get('active', True),
+            "config": {
+                "schedule_report": sched_cfg.get('time'),  # Ej: "07:30"
+                "threshold_alert": thresh_display,         # Ej: "> 100 IMA"
+                "consecutive_sent": thresh_cfg.get('consecutive_sent', 0) # Debug
+            }
+        })
+
+    # 5. Cálculo de Renovación
+    valid_until = sub_raw.get('valid_until')
+    renewal_text = "N/A"
+    if valid_until:
+        # Aquí asumimos que valid_until es futuro, calculamos días faltantes
+        # Si la fecha ya pasó, saldrá negativo (indicando vencido)
+        days_left = -1 * days_between(valid_until) # Simplificado
+        renewal_text = f"Vence: {valid_until}"
+
+    # --- ENSAMBLAJE FINAL DEL JSON ---
+    return {
+        "user_id": item.get('user_id'),
+        "name": item.get('first_name', 'Sin Nombre'),
+        "email": item.get('email', None),
+        "status": status,
+
+        # 📊 Métricas de Retención
+        "crm_metrics": {
+            "first_seen": to_mexico_time(item.get('created_at')),
+            "last_seen": to_mexico_time(item.get('last_interaction')),
+            "days_inactive": days_between(item.get('last_interaction')), # 🚨 VITAL
+            "total_requests": metrics_raw.get('total_requests', 0),
+            "alerts_received": metrics_raw.get('alerts_received', 0)
         },
 
-        # 📍 LOCACIONES (Tal cual vienen de la DB o vacío)
-        "locations": db_item.get('locations', {}),
-        
-        # 🔔 ALERTAS (Tal cual vienen de la DB o vacío)
-        "alerts": db_item.get('alerts', {})
+        # 💰 Suscripción
+        "subscription": {
+            "plan_name": pricing['name'],
+            "tier_id": tier_key,
+            "amount": pricing['amount'],
+            "currency": "MXN",
+            "frequency": pricing['freq'],
+            "stripe_customer_id": sub_raw.get('stripe_customer_id'),
+            "valid_until": valid_until,
+            "auto_renew": sub_raw.get('auto_renew', False),
+            "next_renewal_human": renewal_text
+        },
+
+        # 🚦 Semáforo de Permisos
+        "permissions": {
+            "can_chat_bot": True,
+            "can_create_alerts": (rules['alert_limit'] > 0),
+            "can_receive_contingency": rules['can_contingency'],
+            "can_add_more_locations": (locs_used < rules['loc_limit'])
+        },
+
+        # 🔢 Cupos (Barras de Progreso)
+        "quotas": {
+            "locations": {
+                "used": locs_used,
+                "limit": rules['loc_limit'],
+                "remaining": max(0, rules['loc_limit'] - locs_used)
+            },
+            "alerts": {
+                "used": alerts_used,
+                "limit": rules['alert_limit'],
+                "remaining": max(0, rules['alert_limit'] - alerts_used)
+            }
+        },
+
+        # 🩺 Perfil
+        "profile": {
+            "health_tags": profile_raw.get('tags', []),
+            "device_os": profile_raw.get('device_os', 'Desconocido'),
+            "language": profile_raw.get('language', 'es')
+        },
+
+        # 📍 Mapa Operativo
+        "locations_snapshot": locations_snapshot,
+
+        # 🔔 Config Global
+        "global_config": {
+            "contingency_enabled": alerts_raw.get('contingency', {}).get('enabled', False),
+            "contingency_last_received": alerts_raw.get('contingency', {}).get('last_received')
+        }
     }
 
-    # 2. Fusión Inteligente (Overlay)
-    # Si la DB tiene datos reales para subscription/profile/metrics, sobrescribimos los defaults
-    if 'subscription' in db_item:
-        user['subscription'].update(db_item['subscription'])
-        
-    if 'profile' in db_item:
-        user['profile'].update(db_item['profile'])
-        
-    if 'metrics' in db_item:
-        user['metrics'].update(db_item['metrics'])
-
-    return user
-
-# Helper Decimales
+# --- HANDLER Y SERIALIZACIÓN ---
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, Decimal):
-            return float(obj)
+        if isinstance(obj, Decimal): return float(obj)
         return super(DecimalEncoder, self).default(obj)
 
 def response(status, body):
     return {
         'statusCode': status,
-        'headers': {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-        },
+        'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'},
         'body': json.dumps(body, cls=DecimalEncoder)
     }
 
@@ -91,87 +205,49 @@ def lambda_handler(event, context):
         return response(403, {'error': 'Unauthorized'})
 
     try:
-        method = event.get('requestContext', {}).get('http', {}).get('method', 'GET')
         action = qs.get('action')
         body_data = {}
-        
-        if method == 'POST' and event.get('body'):
+        if event.get('body'):
             body_data = json.loads(event.get('body'))
             action = body_data.get('action', action)
-
-        # --- LISTAR (Tabla Resumen) ---
+        
+        # --- LISTAR (Tabla Resumen Enriquecida) ---
         if action == 'list_users':
             res = table.scan()
-            raw_items = res.get('Items', [])
+            items = res.get('Items', [])
+            enriched_list = [enrich_user_data(u) for u in items]
             
-            summary_list = []
-            for item in raw_items:
-                # Normalizamos primero
-                u = normalize_user(item)
-                
-                # Creamos la fila resumen
-                summary_list.append({
-                    'user_id': u['user_id'],
-                    'name': u['first_name'],
-                    'email': u['email'],               # Ahora saldrá null en vez de nada
-                    'status': u['subscription']['status'],
-                    'alerts': len(u['locations']),     # Contador simple
-                    'last_seen': u['last_interaction']
-                })
-            
-            # Ordenar
-            summary_list.sort(key=lambda x: str(x['last_seen']), reverse=True)
-            return response(200, {'count': len(summary_list), 'users': summary_list})
+            # Ordenar por el más activo recientemente
+            enriched_list.sort(key=lambda x: str(x['crm_metrics'].get('last_seen', '')), reverse=True)
+            return response(200, {'count': len(enriched_list), 'users': enriched_list})
 
-        # --- DETALLE (JSON COMPLETO) ---
+        # --- DETALLE (Ficha Técnica Completa) ---
         elif action == 'get_user':
             uid = qs.get('user_id')
             if not uid: return response(400, {'error': 'Falta user_id'})
-            
             res = table.get_item(Key={'user_id': str(uid)})
             item = res.get('Item')
-            
             if not item: return response(404, {'error': 'Usuario no encontrado'})
+            return response(200, enrich_user_data(item))
             
-            # ¡AQUI ESTÁ LA MAGIA! 👇
-            # Devolvemos el usuario "Normalizado" con todos los campos (incluyendo nulos)
-            full_user = normalize_user(item)
-            
-            return response(200, full_user)
-
-        # --- ACTUALIZAR ---
+        # --- UPDATE (Gestión) ---
         elif action == 'update_user':
             uid = body_data.get('user_id')
             updates = body_data.get('updates', {})
-            
             if not uid or not updates: return response(400, {'error': 'Faltan datos'})
             
-            # Lógica de actualización dinámica DynamoDB
-            update_expr = "SET "
-            expr_vals = {}
-            expr_names = {}
-            parts = []
-            
+            update_expr = "SET "; expr_vals = {}; expr_names = {}; parts = []
             for i, (k, v) in enumerate(updates.items()):
-                key_token = f"#k{i}"
-                val_token = f":v{i}"
-                parts.append(f"{key_token} = {val_token}")
-                expr_names[key_token] = k
-                expr_vals[val_token] = v
-            
+                kt = f"#k{i}"; vt = f":v{i}"
+                parts.append(f"{kt} = {vt}"); expr_names[kt] = k; expr_vals[vt] = v
             update_expr += ", ".join(parts)
             
-            table.update_item(
-                Key={'user_id': str(uid)},
-                UpdateExpression=update_expr,
-                ExpressionAttributeNames=expr_names,
-                ExpressionAttributeValues=expr_vals
-            )
+            table.update_item(Key={'user_id': str(uid)}, UpdateExpression=update_expr, ExpressionAttributeNames=expr_names, ExpressionAttributeValues=expr_vals)
             return response(200, {'status': 'updated'})
 
         else:
             return response(400, {'error': f'Accion desconocida: {action}'})
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"ERROR: {e}")
         return response(500, {'error': str(e)})
