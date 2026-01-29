@@ -2,34 +2,56 @@ version: 0.2
 
 env:
   variables:
-    ECR_REPO_NAME: "smability-chatbot"
-    LAMBDA_FUNC_NAME: "Smability-Chatbot"
+    # 🆕 CAMBIO 1: Usamos un nombre de repo genérico para el "Core"
+    ECR_REPO_NAME: "smability-telegram-core"
+    
+    # 🆕 CAMBIO 2: Definimos AMBAS funciones Lambda
+    LAMBDA_BOT_NAME: "Smability-Chatbot"
+    LAMBDA_SCHEDULER_NAME: "Smability-Scheduler"
+    
     AWS_REGION: "us-east-1"
 
 phases:
   pre_build:
     commands:
-      - echo "🤖 Iniciando Build del Bot..."
-      # --- LA CORRECCIÓN MÁGICA ---
+      - echo "🤖 Iniciando Build UNIFICADO (Bot + Scheduler)..."
+      
       - echo "🆔 Obteniendo Account ID..."
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      # ----------------------------
-      - echo "🔑 Logueando en ECR ($AWS_ACCOUNT_ID)..."
+      
+      - echo "🔑 Logueando en ECR..."
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME
       - IMAGE_TAG=latest
 
+      # 🆕 CAMBIO 3: Copiamos la dependencia de API Light
+      # (Como CodeBuild corre desde la raíz, esta ruta funciona perfecto)
+      - echo "🔄 Sincronizando API Light..."
+      - cp api_light/lambda_function.py app/airegpt_telegram/lambda_api_light.py
+      - echo "✅ Dependencia copiada."
+
   build:
     commands:
-      - echo "📂 Entrando a carpeta del Bot..."
+      - echo "📂 Entrando a carpeta del módulo..."
       - cd app/airegpt_telegram
-      - echo "🐳 Construyendo Docker..."
+      
+      - echo "🐳 Construyendo Docker Maestro..."
       - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
+      # Tag extra con el ID del build para tener historial
+      - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:build-$CODEBUILD_BUILD_ID
 
   post_build:
     commands:
       - echo "⬆️ Subiendo a ECR..."
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo "🔄 Actualizando Lambda..."
-      - aws lambda update-function-code --function-name $LAMBDA_FUNC_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG
-      - echo "✅ Despliegue completado."
+      - docker push $REPOSITORY_URI:build-$CODEBUILD_BUILD_ID
+      
+      # 🆕 CAMBIO 4: Actualizamos EL BOT
+      - echo "🔄 Actualizando Lambda BOT ($LAMBDA_BOT_NAME)..."
+      - aws lambda update-function-code --function-name $LAMBDA_BOT_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG > /dev/null
+      
+      # 🆕 CAMBIO 5: Actualizamos EL SCHEDULER (Con la misma imagen)
+      - echo "🔄 Actualizando Lambda SCHEDULER ($LAMBDA_SCHEDULER_NAME)..."
+      - aws lambda update-function-code --function-name $LAMBDA_SCHEDULER_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG > /dev/null
+      
+      - echo "✅ Despliegue DOBLE completado exitosamente."
