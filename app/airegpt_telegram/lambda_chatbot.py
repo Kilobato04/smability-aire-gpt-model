@@ -18,38 +18,43 @@ client = OpenAI(api_key=OPENAI_API_KEY, timeout=20.0)
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
 
-# --- 🧠 REGLAS DE NEGOCIO (IDENTICAS AL CRM) ---
+# --- 🧠 REGLAS DE NEGOCIO ---
 BUSINESS_RULES = {
     "FREE": {"loc_limit": 2, "alert_limit": 0, "can_contingency": False},
     "PREMIUM": {"loc_limit": 3, "alert_limit": 10, "can_contingency": True}
 }
 
-# --- GATEKEEPER: VERIFICADOR DE CUPOS ---
+# --- GATEKEEPER: VERIFICADOR DE CUPOS (CON LOGS) ---
 def check_quota_and_permissions(user_profile, action_type):
-    """
-    Retorna (True, "") si puede proceder.
-    Retorna (False, "Mensaje de Venta") si está bloqueado.
-    """
     # 1. Identificar Plan
     sub = user_profile.get('subscription', {})
     status = sub.get('status', 'FREE')
-    # Mapeo simple: Si dice PREMIUM en cualquier lado, usa reglas Premium
+    user_id = user_profile.get('user_id', 'unknown')
+    
     rule_key = "PREMIUM" if "PREMIUM" in status.upper() else "FREE"
     rules = BUSINESS_RULES[rule_key]
+
+    print(f"🛡️ [GATEKEEPER] User: {user_id} | Plan Detected: {status} -> Using Rules: {rule_key}")
 
     # 2. Validar Acción: AGREGAR UBICACIÓN
     if action_type == 'add_location':
         current_locs = len(user_profile.get('locations', {}))
+        print(f"📊 [QUOTA] Locations: {current_locs} / {rules['loc_limit']}")
+        
         if current_locs >= rules['loc_limit']:
+            print(f"🚫 [BLOCK] Location limit reached for {user_id}")
             return False, (
                 f"🛑 **Límite Alcanzado ({current_locs}/{rules['loc_limit']})**\n\n"
                 "Tu plan **Básico** solo permite 2 ubicaciones guardadas.\n"
                 "💎 **Cámbiate a Premium** para agregar más lugares y recibir alertas."
             )
 
-    # 3. Validar Acción: CREAR ALERTA (Horario o Umbral)
+    # 3. Validar Acción: CREAR ALERTA
     if action_type == 'add_alert':
+        print(f"📊 [QUOTA] Checking Alert Permissions. Limit: {rules['alert_limit']}")
+        
         if rules['alert_limit'] == 0:
+            print(f"🚫 [BLOCK] Feature restricted (Alerts) for {user_id}")
             return False, (
                 "🔒 **Función Premium**\n\n"
                 "Las alertas automáticas (por horario o contaminación alta) son exclusivas de Smability Premium.\n"
@@ -59,25 +64,29 @@ def check_quota_and_permissions(user_profile, action_type):
         # Contar alertas actuales
         alerts = user_profile.get('alerts', {})
         total_used = 0
-        # Sumar thresholds activos
         for k, v in alerts.get('threshold', {}).items():
             if v.get('active'): total_used += 1
-        # Sumar schedules activos
         for k, v in alerts.get('schedule', {}).items():
-            if v.get('active'): total_used += 1 # Asumimos que si existe está activa o check flag
+            if v.get('active'): total_used += 1
+            
+        print(f"📊 [QUOTA] Alerts Used: {total_used} / {rules['alert_limit']}")
 
         if total_used >= rules['alert_limit']:
+            print(f"🚫 [BLOCK] Alert limit reached for {user_id}")
             return False, f"🛑 **Has alcanzado tu límite de {rules['alert_limit']} alertas.**"
 
     return True, ""
 
 # --- DB HELPERS ---
 def get_user_profile(user_id):
-    try: return table.get_item(Key={'user_id': str(user_id)}, ConsistentRead=True).get('Item', {})
-    except: return {}
+    try: 
+        return table.get_item(Key={'user_id': str(user_id)}, ConsistentRead=True).get('Item', {})
+    except Exception as e:
+        print(f"❌ [DB READ ERROR]: {e}")
+        return {}
 
 def update_user_status(user_id, new_status):
-    """Backdoor para pruebas"""
+    print(f"🔑 [PROMO] Switching User {user_id} to {new_status}")
     try:
         table.update_item(
             Key={'user_id': str(user_id)},
@@ -85,7 +94,9 @@ def update_user_status(user_id, new_status):
             ExpressionAttributeValues={':s': {'status': new_status, 'tier': f"{new_status}_MANUAL"}}
         )
         return True
-    except: return False
+    except Exception as e: 
+        print(f"❌ [DB UPDATE ERROR]: {e}")
+        return False
 
 def save_interaction_and_draft(user_id, first_name, lat=None, lon=None):
     update_expr = "SET first_name=:n, last_interaction=:t, locations=if_not_exists(locations,:e), alerts=if_not_exists(alerts,:al), subscription=if_not_exists(subscription,:sub)"
@@ -94,13 +105,13 @@ def save_interaction_and_draft(user_id, first_name, lat=None, lon=None):
         ':t': datetime.now().isoformat(), 
         ':e': {}, 
         ':al': {'threshold': {}, 'schedule': {}},
-        ':sub': {'status': 'FREE'} # Default a FREE si es nuevo
+        ':sub': {'status': 'FREE'}
     }
     if lat and lon:
         update_expr += ", draft_location = :d"
         vals[':d'] = {'lat': str(lat), 'lon': str(lon), 'ts': datetime.now().isoformat()}
     try: table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=update_expr, ExpressionAttributeValues=vals)
-    except Exception as e: print(f"DB WRITE ERROR: {e}")
+    except Exception as e: print(f"❌ [DB SAVE ERROR]: {e}")
 
 # --- TOOLS ---
 def confirm_saved_location(user_id, tipo):
@@ -109,13 +120,14 @@ def confirm_saved_location(user_id, tipo):
         
         # 🛡️ GATEKEEPER CHECK
         can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_location')
-        if not can_proceed:
-            return msg_bloqueo
+        if not can_proceed: return msg_bloqueo
 
         draft = user.get('draft_location')
         if not draft: return "⚠️ No encontré la ubicación en memoria."
         
         key = tipo.lower()
+        print(f"💾 [ACTION] Saving Location: {key} for {user_id}")
+        
         table.update_item(
             Key={'user_id': str(user_id)}, 
             UpdateExpression="set locations.#loc = :val", 
@@ -123,7 +135,6 @@ def confirm_saved_location(user_id, tipo):
             ExpressionAttributeValues={':val': {'lat': draft['lat'], 'lon': draft['lon'], 'display_name': key.capitalize(), 'active': True}}
         )
         
-        # Feedback inteligente
         user_updated = get_user_profile(user_id)
         locs = user_updated.get('locations', {})
         has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
@@ -133,7 +144,9 @@ def confirm_saved_location(user_id, tipo):
         elif key == 'casa': msg += "\n\n🏢 **Falta:** Envíame la ubicación de tu **TRABAJO**."
         elif key == 'trabajo': msg += "\n\n🏠 **Falta:** Envíame la ubicación de tu **CASA**."
         return msg
-    except Exception as e: return f"Error DB: {str(e)}"
+    except Exception as e:
+        print(f"❌ [TOOL ERROR]: {e}")
+        return f"Error DB: {str(e)}"
 
 def resolve_location_key(user_id, input_name):
     user = get_user_profile(user_id)
@@ -146,8 +159,6 @@ def resolve_location_key(user_id, input_name):
 
 def configure_ias_alert(user_id, nombre_ubicacion, umbral):
     user = get_user_profile(user_id)
-    
-    # 🛡️ GATEKEEPER CHECK
     can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_alert')
     if not can_proceed: return msg_bloqueo
 
@@ -155,14 +166,15 @@ def configure_ias_alert(user_id, nombre_ubicacion, umbral):
     if not key: return f"⚠️ Primero guarda '{nombre_ubicacion}'."
     
     try:
+        print(f"💾 [ACTION] Setting IAS Alert for {user_id} in {key} > {umbral}")
         table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET alerts.threshold.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': {'umbral': int(umbral), 'active': True, 'consecutive_sent': 0}})
         return f"✅ **Alerta Configurada:** Te avisaré si el IAS en **{key.capitalize()}** supera {umbral}."
-    except: return "Error guardando alerta."
+    except Exception as e:
+        print(f"❌ [ALERT ERROR]: {e}")
+        return "Error guardando alerta."
 
 def configure_schedule_alert(user_id, nombre_ubicacion, hora):
     user = get_user_profile(user_id)
-    
-    # 🛡️ GATEKEEPER CHECK
     can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_alert')
     if not can_proceed: return msg_bloqueo
 
@@ -170,11 +182,14 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora):
     if not key: return f"⚠️ Primero guarda '{nombre_ubicacion}'."
     
     try:
+        print(f"💾 [ACTION] Setting Schedule Alert for {user_id} in {key} at {hora}")
         table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET alerts.schedule.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': {'time': str(hora), 'active': True}})
         return f"✅ **Recordatorio:** Reporte diario de **{key.capitalize()}** a las {hora}."
-    except: return "Error guardando recordatorio."
+    except Exception as e:
+        print(f"❌ [SCHEDULE ERROR]: {e}")
+        return "Error guardando recordatorio."
 
-# --- VISUALES (Sin cambios grandes) ---
+# --- VISUALES ---
 def format_forecast_block(timeline):
     if not timeline or not isinstance(timeline, list): return "➡️ Estable"
     block = ""
@@ -205,10 +220,17 @@ def get_maps_url(lat, lon): return f"https://www.google.com/maps/search/?api=1&q
 def generate_report_card(user_name, location_name, lat, lon):
     try:
         url = f"{API_LIGHT_URL}?lat={lat}&lon={lon}"
+        print(f"🔌 [API CALL] {url}") # LOG CRITICO DE RED
+        
         r = requests.get(url, timeout=5)
-        if r.status_code != 200: return f"⚠️ Error de red ({r.status_code})."
+        if r.status_code != 200: 
+            print(f"❌ [API FAIL] Status: {r.status_code}")
+            return f"⚠️ Error de red ({r.status_code})."
+        
         data = r.json()
-        if data.get('status') == 'out_of_bounds': return f"📍 **Fuera de rango.** ({lat:.2f}, {lon:.2f})"
+        if data.get('status') == 'out_of_bounds': 
+            print(f"⚠️ [API BOUNDS] Coordinates out of range: {lat}, {lon}")
+            return f"📍 **Fuera de rango.** ({lat:.2f}, {lon:.2f})"
 
         qa = data.get('aire', {})
         meteo = data.get('meteo', {})
@@ -241,7 +263,9 @@ def generate_report_card(user_name, location_name, lat, lon):
             wind_speed=meteo.get('wsp', 0), 
             footer=cards.BOT_FOOTER
         )
-    except Exception as e: return f"⚠️ Error visual: {str(e)}"
+    except Exception as e: 
+        print(f"❌ [VISUAL ERROR]: {e}")
+        return f"⚠️ Error visual: {str(e)}"
 
 # --- SENDING ---
 def get_inline_markup(tag):
@@ -254,8 +278,10 @@ def send_telegram(chat_id, text, markup=None):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
     if markup: payload["reply_markup"] = markup
-    try: requests.post(url, json=payload)
-    except Exception as e: print(f"NET ERROR: {e}")
+    try: 
+        r = requests.post(url, json=payload)
+        if r.status_code != 200: print(f"❌ [TG FAIL] {r.text}")
+    except Exception as e: print(f"❌ [TG NET ERROR]: {e}")
 
 # --- HANDLER ---
 def lambda_handler(event, context):
@@ -268,6 +294,8 @@ def lambda_handler(event, context):
             chat_id = cb['message']['chat']['id']
             user_id = cb['from']['id']
             data = cb['data']
+            print(f"👆 [CALLBACK] User: {user_id} | Data: {data}") # LOG
+            
             requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/answerCallbackQuery", json={"callback_query_id": cb['id']})
             resp = ""
             if data == "SAVE_HOME": resp = confirm_saved_location(user_id, 'casa')
@@ -288,11 +316,11 @@ def lambda_handler(event, context):
         
         if 'location' in msg:
             lat, lon = msg['location']['latitude'], msg['location']['longitude']
-            user_content = f"📍 [COORDENADAS RECIBIDAS]: {lat},{lon}"
+            user_content = f"📍 [COORDS]: {lat},{lon}"
         elif 'text' in msg:
             user_content = msg['text']
             
-            # 🕵️‍♂️ BACKDOOR PARA PRUEBAS (PROMO CODES)
+            # 🕵️‍♂️ BACKDOOR
             if user_content.strip().startswith('/promo '):
                 code = user_content.split(' ')[1]
                 if code == "SOY_DEV_PREMIUM":
@@ -304,16 +332,23 @@ def lambda_handler(event, context):
                 return {'statusCode': 200, 'body': 'OK'}
 
             if user_content=="/start": 
+                print(f"🆕 [START] User: {user_id}")
                 send_telegram(chat_id, cards.CARD_ONBOARDING.format(user_name=first_name, footer=cards.BOT_FOOTER))
                 return {'statusCode': 200, 'body': 'OK'}
 
+        print(f"📨 [MSG] User: {user_id} | Content: {user_content}") # LOG CRITICO
+
         save_interaction_and_draft(user_id, first_name, lat, lon)
         user_profile = get_user_profile(user_id)
+        
+        # Preparar memoria para GPT
         locs = user_profile.get('locations', {})
         alerts = user_profile.get('alerts', {})
+        plan_status = user_profile.get('subscription',{}).get('status','FREE')
+        
         memoria_str = "**Tus lugares:**\n" + "\n".join([f"- {v.get('display_name')}" for k, v in locs.items()])
         memoria_str += f"\n**Alertas:** {alerts}"
-        memoria_str += f"\n**Plan:** {user_profile.get('subscription',{}).get('status','FREE')}"
+        memoria_str += f"\n**Plan:** {plan_status}"
         
         has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
         forced_tag, system_extra = None, "NORMAL"
@@ -327,15 +362,20 @@ def lambda_handler(event, context):
             elif not has_trabajo: system_extra = "ONBOARDING 2: Pide TRABAJO"
 
         gpt_msgs = [{"role": "system", "content": prompts.get_system_prompt(memoria_str, system_extra, first_name, get_official_report_time(None))}, {"role": "user", "content": user_content}]
+        
+        print(f"🤖 [GPT] Calling OpenAI... (Plan: {plan_status})")
         res = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_msgs, tools=bot_content.TOOLS_SCHEMA, tool_choice="auto", temperature=0.3)
         ai_msg = res.choices[0].message
         
         final_text = ""
         if ai_msg.tool_calls:
+            print(f"🛠️ [TOOL] GPT wants to call: {len(ai_msg.tool_calls)} tools")
             gpt_msgs.append(ai_msg)
             for tc in ai_msg.tool_calls:
                 fn = tc.function.name
                 args = json.loads(tc.function.arguments)
+                print(f"🔧 [EXEC] Tool: {fn} | Args: {args}")
+                
                 r = ""
                 if fn == "confirmar_guardado": r = "Usa los botones."
                 elif fn == "consultar_calidad_aire":
@@ -356,7 +396,9 @@ def lambda_handler(event, context):
                 elif fn == "configurar_alerta_ias": r = configure_ias_alert(user_id, args['nombre_ubicacion'], args['umbral_ias'])
                 elif fn == "configurar_recordatorio": r = configure_schedule_alert(user_id, args['nombre_ubicacion'], args['hora'])
                 else: r = "Acción realizada."
+                
                 gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+            
             final_text = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_msgs, temperature=0.3).choices[0].message.content
         else:
             final_text = ai_msg.content
@@ -368,4 +410,6 @@ def lambda_handler(event, context):
         
         send_telegram(chat_id, final_text, markup)
         return {'statusCode': 200, 'body': 'OK'}
-    except Exception as e: return {'statusCode': 500, 'body': str(e)}
+    except Exception as e:
+        print(f"🔥 [CRITICAL FAIL]: {e}")
+        return {'statusCode': 500, 'body': str(e)}
