@@ -235,7 +235,7 @@ def generate_report_card(user_name, location_name, lat, lon):
         url = f"{API_LIGHT_URL}?lat={lat}&lon={lon}"
         print(f"🔌 [API CALL] {url}") # LOG CRITICO DE RED
         
-        r = requests.get(url, timeout=5)
+        r = requests.get(url, timeout=10)
         if r.status_code != 200: 
             print(f"❌ [API FAIL] Status: {r.status_code}")
             return f"⚠️ Error de red ({r.status_code})."
