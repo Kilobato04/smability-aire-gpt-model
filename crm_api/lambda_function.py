@@ -14,18 +14,38 @@ dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
 
 # --- 🧠 REGLAS DE NEGOCIO ---
+# --- 🧠 REGLAS DE NEGOCIO (QUOTAS) ---
 BUSINESS_RULES = {
     "FREE": {
-        "loc_limit": 2, "alert_limit": 0, "can_contingency": False,
+        "loc_limit": 2, 
+        "alert_limit": 0, 
+        "can_contingency": False,
         "price": {"amount": 0, "freq": "N/A", "name": "Básico"}
     },
     "PREMIUM_MONTHLY": {
-        "loc_limit": 3, "alert_limit": 10, "can_contingency": True,
+        "loc_limit": 3, 
+        "alert_limit": 10, 
+        "can_contingency": True,
         "price": {"amount": 49.00, "freq": "Mensual", "name": "Premium Mensual"}
     },
     "PREMIUM_ANNUAL": {
-        "loc_limit": 3, "alert_limit": 10, "can_contingency": True,
+        "loc_limit": 3, 
+        "alert_limit": 10, 
+        "can_contingency": True,
         "price": {"amount": 329.00, "freq": "Anual", "name": "Premium Anual"}
+    },
+    # 👇 AGREGAMOS ESTOS DOS PARA SOPORTAR EL COMANDO /PROMO 👇
+    "PREMIUM_MANUAL": {
+        "loc_limit": 3, 
+        "alert_limit": 10, 
+        "can_contingency": True,
+        "price": {"amount": 0, "freq": "Manual", "name": "Premium Dev (Gratis)"}
+    },
+    "PREMIUM": { # Fallback genérico
+        "loc_limit": 3, 
+        "alert_limit": 10, 
+        "can_contingency": True,
+        "price": {"amount": 0, "freq": "Genérico", "name": "Premium"}
     }
 }
 
