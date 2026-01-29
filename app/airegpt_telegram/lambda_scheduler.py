@@ -89,11 +89,19 @@ def get_location_air_data(lat, lon):
         print(f"⚠️ API Light Error: {e}")
     return None
 
-# --- CORE LOGIC ---
+# --- CORE LOGIC (CORREGIDO) ---
 def process_user(user, current_hour_str, contingency_data):
     user_id = user['user_id']
     first_name = user.get('first_name', 'Usuario')
+    
+    # ⚓ ANCLA A: FIX DE ROBUSTEZ (CRÍTICO)
+    # Obtenemos alerts. Si DynamoDB devolvió un string en lugar de un dict, cortamos.
     alerts = user.get('alerts', {})
+    if isinstance(alerts, str):
+        print(f"⚠️ [DATA ERROR] User {user_id} tiene 'alerts' corrupto (String). Saltando.")
+        return
+    # ------------------------------------------
+
     locations = user.get('locations', {})
     health = user.get('health_profile', {})
     h_str = ", ".join([v.get('condition','') for v in health.values()]) if health else None
@@ -102,13 +110,11 @@ def process_user(user, current_hour_str, contingency_data):
     can_alerts, can_contingency = get_user_permissions(user)
     
     if not can_alerts and not can_contingency:
-        # Optimización: Si no tiene permisos de nada, salimos rápido.
         return 
 
     # 1. CONTINGENCIA
     is_c, ph, pol = contingency_data
     if is_c and can_contingency: # 🔒 Solo si paga
-        # Verificar si el usuario la tiene activada en sus settings
         user_wants_cont = alerts.get('contingency', {}).get('enabled', False)
         
         if user_wants_cont:
@@ -125,74 +131,108 @@ def process_user(user, current_hour_str, contingency_data):
     # 2. PROCESAMIENTO DE ALERTAS (Solo si tiene permiso PREMIUM)
     if can_alerts:
         
+        # ⚓ ANCLA B: FIX VENTANA DE 20 MINUTOS
+        # Calculamos el minuto actual para evitar spam (ej. 7:00, 7:20, 7:40)
+        now = get_cdmx_time()
+        current_minute = now.minute
+        
+        # Solo procesamos alertas de horario entre el minuto 18 y 38
+        is_schedule_window = (18 <= current_minute < 38)
+
         # A. RECORDATORIOS POR HORARIO
-        for loc_name, config in alerts.get('schedule', {}).items():
-            # Validamos hora (Ej: "07:30" coincide con "07:00" en el scheduler horario)
-            if config.get('active') and config.get('time', '').split(':')[0] == current_hour_str.split(':')[0]:
+        schedule_data = alerts.get('schedule', {})
+        
+        # Validamos que sea diccionario antes de iterar
+        if isinstance(schedule_data, dict) and is_schedule_window:
+            
+            for loc_name, config in schedule_data.items():
+                if not isinstance(config, dict): continue
+
+                # Validamos hora (Ej: "07:30" coincide con "07:00")
+                if config.get('active') and config.get('time', '').split(':')[0] == current_hour_str.split(':')[0]:
+                    
+                    loc_data = locations.get(loc_name)
+                    if loc_data:
+                        data = get_location_air_data(loc_data['lat'], loc_data['lon'])
+                        if data:
+                            qa = data.get('aire', {})
+                            f_block = format_forecast_block(data.get('pronostico_timeline', []))
+                            
+                            cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extrema"}
+                            cat = cat_map.get(qa.get('riesgo'), "Regular")
+                            info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Regular'])
+                            
+                            print(f"⏰ [NOTIFY] Enviando Reporte Diario a {first_name}")
+                            card = cards.CARD_REMINDER.format(
+                                user_name=first_name, location_name=loc_data.get('display_name', loc_name),
+                                maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
+                                report_time=f"{current_hour_str.split(':')[0]}:20", region="ZMVM",
+                                ias_value=qa.get('ias', 0), risk_category=cat, risk_circle=info['emoji'],
+                                natural_message=info['msg'], forecast_block=f_block,
+                                health_recommendation=cards.get_health_advice(cat, h_str),
+                                footer=cards.BOT_FOOTER
+                            )
+                            send_telegram_push(user_id, card)
+
+        # B. ALERTAS POR UMBRAL (Emergencia) - Estas se revisan SIEMPRE (cada 20 min)
+        threshold_data = alerts.get('threshold', {})
+        if isinstance(threshold_data, dict):
+            
+            for loc_name, config in threshold_data.items():
+                if not isinstance(config, dict): continue
+                if not config.get('active', False): continue
                 
+                umbral = max(int(config.get('umbral', 100)), 50)
                 loc_data = locations.get(loc_name)
+                
                 if loc_data:
                     data = get_location_air_data(loc_data['lat'], loc_data['lon'])
                     if data:
                         qa = data.get('aire', {})
-                        f_block = format_forecast_block(data.get('pronostico_timeline', []))
+                        cur_ias = qa.get('ias', 0)
                         
-                        cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extrema"}
-                        cat = cat_map.get(qa.get('riesgo'), "Regular")
-                        info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Regular'])
+                        if cur_ias > umbral:
+                            count = int(config.get('consecutive_sent', 0))
+                            if count < 3:
+                                f_short = interpret_timeline_short(cur_ias, data.get('pronostico_timeline', []))
+                                cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extremadamente Mala"}
+                                cat = cat_map.get(qa.get('riesgo'), "Regular")
+                                info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Mala'])
+                                
+                                print(f"🔔 [NOTIFY] Alerta de Umbral (> {umbral}) a {first_name}")
+                                card = cards.CARD_ALERT_IAS.format(
+                                    user_name=first_name, location_name=loc_data.get('display_name', loc_name),
+                                    maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
+                                    report_time=f"{current_hour_str.split(':')[0]}:20", region="ZMVM",
+                                    risk_category=cat, risk_circle=info['emoji'], ias_value=cur_ias,
+                                    forecast_msg=f_short, natural_message=info['msg'],
+                                    threshold=umbral, pollutant="N/A", health_recommendation=cards.get_health_advice(cat, h_str),
+                                    footer=cards.BOT_FOOTER
+                                )
+                                send_telegram_push(user_id, card)
+                                
+                                # Actualizamos contador con DynamoDB update expression para seguridad
+                                try:
+                                    table.update_item(
+                                        Key={'user_id': user_id},
+                                        UpdateExpression=f"SET alerts.threshold.#{loc_name}.consecutive_sent = :inc",
+                                        ExpressionAttributeNames={f"#{loc_name}": loc_name},
+                                        ExpressionAttributeValues={':inc': count + 1}
+                                    )
+                                except Exception as e:
+                                    print(f"Error actualizando contador: {e}")
                         
-                        print(f"⏰ [NOTIFY] Enviando Reporte Diario a {first_name}")
-                        card = cards.CARD_REMINDER.format(
-                            user_name=first_name, location_name=loc_data.get('display_name', loc_name),
-                            maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
-                            report_time=f"{current_hour_str.split(':')[0]}:20", region="ZMVM",
-                            ias_value=qa.get('ias', 0), risk_category=cat, risk_circle=info['emoji'],
-                            natural_message=info['msg'], forecast_block=f_block,
-                            health_recommendation=cards.get_health_advice(cat, h_str),
-                            footer=cards.BOT_FOOTER
-                        )
-                        send_telegram_push(user_id, card)
-
-        # B. ALERTAS POR UMBRAL (Emergencia)
-        for loc_name, config in alerts.get('threshold', {}).items():
-            if not config.get('active', False): continue
-            
-            umbral = max(int(config.get('umbral', 100)), 50) # Mínimo 50 para evitar spam
-            loc_data = locations.get(loc_name)
-            
-            if loc_data:
-                data = get_location_air_data(loc_data['lat'], loc_data['lon'])
-                if data:
-                    qa = data.get('aire', {})
-                    cur_ias = qa.get('ias', 0)
-                    
-                    if cur_ias > umbral:
-                        count = int(config.get('consecutive_sent', 0))
-                        # Limitamos a 3 alertas consecutivas para no saturar
-                        if count < 3:
-                            f_short = interpret_timeline_short(cur_ias, data.get('pronostico_timeline', []))
-                            cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extremadamente Mala"}
-                            cat = cat_map.get(qa.get('riesgo'), "Regular")
-                            info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Mala'])
-                            
-                            print(f"🔔 [NOTIFY] Alerta de Umbral (> {umbral}) a {first_name}")
-                            card = cards.CARD_ALERT_IAS.format(
-                                user_name=first_name, location_name=loc_data.get('display_name', loc_name),
-                                maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
-                                report_time=f"{current_hour_str.split(':')[0]}:20", region="ZMVM",
-                                risk_category=cat, risk_circle=info['emoji'], ias_value=cur_ias,
-                                forecast_msg=f_short, natural_message=info['msg'],
-                                threshold=umbral, pollutant="N/A", health_recommendation=cards.get_health_advice(cat, h_str),
-                                footer=cards.BOT_FOOTER
-                            )
-                            send_telegram_push(user_id, card)
-                            
-                            # Actualizamos contador
-                            table.update_item(Key={'user_id': user_id}, UpdateExpression=f"SET alerts.threshold.#{loc_name}.consecutive_sent = :inc", ExpressionAttributeNames={f"#{loc_name}": loc_name}, ExpressionAttributeValues={':inc': count + 1})
-                    
-                    elif config.get('consecutive_sent', 0) > 0:
-                        # Si bajó el nivel, reseteamos el contador
-                        table.update_item(Key={'user_id': user_id}, UpdateExpression=f"SET alerts.threshold.#{loc_name}.consecutive_sent = :zero", ExpressionAttributeNames={f"#{loc_name}": loc_name}, ExpressionAttributeValues={':zero': 0})
+                        elif config.get('consecutive_sent', 0) > 0:
+                            # Si bajó el nivel, reseteamos el contador
+                            try:
+                                table.update_item(
+                                    Key={'user_id': user_id},
+                                    UpdateExpression=f"SET alerts.threshold.#{loc_name}.consecutive_sent = :zero",
+                                    ExpressionAttributeNames={f"#{loc_name}": loc_name},
+                                    ExpressionAttributeValues={':zero': 0}
+                                )
+                            except Exception as e:
+                                print(f"Error reseteando contador: {e}")
 
 def lambda_handler(event, context):
     now = get_cdmx_time()
