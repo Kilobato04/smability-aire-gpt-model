@@ -9,46 +9,46 @@ env:
 
 phases:
   pre_build:
-    commands:
-      - echo "🤖 Iniciando Build UNIFICADO..."
-      - echo "🆔 Obteniendo Account ID..."
-      - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - echo "🔑 Logueando en ECR..."
-      - "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME
-      - IMAGE_TAG=latest
+    commands: |
+      echo "🤖 Iniciando Build UNIFICADO (Modo Bloque)..."
+      echo "🆔 Obteniendo Account ID..."
+      export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      
+      echo "🔑 Logueando en ECR..."
+      aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      
+      REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME
+      IMAGE_TAG=latest
 
-      # Verificar/Crear Repo (Con comillas para proteger el || )
-      - "aws ecr describe-repositories --repository-names $ECR_REPO_NAME || aws ecr create-repository --repository-name $ECR_REPO_NAME"
+      echo "🔍 Verificando repo..."
+      aws ecr describe-repositories --repository-names $ECR_REPO_NAME || aws ecr create-repository --repository-name $ECR_REPO_NAME
 
-      - echo "🔄 Sincronizando API Light..."
-      - cp api_light/lambda_function.py app/airegpt_telegram/lambda_api_light.py
+      echo "🔄 Sincronizando API Light..."
+      cp api_light/lambda_function.py app/airegpt_telegram/lambda_api_light.py
 
   build:
-    commands:
-      - echo "📂 Entrando a carpeta del módulo..."
-      - cd app/airegpt_telegram
+    commands: |
+      echo "📂 Entrando a carpeta del módulo..."
+      cd app/airegpt_telegram
       
-      # TRUCO BASH: Limpiamos el ID sin usar awk (evitamos los dos puntos)
-      - export CLEAN_TAG=${CODEBUILD_BUILD_ID##*:}
-      - echo "🏷️ Tag limpio generado: $CLEAN_TAG"
+      echo "🧹 Limpiando Tag..."
+      export CLEAN_TAG=${CODEBUILD_BUILD_ID##*:}
+      echo "🏷️ Tag limpio: $CLEAN_TAG"
       
-      - echo "🐳 Construyendo Docker..."
-      - "docker build -t $REPOSITORY_URI:$IMAGE_TAG ."
-      - "docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:build-$CLEAN_TAG"
+      echo "🐳 Construyendo Docker..."
+      docker build -t $REPOSITORY_URI:$IMAGE_TAG .
+      docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:build-$CLEAN_TAG
 
   post_build:
-    commands:
-      # Redefinimos CLEAN_TAG porque las variables no pasan de build a post_build
-      - export CLEAN_TAG=${CODEBUILD_BUILD_ID##*:}
+    commands: |
+      export CLEAN_TAG=${CODEBUILD_BUILD_ID##*:}
       
-      - echo "⬆️ Subiendo a ECR..."
-      - "docker push $REPOSITORY_URI:$IMAGE_TAG"
-      - "docker push $REPOSITORY_URI:build-$CLEAN_TAG"
+      echo "⬆️ Subiendo a ECR..."
+      docker push $REPOSITORY_URI:$IMAGE_TAG
+      docker push $REPOSITORY_URI:build-$CLEAN_TAG
       
-      - echo "🔄 Actualizando Lambdas..."
-      # El > /dev/null a veces molesta a YAML, lo quitamos para ver logs completos y evitar errores
-      - "aws lambda update-function-code --function-name $LAMBDA_BOT_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG"
-      - "aws lambda update-function-code --function-name $LAMBDA_SCHEDULER_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG"
+      echo "🔄 Actualizando Lambdas..."
+      aws lambda update-function-code --function-name $LAMBDA_BOT_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG
+      aws lambda update-function-code --function-name $LAMBDA_SCHEDULER_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG
       
-      - echo "✅ Despliegue DOBLE completado."
+      echo "✅ Despliegue completado."
