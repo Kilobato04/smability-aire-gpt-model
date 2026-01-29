@@ -14,12 +14,12 @@ phases:
       - echo "🆔 Obteniendo Account ID..."
       - export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - echo "🔑 Logueando en ECR..."
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - "aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME
       - IMAGE_TAG=latest
 
-      # Verificar/Crear Repo (Ya lo hiciste manual, pero dejamos esto por seguridad futura)
-      - aws ecr describe-repositories --repository-names $ECR_REPO_NAME || aws ecr create-repository --repository-name $ECR_REPO_NAME
+      # Crear repo si no existe (con comillas por si acaso)
+      - "aws ecr describe-repositories --repository-names $ECR_REPO_NAME || aws ecr create-repository --repository-name $ECR_REPO_NAME"
 
       - echo "🔄 Sincronizando API Light..."
       - cp api_light/lambda_function.py app/airegpt_telegram/lambda_api_light.py
@@ -29,25 +29,24 @@ phases:
       - echo "📂 Entrando a carpeta del módulo..."
       - cd app/airegpt_telegram
       
-      # 🆕 FIX: Limpiamos el Build ID para quitar los dos puntos prohibidos (:)
-      - CLEAN_TAG=$(echo $CODEBUILD_BUILD_ID | awk -F":" '{print $2}')
+      # 🛡️ FIX YAML: Usamos comillas para que los dos puntos (:) no rompan el parser
+      - "CLEAN_TAG=$(echo $CODEBUILD_BUILD_ID | awk -F: '{print $2}')"
       - echo "🏷️ Tag limpio generado: $CLEAN_TAG"
       
       - echo "🐳 Construyendo Docker..."
-      - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
-      # Usamos el tag limpio
-      - docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:build-$CLEAN_TAG
+      # 🛡️ FIX YAML: Comillas aquí también
+      - "docker build -t $REPOSITORY_URI:$IMAGE_TAG ."
+      - "docker tag $REPOSITORY_URI:$IMAGE_TAG $REPOSITORY_URI:build-$CLEAN_TAG"
 
   post_build:
     commands:
       - echo "⬆️ Subiendo a ECR..."
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - docker push $REPOSITORY_URI:build-$CLEAN_TAG
+      # 🛡️ FIX YAML: Comillas en los push
+      - "docker push $REPOSITORY_URI:$IMAGE_TAG"
+      - "docker push $REPOSITORY_URI:build-$CLEAN_TAG"
       
-      - echo "🔄 Actualizando Lambda BOT ($LAMBDA_BOT_NAME)..."
-      - aws lambda update-function-code --function-name $LAMBDA_BOT_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG > /dev/null
-      
-      - echo "🔄 Actualizando Lambda SCHEDULER ($LAMBDA_SCHEDULER_NAME)..."
-      - aws lambda update-function-code --function-name $LAMBDA_SCHEDULER_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG > /dev/null
+      - echo "🔄 Actualizando Lambdas..."
+      - "aws lambda update-function-code --function-name $LAMBDA_BOT_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG > /dev/null"
+      - "aws lambda update-function-code --function-name $LAMBDA_SCHEDULER_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG > /dev/null"
       
       - echo "✅ Despliegue DOBLE completado."
