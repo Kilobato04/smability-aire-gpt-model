@@ -63,16 +63,24 @@ def check_quota_and_permissions(user_profile, action_type):
         
         # Contar alertas actuales
         alerts = user_profile.get('alerts', {})
-        # --- 🛡️ FIX DE BLINDAJE (Inserta esto aquí) ---
-        if isinstance(alerts, str):
-            print(f"⚠️ [DATA FIX] Alerts is string inside Gatekeeper. Resetting.")
-            alerts = {}
-        # ----------------------------------------------
+
+        # --- 🛡️ FIX CRÍTICO AQUÍ TAMBIÉN ---
+        if isinstance(alerts, str): 
+            alerts = {} # Si es string, lo ignoramos y asumimos 0 alertas
+        # -----------------------------------
+
         total_used = 0
-        for k, v in alerts.get('threshold', {}).items():
-            if v.get('active'): total_used += 1
-        for k, v in alerts.get('schedule', {}).items():
-            if v.get('active'): total_used += 1
+        
+        # Ahora es seguro usar .get()
+        threshold_alerts = alerts.get('threshold', {})
+        if isinstance(threshold_alerts, dict):
+            for k, v in threshold_alerts.items():
+                if isinstance(v, dict) and v.get('active'): total_used += 1
+        
+        schedule_alerts = alerts.get('schedule', {})
+        if isinstance(schedule_alerts, dict):
+            for k, v in schedule_alerts.items():
+                if isinstance(v, dict) and v.get('active'): total_used += 1
             
         print(f"📊 [QUOTA] Alerts Used: {total_used} / {rules['alert_limit']}")
 
