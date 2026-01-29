@@ -353,6 +353,8 @@ def lambda_handler(event, context):
 
         save_interaction_and_draft(user_id, first_name, lat, lon)
         user_profile = get_user_profile(user_id)
+        # Parche de seguridad
+        if isinstance(user_profile.get('alerts'), str): user_profile['alerts'] = {}
         
         # Preparar memoria para GPT
         locs = user_profile.get('locations', {})
