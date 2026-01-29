@@ -11,7 +11,6 @@ import prompts
 # --- CONFIG ---
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
-# ¡NUEVO! La URL de tu API Light (la pondremos en variables de entorno)
 API_LIGHT_URL = os.environ.get('API_LIGHT_URL', 'https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/')
 DYNAMODB_TABLE = 'SmabilityUsers'
 
@@ -19,59 +18,112 @@ client = OpenAI(api_key=OPENAI_API_KEY, timeout=20.0)
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
 
-# --- VISUALES ---
-def format_forecast_block(timeline):
-    if not timeline or not isinstance(timeline, list): return "➡️ Estable"
-    block = ""
-    # Mapeo de seguridad por si el API falla, pero idealmente usamos lo que viene
-    emoji_map = {"Bajo": "🟢", "Moderado": "🟡", "Alto": "🟠", "Muy Alto": "🔴", "Extremadamente Alto": "🟣"}
-    count = 0
-    for t in timeline:
-        if count >= 4: break 
-        hora = t.get('hora', '--:--')
-        riesgo = t.get('riesgo', 'Bajo')
-        ias = t.get('ias', 0)
-        # Usamos el emoji del mapa local o un default
-        emoji = emoji_map.get(riesgo, "⚪")
-        block += f"`{hora}` | {emoji} {ias} pts\n"
-        count += 1
-    return block.strip()
+# --- 🧠 REGLAS DE NEGOCIO (IDENTICAS AL CRM) ---
+BUSINESS_RULES = {
+    "FREE": {"loc_limit": 2, "alert_limit": 0, "can_contingency": False},
+    "PREMIUM": {"loc_limit": 3, "alert_limit": 10, "can_contingency": True}
+}
 
-def get_official_report_time(ts_str):
-    # Intentamos usar el TS que viene del API, si no, calculamos
-    if ts_str: return ts_str[11:16] # "2026-01-28 14:20:12" -> "14:20"
-    now = datetime.utcnow() - timedelta(hours=6)
-    return now.strftime("%H:%M")
+# --- GATEKEEPER: VERIFICADOR DE CUPOS ---
+def check_quota_and_permissions(user_profile, action_type):
+    """
+    Retorna (True, "") si puede proceder.
+    Retorna (False, "Mensaje de Venta") si está bloqueado.
+    """
+    # 1. Identificar Plan
+    sub = user_profile.get('subscription', {})
+    status = sub.get('status', 'FREE')
+    # Mapeo simple: Si dice PREMIUM en cualquier lado, usa reglas Premium
+    rule_key = "PREMIUM" if "PREMIUM" in status.upper() else "FREE"
+    rules = BUSINESS_RULES[rule_key]
 
-def get_time_greeting():
-    h = (datetime.utcnow() - timedelta(hours=6)).hour
-    return "Buenos días" if 5<=h<12 else "Buenas tardes" if 12<=h<20 else "Buenas noches"
+    # 2. Validar Acción: AGREGAR UBICACIÓN
+    if action_type == 'add_location':
+        current_locs = len(user_profile.get('locations', {}))
+        if current_locs >= rules['loc_limit']:
+            return False, (
+                f"🛑 **Límite Alcanzado ({current_locs}/{rules['loc_limit']})**\n\n"
+                "Tu plan **Básico** solo permite 2 ubicaciones guardadas.\n"
+                "💎 **Cámbiate a Premium** para agregar más lugares y recibir alertas."
+            )
 
-def get_maps_url(lat, lon): return f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
+    # 3. Validar Acción: CREAR ALERTA (Horario o Umbral)
+    if action_type == 'add_alert':
+        if rules['alert_limit'] == 0:
+            return False, (
+                "🔒 **Función Premium**\n\n"
+                "Las alertas automáticas (por horario o contaminación alta) son exclusivas de Smability Premium.\n"
+                "💎 **Actívalo hoy por solo $49 MXN/mes.**"
+            )
+        
+        # Contar alertas actuales
+        alerts = user_profile.get('alerts', {})
+        total_used = 0
+        # Sumar thresholds activos
+        for k, v in alerts.get('threshold', {}).items():
+            if v.get('active'): total_used += 1
+        # Sumar schedules activos
+        for k, v in alerts.get('schedule', {}).items():
+            if v.get('active'): total_used += 1 # Asumimos que si existe está activa o check flag
 
-# --- DB (Sin cambios) ---
+        if total_used >= rules['alert_limit']:
+            return False, f"🛑 **Has alcanzado tu límite de {rules['alert_limit']} alertas.**"
+
+    return True, ""
+
+# --- DB HELPERS ---
 def get_user_profile(user_id):
     try: return table.get_item(Key={'user_id': str(user_id)}, ConsistentRead=True).get('Item', {})
     except: return {}
 
+def update_user_status(user_id, new_status):
+    """Backdoor para pruebas"""
+    try:
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET subscription = :s",
+            ExpressionAttributeValues={':s': {'status': new_status, 'tier': f"{new_status}_MANUAL"}}
+        )
+        return True
+    except: return False
+
 def save_interaction_and_draft(user_id, first_name, lat=None, lon=None):
-    update_expr = "SET first_name=:n, last_interaction=:t, locations=if_not_exists(locations,:e), alerts=if_not_exists(alerts,:al), health_profile=if_not_exists(health_profile,:e)"
-    vals = {':n': first_name, ':t': datetime.now().isoformat(), ':e': {}, ':al': {'threshold': {}, 'schedule': {}}}
+    update_expr = "SET first_name=:n, last_interaction=:t, locations=if_not_exists(locations,:e), alerts=if_not_exists(alerts,:al), subscription=if_not_exists(subscription,:sub)"
+    vals = {
+        ':n': first_name, 
+        ':t': datetime.now().isoformat(), 
+        ':e': {}, 
+        ':al': {'threshold': {}, 'schedule': {}},
+        ':sub': {'status': 'FREE'} # Default a FREE si es nuevo
+    }
     if lat and lon:
         update_expr += ", draft_location = :d"
         vals[':d'] = {'lat': str(lat), 'lon': str(lon), 'ts': datetime.now().isoformat()}
     try: table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=update_expr, ExpressionAttributeValues=vals)
     except Exception as e: print(f"DB WRITE ERROR: {e}")
 
-# --- TOOLS (Sin cambios mayores) ---
+# --- TOOLS ---
 def confirm_saved_location(user_id, tipo):
     try:
         user = get_user_profile(user_id)
+        
+        # 🛡️ GATEKEEPER CHECK
+        can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_location')
+        if not can_proceed:
+            return msg_bloqueo
+
         draft = user.get('draft_location')
         if not draft: return "⚠️ No encontré la ubicación en memoria."
-        key = tipo.lower()
-        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="set locations.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': {'lat': draft['lat'], 'lon': draft['lon'], 'display_name': key.capitalize(), 'active': True}})
         
+        key = tipo.lower()
+        table.update_item(
+            Key={'user_id': str(user_id)}, 
+            UpdateExpression="set locations.#loc = :val", 
+            ExpressionAttributeNames={'#loc': key}, 
+            ExpressionAttributeValues={':val': {'lat': draft['lat'], 'lon': draft['lon'], 'display_name': key.capitalize(), 'active': True}}
+        )
+        
+        # Feedback inteligente
         user_updated = get_user_profile(user_id)
         locs = user_updated.get('locations', {})
         has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
@@ -93,53 +145,81 @@ def resolve_location_key(user_id, input_name):
     return None
 
 def configure_ias_alert(user_id, nombre_ubicacion, umbral):
+    user = get_user_profile(user_id)
+    
+    # 🛡️ GATEKEEPER CHECK
+    can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_alert')
+    if not can_proceed: return msg_bloqueo
+
     key = resolve_location_key(user_id, nombre_ubicacion)
     if not key: return f"⚠️ Primero guarda '{nombre_ubicacion}'."
+    
     try:
-        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET alerts.threshold.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': {'umbral': int(umbral), 'active': True}})
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET alerts.threshold.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': {'umbral': int(umbral), 'active': True, 'consecutive_sent': 0}})
         return f"✅ **Alerta Configurada:** Te avisaré si el IAS en **{key.capitalize()}** supera {umbral}."
     except: return "Error guardando alerta."
 
 def configure_schedule_alert(user_id, nombre_ubicacion, hora):
+    user = get_user_profile(user_id)
+    
+    # 🛡️ GATEKEEPER CHECK
+    can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_alert')
+    if not can_proceed: return msg_bloqueo
+
     key = resolve_location_key(user_id, nombre_ubicacion)
     if not key: return f"⚠️ Primero guarda '{nombre_ubicacion}'."
+    
     try:
-        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET alerts.schedule.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': str(hora)})
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET alerts.schedule.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': {'time': str(hora), 'active': True}})
         return f"✅ **Recordatorio:** Reporte diario de **{key.capitalize()}** a las {hora}."
     except: return "Error guardando recordatorio."
 
-# --- REPORT CARD (AQUÍ ESTÁ LA MAGIA 🌟) ---
+# --- VISUALES (Sin cambios grandes) ---
+def format_forecast_block(timeline):
+    if not timeline or not isinstance(timeline, list): return "➡️ Estable"
+    block = ""
+    emoji_map = {"Bajo": "🟢", "Moderado": "🟡", "Alto": "🟠", "Muy Alto": "🔴", "Extremadamente Alto": "🟣"}
+    count = 0
+    for t in timeline:
+        if count >= 4: break 
+        hora = t.get('hora', '--:--')
+        riesgo = t.get('riesgo', 'Bajo')
+        ias = t.get('ias', 0)
+        emoji = emoji_map.get(riesgo, "⚪")
+        block += f"`{hora}` | {emoji} {ias} pts\n"
+        count += 1
+    return block.strip()
+
+def get_official_report_time(ts_str):
+    if ts_str: return ts_str[11:16]
+    now = datetime.utcnow() - timedelta(hours=6)
+    return now.strftime("%H:%M")
+
+def get_time_greeting():
+    h = (datetime.utcnow() - timedelta(hours=6)).hour
+    return "Buenos días" if 5<=h<12 else "Buenas tardes" if 12<=h<20 else "Buenas noches"
+
+def get_maps_url(lat, lon): return f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
+
+# --- REPORT CARD ---
 def generate_report_card(user_name, location_name, lat, lon):
-    print(f"🔍 [DEBUG API] Consultando API Light para: {lat}, {lon}")
     try:
-        # CAMBIO: Usamos HTTP REQUEST a la API Light en lugar de importar localmente
-        # Esto usa el endpoint 'bot' o 'map' (usaremos mode=bot implícito con lat/lon)
         url = f"{API_LIGHT_URL}?lat={lat}&lon={lon}"
         r = requests.get(url, timeout=5)
-        
         if r.status_code != 200: return f"⚠️ Error de red ({r.status_code})."
-            
         data = r.json()
-        
-        # Validar si estamos fuera de rango
-        if data.get('status') == 'out_of_bounds':
-            return f"📍 **Ubicación fuera de rango.**\nEl modelo solo cubre el Valle de México. Tus coordenadas ({lat:.2f}, {lon:.2f}) están fuera."
+        if data.get('status') == 'out_of_bounds': return f"📍 **Fuera de rango.** ({lat:.2f}, {lon:.2f})"
 
-        # Extraemos la data del Nuevo JSON Homologado
         qa = data.get('aire', {})
         meteo = data.get('meteo', {})
         ubic = data.get('ubicacion', {})
         
-        # ORO MOLIDO: Usamos los textos pre-cocinados del API
         ias_val = qa.get('ias', 0)
         calidad = qa.get('calidad', 'Regular')
-        color_emoji = cards.get_emoji_for_quality(calidad) # Helper en cards
+        color_emoji = cards.get_emoji_for_quality(calidad)
         mensaje_corto = qa.get('mensaje_corto', 'Sin datos.')
         tendencia = qa.get('tendencia', 'Estable')
-        
         forecast_block = format_forecast_block(data.get('pronostico_timeline', []))
-        
-        # El municipio viene mejor del API ahora
         region_str = f"{ubic.get('mun', 'ZMVM')}, {ubic.get('edo', 'CDMX')}"
 
         return cards.CARD_REPORT.format(
@@ -152,9 +232,9 @@ def generate_report_card(user_name, location_name, lat, lon):
             ias_value=ias_val, 
             risk_category=calidad, 
             risk_circle=color_emoji, 
-            natural_message=mensaje_corto, # ¡Directo del API!
+            natural_message=mensaje_corto,
             forecast_block=forecast_block, 
-            trend_arrow=tendencia, # ¡Directo del API!
+            trend_arrow=tendencia,
             health_recommendation=cards.get_health_advice(calidad),
             temp=meteo.get('tmp', 0), 
             humidity=meteo.get('rh', 0), 
@@ -163,7 +243,7 @@ def generate_report_card(user_name, location_name, lat, lon):
         )
     except Exception as e: return f"⚠️ Error visual: {str(e)}"
 
-# --- SENDING (Sin cambios) ---
+# --- SENDING ---
 def get_inline_markup(tag):
     if tag == "CONFIRM_HOME": return {"inline_keyboard": [[{"text": "✅ Sí, es Casa", "callback_data": "SAVE_HOME"}], [{"text": "🔄 Cambiar", "callback_data": "RESET"}]]}
     if tag == "CONFIRM_WORK": return {"inline_keyboard": [[{"text": "✅ Sí, es Trabajo", "callback_data": "SAVE_WORK"}], [{"text": "🔄 Cambiar", "callback_data": "RESET"}]]}
@@ -174,15 +254,10 @@ def send_telegram(chat_id, text, markup=None):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
     if markup: payload["reply_markup"] = markup
-    try:
-        r = requests.post(url, json=payload)
-        if r.status_code == 400:
-            payload["parse_mode"] = ""
-            payload["text"] = text + "\n\n(Sin formato)."
-            requests.post(url, json=payload)
+    try: requests.post(url, json=payload)
     except Exception as e: print(f"NET ERROR: {e}")
 
-# --- HANDLER (Sin cambios mayores) ---
+# --- HANDLER ---
 def lambda_handler(event, context):
     try:
         body = json.loads(event.get('body', '{}'))
@@ -210,11 +285,24 @@ def lambda_handler(event, context):
         
         lat, lon = None, None
         user_content = ""
+        
         if 'location' in msg:
             lat, lon = msg['location']['latitude'], msg['location']['longitude']
             user_content = f"📍 [COORDENADAS RECIBIDAS]: {lat},{lon}"
         elif 'text' in msg:
             user_content = msg['text']
+            
+            # 🕵️‍♂️ BACKDOOR PARA PRUEBAS (PROMO CODES)
+            if user_content.strip().startswith('/promo '):
+                code = user_content.split(' ')[1]
+                if code == "SOY_DEV_PREMIUM":
+                    if update_user_status(user_id, 'PREMIUM'): send_telegram(chat_id, "💎 **¡Modo DEV activado!** Ahora eres PREMIUM.")
+                    else: send_telegram(chat_id, "❌ Error DB.")
+                elif code == "SOY_MORTAL":
+                    if update_user_status(user_id, 'FREE'): send_telegram(chat_id, "📉 **Modo DEV desactivado.** Ahora eres FREE.")
+                    else: send_telegram(chat_id, "❌ Error DB.")
+                return {'statusCode': 200, 'body': 'OK'}
+
             if user_content=="/start": 
                 send_telegram(chat_id, cards.CARD_ONBOARDING.format(user_name=first_name, footer=cards.BOT_FOOTER))
                 return {'statusCode': 200, 'body': 'OK'}
@@ -225,6 +313,7 @@ def lambda_handler(event, context):
         alerts = user_profile.get('alerts', {})
         memoria_str = "**Tus lugares:**\n" + "\n".join([f"- {v.get('display_name')}" for k, v in locs.items()])
         memoria_str += f"\n**Alertas:** {alerts}"
+        memoria_str += f"\n**Plan:** {user_profile.get('subscription',{}).get('status','FREE')}"
         
         has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
         forced_tag, system_extra = None, "NORMAL"
@@ -259,8 +348,7 @@ def lambda_handler(event, context):
                         if key and key in locs:
                             in_lat = float(locs[key]['lat'])
                             in_lon = float(locs[key]['lon'])
-                        else:
-                            r = "⚠️ No encontré coordenadas válidas para esa ubicación."
+                        else: r = "⚠️ No encontré coordenadas válidas para esa ubicación."
                     
                     if in_lat != 0 and in_lon != 0:
                         r = generate_report_card(first_name, in_name, in_lat, in_lon)
