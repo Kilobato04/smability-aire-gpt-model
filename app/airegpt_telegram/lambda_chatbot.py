@@ -63,6 +63,11 @@ def check_quota_and_permissions(user_profile, action_type):
         
         # Contar alertas actuales
         alerts = user_profile.get('alerts', {})
+        # --- 🛡️ FIX DE BLINDAJE (Inserta esto aquí) ---
+        if isinstance(alerts, str):
+            print(f"⚠️ [DATA FIX] Alerts is string inside Gatekeeper. Resetting.")
+            alerts = {}
+        # ----------------------------------------------
         total_used = 0
         for k, v in alerts.get('threshold', {}).items():
             if v.get('active'): total_used += 1
@@ -344,6 +349,12 @@ def lambda_handler(event, context):
         # Preparar memoria para GPT
         locs = user_profile.get('locations', {})
         alerts = user_profile.get('alerts', {})
+
+        # --- 🛡️ FIX DE BLINDAJE (Inserta esto aquí) ---
+        if isinstance(locs, str): locs = {}
+        if isinstance(alerts, str): alerts = {}
+        # ----------------------------------------------
+
         plan_status = user_profile.get('subscription',{}).get('status','FREE')
         
         memoria_str = "**Tus lugares:**\n" + "\n".join([f"- {v.get('display_name')}" for k, v in locs.items()])
