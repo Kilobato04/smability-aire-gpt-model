@@ -79,3 +79,4 @@ def lambda_handler(event, context):
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         return response(500, {'error': str(e)})
+# BUILD TIMESTAMP: Thu Jan 29 01:07:44 AM UTC 2026
