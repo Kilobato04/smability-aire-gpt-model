@@ -20,6 +20,7 @@ cd smability-aire-gpt-model
 # Aplicar cambios usando tu script de deploy rápido
 git pull origin main - push despues de commit en github
 git pull origin main --no-rebase     #por si hay mezcla
+./deploy_crm.sh
 ./deploy_forecast.sh - ajustes de forecast
 ./deploy_heavy.sh - ajustes a lambdas modelo pesado
 cd api_light
