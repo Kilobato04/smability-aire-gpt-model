@@ -5,7 +5,6 @@ import requests
 import boto3
 from datetime import datetime, timedelta
 # Asegúrate de que estos módulos existen en tu entorno o están en layers
-import lambda_api_light 
 import cards
 import re
 
@@ -81,16 +80,38 @@ def check_master_api_contingency():
     return False, "", ""
 
 def get_location_air_data(lat, lon):
+    # URL de tu API Light (Function URL)
+    # Usamos la URL pública que ya comprobamos que funciona
+    API_URL = "https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/"
+    
     try:
-        # Simulamos evento. AGREGAMOS 'ts' para forzar la recarga de caché en API Light
-        timestamp = str(int(time.time()))
-        mock = {'queryStringParameters': {'lat': str(lat), 'lon': str(lon), 'mode': 'live', 'ts': timestamp}}
+        # 1. Cache Buster: Timestamp para evitar datos viejos
+        ts = int(time.time())
         
-        res = lambda_api_light.lambda_handler(mock, None)
-        if res['statusCode'] == 200: return json.loads(res['body'])
+        # 2. Configurar parámetros
+        params = {
+            'lat': lat,
+            'lon': lon,
+            'mode': 'live',
+            'ts': ts  # Truco anti-caché
+        }
+        
+        # 3. Llamada HTTP con Timeout largo (25s) para aguantar Cold Starts
+        # print(f"   📡 [HTTP] Request a API Light...") 
+        response = requests.get(API_URL, params=params, timeout=25)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"   ❌ [HTTP ERROR] Status: {response.status_code} | Body: {response.text[:100]}")
+            return None
+
+    except requests.exceptions.Timeout:
+        print(f"   🐢 [TIMEOUT] La API Light tardó más de 25s en responder.")
+        return None
     except Exception as e: 
-        print(f"⚠️ API Light Error: {e}")
-    return None
+        print(f"   ⚠️ [REQ ERROR] {str(e)}")
+        return None
 
 # --- CORE LOGIC (CORREGIDO) ---
 def process_user(user, current_hour_str, contingency_data):
