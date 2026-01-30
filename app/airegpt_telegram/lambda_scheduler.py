@@ -6,7 +6,8 @@ import boto3
 from datetime import datetime, timedelta
 # Asegúrate de que estos módulos existen en tu entorno o están en layers
 import lambda_api_light 
-import cards 
+import cards
+import re
 
 # --- CONFIGURACIÓN ---
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
@@ -81,8 +82,10 @@ def check_master_api_contingency():
 
 def get_location_air_data(lat, lon):
     try:
-        # Simulamos evento para reusar la lambda de API Light sin hacer HTTP request (ahorra $)
-        mock = {'queryStringParameters': {'lat': str(lat), 'lon': str(lon), 'mode': 'live'}}
+        # Simulamos evento. AGREGAMOS 'ts' para forzar la recarga de caché en API Light
+        timestamp = str(int(time.time()))
+        mock = {'queryStringParameters': {'lat': str(lat), 'lon': str(lon), 'mode': 'live', 'ts': timestamp}}
+        
         res = lambda_api_light.lambda_handler(mock, None)
         if res['statusCode'] == 200: return json.loads(res['body'])
     except Exception as e: 
@@ -182,7 +185,27 @@ def process_user(user, current_hour_str, contingency_data):
                 if not isinstance(config, dict): continue
                 if not config.get('active', False): continue
                 
-                umbral = max(int(config.get('umbral', 100)), 50)
+                # --- FIX: PARSEO INTELIGENTE (Texto a Número) ---
+                raw_umbral = config.get('umbral', 100)
+                umbral = 100 # Valor seguro por defecto
+                
+                try:
+                    # Intento 1: Es número directo
+                    if isinstance(raw_umbral, (int, float)):
+                        umbral = int(raw_umbral)
+                    # Intento 2: Es texto (ej: "> 40 IMA") -> Usamos Regex
+                    else:
+                        match = re.search(r'(\d+)', str(raw_umbral))
+                        if match:
+                            umbral = int(match.group(1))
+                except:
+                    print(f"⚠️ Error leyendo umbral: {raw_umbral}")
+                    continue # Saltamos esta alerta si el dato es ilegible
+                
+                # Regla de seguridad: Mínimo 40 para no spamear con aire bueno
+                umbral = max(umbral, 40)
+                # -----------------------------------------------
+
                 loc_data = locations.get(loc_name)
                 
                 if loc_data:
