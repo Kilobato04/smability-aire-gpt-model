@@ -239,8 +239,8 @@ def process_user(user, current_hour_str, contingency_data):
                     print(f"   ❌ [ERROR] Falló el parseo de umbral: {e}")
                     continue
                 
-                # Regla de seguridad: Mínimo 40
-                umbral = max(umbral, 40)
+                # Regla de seguridad: Mínimo 40 - ajuste vs SPAM
+                umbral = max(umbral, 15)
 
                 # [LOG 3] Confirmación de matemáticas
                 print(f"   🔢 [MATH] {loc_name}: Umbral Final = {umbral} (Raw: {raw_umbral})")
