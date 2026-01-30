@@ -177,17 +177,30 @@ def process_user(user, current_hour_str, contingency_data):
                             )
                             send_telegram_push(user_id, card)
 
-        # B. ALERTAS POR UMBRAL (Emergencia) - Estas se revisan SIEMPRE (cada 20 min)
+        # ---------------------------------------------------------
+        # B. ALERTAS POR UMBRAL (Emergencia) - CON LOGS DE DEBUG 🕵️‍♂️
+        # ---------------------------------------------------------
         threshold_data = alerts.get('threshold', {})
+        
+        # [LOG 1] Ver qué config tiene el usuario
+        print(f"🔍 [DEBUG] User: {first_name} | Threshold Data: {json.dumps(threshold_data, default=str)}")
+
         if isinstance(threshold_data, dict):
             
             for loc_name, config in threshold_data.items():
-                if not isinstance(config, dict): continue
-                if not config.get('active', False): continue
+                if not isinstance(config, dict): 
+                    print(f"   ⚠️ [SKIP] Config de {loc_name} no es diccionario.")
+                    continue
+                
+                # [LOG 2] Estado de activación
+                is_active = config.get('active', False)
+                if not is_active: 
+                    print(f"   ⏭️ [SKIP] {loc_name}: Alerta desactivada (active=False)")
+                    continue
                 
                 # --- FIX: PARSEO INTELIGENTE (Texto a Número) ---
                 raw_umbral = config.get('umbral', 100)
-                umbral = 100 # Valor seguro por defecto
+                umbral = 100 # Default seguro
                 
                 try:
                     # Intento 1: Es número directo
@@ -198,31 +211,45 @@ def process_user(user, current_hour_str, contingency_data):
                         match = re.search(r'(\d+)', str(raw_umbral))
                         if match:
                             umbral = int(match.group(1))
-                except:
-                    print(f"⚠️ Error leyendo umbral: {raw_umbral}")
-                    continue # Saltamos esta alerta si el dato es ilegible
+                        else:
+                            print(f"   ⚠️ [REGEX FAIL] No se pudo leer número en: '{raw_umbral}'")
+                            continue 
+                except Exception as e:
+                    print(f"   ❌ [ERROR] Falló el parseo de umbral: {e}")
+                    continue
                 
-                # Regla de seguridad: Mínimo 40 para no spamear con aire bueno
+                # Regla de seguridad: Mínimo 40
                 umbral = max(umbral, 40)
-                # -----------------------------------------------
+
+                # [LOG 3] Confirmación de matemáticas
+                print(f"   🔢 [MATH] {loc_name}: Umbral Final = {umbral} (Raw: {raw_umbral})")
 
                 loc_data = locations.get(loc_name)
                 
                 if loc_data:
+                    # [LOG 4] Llamada a API
+                    print(f"   📡 [API] Consultando API Light para {loc_name}...")
                     data = get_location_air_data(loc_data['lat'], loc_data['lon'])
+                    
                     if data:
                         qa = data.get('aire', {})
                         cur_ias = qa.get('ias', 0)
                         
+                        # [LOG 5] EL MOMENTO DE LA VERDAD
+                        print(f"   ⚖️ [COMPARE] {loc_name}: ¿Actual {cur_ias} > Umbral {umbral}?")
+                        
                         if cur_ias > umbral:
                             count = int(config.get('consecutive_sent', 0))
+                            print(f"   🚨 [TRIGGER] CONDICIÓN CUMPLIDA. Consecutive sent: {count}")
+
                             if count < 3:
                                 f_short = interpret_timeline_short(cur_ias, data.get('pronostico_timeline', []))
                                 cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extremadamente Mala"}
                                 cat = cat_map.get(qa.get('riesgo'), "Regular")
                                 info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Mala'])
                                 
-                                print(f"🔔 [NOTIFY] Alerta de Umbral (> {umbral}) a {first_name}")
+                                print(f"   📤 [SENDING] Enviando mensaje a Telegram...")
+                                
                                 card = cards.CARD_ALERT_IAS.format(
                                     user_name=first_name, location_name=loc_data.get('display_name', loc_name),
                                     maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
@@ -234,7 +261,7 @@ def process_user(user, current_hour_str, contingency_data):
                                 )
                                 send_telegram_push(user_id, card)
                                 
-                                # Actualizamos contador con DynamoDB update expression para seguridad
+                                # Actualizar contador
                                 try:
                                     table.update_item(
                                         Key={'user_id': user_id},
@@ -242,11 +269,15 @@ def process_user(user, current_hour_str, contingency_data):
                                         ExpressionAttributeNames={f"#{loc_name}": loc_name},
                                         ExpressionAttributeValues={':inc': count + 1}
                                     )
+                                    print("   ✅ [DB] Contador actualizado.")
                                 except Exception as e:
-                                    print(f"Error actualizando contador: {e}")
-                        
+                                    print(f"   ❌ [DB ERROR] No se pudo actualizar contador: {e}")
+                            else:
+                                print(f"   🛑 [MUTE] Alerta silenciada por spam (consecutive >= 3)")
+
                         elif config.get('consecutive_sent', 0) > 0:
-                            # Si bajó el nivel, reseteamos el contador
+                            # Resetear contador si bajó el nivel
+                            print(f"   ⬇️ [RESET] El nivel bajó ({cur_ias} < {umbral}). Reseteando contador.")
                             try:
                                 table.update_item(
                                     Key={'user_id': user_id},
@@ -254,8 +285,11 @@ def process_user(user, current_hour_str, contingency_data):
                                     ExpressionAttributeNames={f"#{loc_name}": loc_name},
                                     ExpressionAttributeValues={':zero': 0}
                                 )
-                            except Exception as e:
-                                print(f"Error reseteando contador: {e}")
+                            except Exception as e: print(f"Error reseteando: {e}")
+                    else:
+                        print(f"   ❌ [API FAIL] API devolvió None para {loc_name}")
+                else:
+                    print(f"   ⚠️ [DATA] No se encontró config de location para {loc_name}")
 
 def lambda_handler(event, context):
     now = get_cdmx_time()
