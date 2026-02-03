@@ -111,6 +111,24 @@ CARD_HNC_RESULT = """🚗 **HOY NO CIRCULA**
 ⚠️ *Razón:* {reason}
 {footer}"""
 
+CARD_HNC_DETAILED = """🚗 **TU CALENDARIO HNC ({mes_nombre})**
+🚘 **Placa:** ..{plate} ({color}) | **Holo:** {holo}
+
+📅 **DÍAS SIN CIRCULAR:**
+{dias_semana_txt}
+{sabados_txt}
+🕒 **Horario:** 05:00 - 22:00 hrs
+
+📋 **Fechas específicas este mes:**
+{lista_fechas}
+
+👮 **RIESGO DE MULTA (Si omites):**
+🏛️ **CDMX:** {multa_cdmx} + Corralón
+🌲 **Edomex:** {multa_edomex} + Retención
+
+📝 *Alertas automáticas activadas a las 20:00 hrs.*
+{footer}"""
+
 # --- HELPER VISUAL DE DÍAS ---
 def format_days_text(days_list):
     if not days_list or len(days_list) == 7: return "Diario"
