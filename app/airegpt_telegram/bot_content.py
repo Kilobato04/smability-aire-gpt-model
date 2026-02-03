@@ -105,6 +105,20 @@ TOOLS_SCHEMA = [
             "parameters": {"type": "object", "properties": {}}
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "consultar_hoy_no_circula",
+            "description": "Verifica si el auto del usuario circula en una fecha específica. Requiere que el usuario tenga auto configurado.",
+            "parameters": {
+                "type": "object", 
+                "properties": {
+                    "fecha_referencia": {"type": "string", "description": "La fecha a consultar en formato YYYY-MM-DD. Si el usuario dice 'mañana', calcula la fecha. Si es 'hoy', usa la fecha actual."}
+                }, 
+                "required": ["fecha_referencia"]
+            }
+        }
+    },
     # 2. AGREGAR ESTA NUEVA (Para la tarjeta resumen)
     {
         "type": "function",
