@@ -221,6 +221,71 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     except Exception as e:
         print(f"❌ [SCHEDULE ERROR]: {e}")
         return "Error guardando recordatorio."
+# --- MOTOR HNC Y VEHÍCULO (NUEVO) ---
+MATRIZ_SEMANAL = {5:0, 6:0, 7:1, 8:1, 3:2, 4:2, 1:3, 2:3, 9:4, 0:4} # Key:Digito -> Val:DiaSemana (0=Lun)
+
+def check_driving_status(plate_last_digit, hologram, date_str, contingency_phase=0):
+    """Calcula si circula o no (Motor HNC)"""
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        day_week = dt.weekday() # 0=Lun, 6=Dom
+        day_month = dt.day
+        holo = str(hologram).lower()
+        plate = int(plate_last_digit)
+
+        # 1. Domingo
+        if day_week == 6: return True, "Es domingo, todos circulan."
+
+        # 2. Contingencia (MVP: Asumimos Fase 0 si no hay dato, Fase 1 si phase>=1)
+        if contingency_phase >= 1:
+            if holo == '2': return False, "⛔ CONTINGENCIA: Holo 2 no circula."
+            if holo == '1': return False, "⛔ CONTINGENCIA: Holo 1 no circula."
+            if MATRIZ_SEMANAL.get(plate) == day_week: return False, "⛔ CONTINGENCIA: Tu engomado descansa hoy."
+
+        # 3. Exentos
+        if holo in ['0', '00', 'exento', 'hibrido']: return True, "Holograma Exento circula diario."
+
+        # 4. Sábados
+        if day_week == 5:
+            if holo == '2' or holo == 'foraneo': return False, "🚫 Holo 2 no circula en sábado."
+            if holo == '1':
+                sat_idx = (day_month - 1) // 7 + 1
+                is_impar = (plate % 2 != 0)
+                if is_impar and sat_idx in [1, 3]: return False, f"🚫 Holo 1 Impar descansa el {sat_idx}º sábado."
+                if not is_impar and sat_idx in [2, 4]: return False, f"🚫 Holo 1 Par descansa el {sat_idx}º sábado."
+                if sat_idx == 5: return False, "🚫 5to Sábado: Descansan todos los Holo 1."
+            return True, "✅ Tu holograma circula este sábado."
+
+        # 5. Entre Semana
+        dia_no_circula = MATRIZ_SEMANAL.get(plate)
+        if dia_no_circula == day_week: return False, "🚫 Hoy no circulas por terminación de placa."
+            
+        return True, "✅ Puedes circular."
+    except Exception as e:
+        print(f"❌ Error HNC Logic: {e}")
+        return False, "Error en cálculo de fecha."
+
+def save_vehicle_profile(user_id, digit, hologram):
+    """Guarda auto y calcula color de engomado"""
+    try:
+        digit = int(digit)
+        holo = str(hologram).lower().replace("holograma", "").strip()
+        colors = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
+        color = colors.get(digit, "Desconocido")
+        
+        vehicle_data = {
+            "active": True,
+            "plate_last_digit": digit,
+            "hologram": holo,
+            "engomado": color,
+            "updated_at": datetime.now().isoformat(),
+            "alert_config": {"enabled": True, "time": "20:00"}
+        }
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET vehicle = :v", ExpressionAttributeValues={':v': vehicle_data})
+        return f"✅ Auto guardado: Terminación {digit} (Engomado {color}), Holograma {holo.upper()}. Alertas HNC activadas."
+    except Exception as e:
+        print(f"❌ Error Saving Vehicle: {e}")
+        return "Error al guardar el vehículo."
 
 # --- VISUALES ---
 def format_forecast_block(timeline):
@@ -490,6 +555,53 @@ def lambda_handler(event, context):
                         # 2. 🛑 HARD STOP: Detenemos la Lambda aquí.
                         return {'statusCode': 200, 'body': 'OK'}
 
+                # --- NUEVOS BLOQUES HNC (PEGAR AQUÍ) ---
+                elif fn == "configurar_auto":
+                    digit = args.get('ultimo_digito')
+                    holo = args.get('hologram') or args.get('holograma')
+                    if digit is None or holo is None:
+                        r = "⚠️ Faltan datos. Necesito último dígito y holograma."
+                    else:
+                        r = save_vehicle_profile(user_id, digit, holo)
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+
+                elif fn == "consultar_hoy_no_circula":
+                    user = get_user_profile(user_id)
+                    veh = user.get('vehicle')
+                    
+                    if not veh or not veh.get('active'):
+                        r = "⚠️ No tienes auto configurado. Dime algo como: *'Mi auto es placas 555 y holograma 0'*."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    else:
+                        plate = veh.get('plate_last_digit')
+                        holo = veh.get('hologram')
+                        # Default a 'hoy' si no especifica fecha, pero el prompt suele mandar fecha
+                        fecha = args.get('fecha_referencia', datetime.now().strftime("%Y-%m-%d"))
+                        
+                        can_drive, reason = check_driving_status(plate, holo, fecha)
+                        
+                        # Visuales
+                        dt_obj = datetime.strptime(fecha, "%Y-%m-%d")
+                        dias_map = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+                        status_emoji = "✅" if can_drive else "⛔"
+                        status_title = "PUEDES CIRCULAR" if can_drive else "NO CIRCULAS"
+                        status_msg = "¡Vámonos! Tu auto está libre." if can_drive else "Evita multas, déjalo en casa."
+                        
+                        card = cards.CARD_HNC_RESULT.format(
+                            fecha_str=fecha,
+                            dia_semana=dias_map[dt_obj.weekday()],
+                            plate_info=f"Terminación {plate}",
+                            hologram=holo,
+                            status_emoji=status_emoji,
+                            status_title=status_title,
+                            status_message=status_msg,
+                            reason=reason,
+                            footer=cards.BOT_FOOTER
+                        )
+                        send_telegram(chat_id, card)
+                        return {'statusCode': 200, 'body': 'OK'} # Hard Stop para evitar texto redundante
+
+                # --- FIN NUEVOS BLOQUES ---
                 else: 
                     # Para cualquier otra tool genérica
                     r = "Acción realizada."
