@@ -186,7 +186,22 @@ def configure_ias_alert(user_id, nombre_ubicacion, umbral):
         print(f"❌ [ALERT ERROR]: {e}")
         return "Error guardando alerta."
 
-def configure_schedule_alert(user_id, nombre_ubicacion, hora):
+# --- HELPER DE DÍAS (NUEVO) ---
+def parse_days_input(dias_str):
+    """Traduce texto natural a lista de días [0-6]"""
+    if not dias_str: return [0,1,2,3,4,5,6] # Default Diario
+    txt = dias_str.lower()
+    
+    if any(x in txt for x in ["diario", "todos", "siempre"]): return [0,1,2,3,4,5,6]
+    if "fin" in txt and "semana" in txt: return [5,6]
+    if "laboral" in txt or ("lunes" in txt and "viernes" in txt and "a" in txt): return [0,1,2,3,4]
+
+    mapping = {"lun":0, "mar":1, "mie":2, "mié":2, "jue":3, "vie":4, "sab":5, "sáb":5, "dom":6}
+    days = {idx for word, idx in mapping.items() if word in txt}
+    return sorted(list(days)) if days else [0,1,2,3,4,5,6]
+
+# --- FUNCIÓN ACTUALIZADA (SOPORTA DÍAS) ---
+def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     user = get_user_profile(user_id)
     can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_alert')
     if not can_proceed: return msg_bloqueo
@@ -194,10 +209,15 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora):
     key = resolve_location_key(user_id, nombre_ubicacion)
     if not key: return f"⚠️ Primero guarda '{nombre_ubicacion}'."
     
+    days_list = parse_days_input(dias_str)
+    
     try:
-        print(f"💾 [ACTION] Setting Schedule Alert for {user_id} in {key} at {hora}")
-        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET alerts.schedule.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': {'time': str(hora), 'active': True}})
-        return f"✅ **Recordatorio:** Reporte diario de **{key.capitalize()}** a las {hora}."
+        print(f"💾 [ACTION] Schedule {user_id} in {key} at {hora} days={days_list}")
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET alerts.schedule.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': {'time': str(hora), 'days': days_list, 'active': True}})
+        
+        # Formatear respuesta bonita
+        from cards import format_days_text
+        return f"✅ **Recordatorio:** {key.capitalize()} a las {hora} ({format_days_text(days_list)})."
     except Exception as e:
         print(f"❌ [SCHEDULE ERROR]: {e}")
         return "Error guardando recordatorio."
@@ -314,6 +334,23 @@ def lambda_handler(event, context):
             if data == "SAVE_HOME": resp = confirm_saved_location(user_id, 'casa')
             elif data == "SAVE_WORK": resp = confirm_saved_location(user_id, 'trabajo')
             elif data == "RESET": resp = "🗑️ Cancelado."
+            # --- AGREGAR ESTO (Lógica de Botones Resumen) ---
+            elif data in ["CHECK_HOME", "CHECK_WORK"]:
+                user = get_user_profile(user_id)
+                locs = user.get('locations', {})
+                key = 'casa' if data == "CHECK_HOME" else 'trabajo'
+                
+                if key in locs:
+                    lat, lon = float(locs[key]['lat']), float(locs[key]['lon'])
+                    first_name = cb['from'].get('first_name', 'Usuario')
+                    # Generamos reporte visual
+                    report_card = generate_report_card(first_name, key.capitalize(), lat, lon)
+                    send_telegram(chat_id, report_card)
+                    return {'statusCode': 200, 'body': 'OK'} # Salimos para no enviar resp texto
+                else:
+                    resp = f"⚠️ No tienes ubicación de {key} guardada."
+            
+            # Enviar respuesta de texto simple si no fue reporte
             send_telegram(chat_id, resp)
             return {'statusCode': 200, 'body': 'OK'}
 
@@ -415,7 +452,37 @@ def lambda_handler(event, context):
                         r = generate_report_card(first_name, in_name, in_lat, in_lon)
                     
                 elif fn == "configurar_alerta_ias": r = configure_ias_alert(user_id, args['nombre_ubicacion'], args['umbral_ias'])
-                elif fn == "configurar_recordatorio": r = configure_schedule_alert(user_id, args['nombre_ubicacion'], args['hora'])
+                elif fn == "configurar_recordatorio": 
+                    # AHORA PASAMOS EL ARGUMENTO 'dias' QUE VIENE DEL LLM
+                    r = configure_schedule_alert(user_id, args['nombre_ubicacion'], args['hora'], args.get('dias'))
+
+                elif fn == "consultar_resumen_configuracion":
+                    # GATEKEEPER DE RESUMEN
+                    user = get_user_profile(user_id)
+                    status = user.get('subscription', {}).get('status', 'FREE')
+                    
+                    if "PREMIUM" not in status.upper() and "TRIAL" not in status.upper():
+                        r = "🚫 El usuario es FREE. Dile amablemente que no tiene alertas activas y que requiere Premium."
+                    else:
+                        # 1. Generar Texto
+                        r = cards.generate_summary_card(
+                            first_name, 
+                            user.get('alerts', {}), 
+                            user.get('vehicle', None), 
+                            user.get('exposure_profile', None)
+                        )
+                        # 2. Generar Botones
+                        markup = cards.get_summary_buttons(
+                            'casa' in user.get('locations',{}), 
+                            'trabajo' in user.get('locations',{})
+                        )
+                        # 3. Enviar directo (bypass del return final)
+                        send_telegram(chat_id, r, markup)
+                        
+                        # Agregamos registro falso al historial para que GPT no se rompa
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Tarjeta enviada."})
+                        continue 
+
                 else: r = "Acción realizada."
                 
                 gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
