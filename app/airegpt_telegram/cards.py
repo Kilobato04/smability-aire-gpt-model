@@ -101,6 +101,16 @@ CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
 _Fuente: SIMAT /Smability_
 {footer}"""
 
+CARD_HNC_RESULT = """🚗 **HOY NO CIRCULA**
+📅 **Fecha:** {fecha_str} ({dia_semana})
+🚘 **Auto:** {plate_info} (Holo {hologram})
+
+{status_emoji} **{status_title}**
+{status_message}
+
+⚠️ *Razón:* {reason}
+{footer}"""
+
 # --- HELPER VISUAL DE DÍAS ---
 def format_days_text(days_list):
     if not days_list or len(days_list) == 7: return "Diario"
