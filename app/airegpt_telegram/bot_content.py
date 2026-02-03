@@ -119,6 +119,21 @@ TOOLS_SCHEMA = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "configurar_auto",
+            "description": "Guarda o actualiza el vehículo del usuario. NO pedir color de engomado, se calcula solo.",
+            "parameters": {
+                "type": "object", 
+                "properties": {
+                    "ultimo_digito": {"type": "integer", "description": "Último número de la placa (0-9)."}, 
+                    "holograma": {"type": "string", "description": "Ejemplos: '00', '0', '1', '2', 'exento', 'hibrido'"}
+                }, 
+                "required": ["ultimo_digito", "holograma"]
+            }
+        }
+    },
     # 2. AGREGAR ESTA NUEVA (Para la tarjeta resumen)
     {
         "type": "function",
