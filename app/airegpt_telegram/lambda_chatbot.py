@@ -451,10 +451,16 @@ def lambda_handler(event, context):
                     if in_lat != 0 and in_lon != 0:
                         r = generate_report_card(first_name, in_name, in_lat, in_lon)
                     
-                elif fn == "configurar_alerta_ias": r = configure_ias_alert(user_id, args['nombre_ubicacion'], args['umbral_ias'])
+                elif fn == "configurar_alerta_ias": 
+                    r = configure_ias_alert(user_id, args['nombre_ubicacion'], args['umbral_ias'])
+                    # IMPORTANTE: Avisar al LLM que ya se hizo
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+
                 elif fn == "configurar_recordatorio": 
                     # AHORA PASAMOS EL ARGUMENTO 'dias' QUE VIENE DEL LLM
                     r = configure_schedule_alert(user_id, args['nombre_ubicacion'], args['hora'], args.get('dias'))
+                    # IMPORTANTE: Avisar al LLM que ya se hizo
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
                 elif fn == "consultar_resumen_configuracion":
                     # GATEKEEPER DE RESUMEN
@@ -462,31 +468,34 @@ def lambda_handler(event, context):
                     status = user.get('subscription', {}).get('status', 'FREE')
                     
                     if "PREMIUM" not in status.upper() and "TRIAL" not in status.upper():
+                        # CASO FREE: Dejamos que el LLM explique
                         r = "🚫 El usuario es FREE. Dile amablemente que no tiene alertas activas y que requiere Premium."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                     else:
-                        # 1. Generar Texto
+                        # CASO PREMIUM: Generamos la tarjeta visual
                         r = cards.generate_summary_card(
                             first_name, 
                             user.get('alerts', {}), 
                             user.get('vehicle', None), 
                             user.get('exposure_profile', None)
                         )
-                        # 2. Generar Botones
                         markup = cards.get_summary_buttons(
                             'casa' in user.get('locations',{}), 
                             'trabajo' in user.get('locations',{})
                         )
-                        # 3. Enviar directo (bypass del return final)
+                        
+                        # 1. Enviar tarjeta visual
                         send_telegram(chat_id, r, markup)
                         
-                        # Agregamos registro falso al historial para que GPT no se rompa
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Tarjeta enviada."})
-                        continue 
+                        # 2. 🛑 HARD STOP: Detenemos la Lambda aquí.
+                        return {'statusCode': 200, 'body': 'OK'}
 
-                else: r = "Acción realizada."
-                
-                gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                else: 
+                    # Para cualquier otra tool genérica
+                    r = "Acción realizada."
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
             
+            # --- FINAL DEL PROCESAMIENTO DE TOOLS ---
             final_text = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_msgs, temperature=0.3).choices[0].message.content
         else:
             final_text = ai_msg.content
