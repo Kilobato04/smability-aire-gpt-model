@@ -100,3 +100,68 @@ CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
 
 _Fuente: SIMAT /Smability_
 {footer}"""
+
+# --- HELPER VISUAL DE DÍAS ---
+def format_days_text(days_list):
+    if not days_list or len(days_list) == 7: return "Diario"
+    if days_list == [0,1,2,3,4]: return "Lun-Vie"
+    if days_list == [5,6]: return "Fin de Semana"
+    names = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"]
+    return ",".join([names[i] for i in days_list])
+
+# --- HELPER DE BOTONES (Sin botón de Riesgo) ---
+def get_summary_buttons(has_home, has_work):
+    keyboard = []
+    row = []
+    if has_home: row.append({"text": "☁️ Ver Casa", "callback_data": "CHECK_HOME"})
+    if has_work: row.append({"text": "🏢 Ver Oficina", "callback_data": "CHECK_WORK"})
+    if row: keyboard.append(row)
+    return {"inline_keyboard": keyboard}
+
+# --- TARJETA PRINCIPAL ---
+def generate_summary_card(user_name, alerts, vehicle=None, exposure=None):
+    msg = f"⚙️ **TUS ALERTAS Y SERVICIOS**\n*Resumen para {user_name}:*\n\n"
+    
+    # 1. UMBRALES
+    thresh = alerts.get('threshold', {})
+    active = False
+    msg += "📉 **Vigilancia IAS (24/7):**\n"
+    for loc, cfg in thresh.items():
+        if cfg.get('active'):
+            active = True
+            msg += f"• *{loc.capitalize()}:* > {cfg.get('umbral')} IAS\n"
+    if not active: msg += "_(Sin vigilancia activa)_\n"
+    msg += "\n"
+
+    # 2. HORARIOS
+    sched = alerts.get('schedule', {})
+    msg += "⏰ **Reportes Programados:**\n"
+    if not sched:
+        msg += "_(Sin horarios)_\n"
+    else:
+        for loc, data in sched.items():
+            hora = data.get('time', '00:00')
+            dias = data.get('days', [0,1,2,3,4,5,6])
+            msg += f"• *{loc.capitalize()}:* {hora} ({format_days_text(dias)})\n"
+    msg += "\n"
+
+    # 3. AUTO
+    if vehicle and vehicle.get('active'):
+        plate = vehicle.get('plate_last_digit')
+        msg += f"🚗 **Tu Auto (..{plate}):**\n"
+        hnc_on = "✅" if vehicle.get('alert_config', {}).get('enabled') else "🔕"
+        msg += f"🔔 Aviso HNC: {hnc_on} (20:00)\n\n"
+
+    # 4. EXPOSICIÓN (Solo DATOS, sin cálculo)
+    if exposure:
+        mode = exposure.get('mode', 'Transporte').capitalize()
+        duration = exposure.get('duration', '?')
+        msg += f"🫁 **Perfil de Exposición:**\n"
+        msg += f"• Medio: {mode}\n"
+        msg += f"• Tiempo: {duration}\n\n"
+
+    # 5. FOOTER CONVERSACIONAL
+    msg += "📝 *¿Quieres cambios?* Solo pídelo.\n"
+    msg += "_Ej: \"Ajusta el umbral de Casa a 100\" o \"Avísame en Trabajo a las 9am\"._"
+    
+    return msg
