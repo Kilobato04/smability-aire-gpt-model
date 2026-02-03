@@ -61,8 +61,16 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "configurar_recordatorio",
-            "description": "Configura reporte diario.",
-            "parameters": {"type": "object", "properties": {"nombre_ubicacion": {"type": "string"}, "hora": {"type": "string"}}, "required": ["nombre_ubicacion", "hora"]}
+            "description": "Configura reporte diario. Identifica hora y días (ej. lunes y viernes).",
+            "parameters": {
+                "type": "object", 
+                "properties": {
+                    "nombre_ubicacion": {"type": "string"}, 
+                    "hora": {"type": "string", "description": "HH:MM"},
+                    "dias": {"type": "string", "description": "Ej: 'lunes a viernes', 'fines de semana', 'diario', 'martes'"}
+                }, 
+                "required": ["nombre_ubicacion", "hora"]
+            }
         }
     },
     {
@@ -94,6 +102,15 @@ TOOLS_SCHEMA = [
         "function": {
             "name": "consultar_mis_datos",
             "description": "Muestra datos.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    },
+    # 2. AGREGAR ESTA NUEVA (Para la tarjeta resumen)
+    {
+        "type": "function",
+        "function": {
+            "name": "consultar_resumen_configuracion",
+            "description": "Muestra tarjeta con resumen de alertas, horarios, auto y status. Usar cuando el usuario pregunte 'qué tengo configurado' o 'mis alertas'.",
             "parameters": {"type": "object", "properties": {}}
         }
     }
