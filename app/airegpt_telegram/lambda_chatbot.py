@@ -19,32 +19,41 @@ def get_mexico_time():
     """Retorna la hora actual en CDMX (UTC-6)"""
     return datetime.utcnow() - timedelta(hours=6)
 
+# --- HELPER VERIFICACIÓN (CORREGIDO) ---
 def get_verification_period(plate_digit, hologram):
+    """Calcula el periodo de verificación bimestral"""
+    # 1. Caso Exentos
     if str(hologram).lower() in ['00', 'exento', 'hibrido']:
         return "🟢 **EXENTO** (No verifica)"
-
-def get_verification_deadline(period_txt):
-    """Extrae el mes límite del texto del periodo"""
-    if "EXENTO" in period_txt: return "N/A"
-    # Ejemplo entrada: "🟡 Ene-Feb / Jul-Ago"
-    # Lógica simple: Tomamos los meses finales
-    if "Feb" in period_txt: return "28 de Febrero / 31 de Agosto"
-    if "Mar" in period_txt: return "31 de Marzo / 30 de Septiembre"
-    if "Abr" in period_txt: return "30 de Abril / 31 de Octubre"
-    if "May" in period_txt: return "31 de Mayo / 30 de Noviembre"
-    if "Jun" in period_txt: return "30 de Junio / 31 de Diciembre"
-    return "Revisar Calendario"
     
+    # 2. Validación de Placa
     try:
         d = int(plate_digit)
     except:
-        return "⚠️ Error en placa"
+        return "⚠️ Revisar Placa"
+
+    # 3. Lógica Bimestral (CDMX/Edomex)
     if d in [5, 6]: return "🟡 Ene-Feb / Jul-Ago"
     if d in [7, 8]: return "🌸 Feb-Mar / Ago-Sep"
     if d in [3, 4]: return "🔴 Mar-Abr / Sep-Oct"
     if d in [1, 2]: return "🟢 Abr-May / Oct-Nov"
     if d in [9, 0]: return "🔵 May-Jun / Nov-Dic"
-    return "Desconocido"
+    
+    return "📅 Revisar Calendario"
+
+def get_verification_deadline(period_txt):
+    """Extrae el mes límite del texto del periodo de forma segura"""
+    if not period_txt or "EXENTO" in period_txt or "Revisar" in period_txt: 
+        return "N/A"
+        
+    # Lógica de fechas límite basada en el segundo bimestre
+    if "Feb" in period_txt: return "28 Feb / 31 Ago"
+    if "Mar" in period_txt: return "31 Mar / 30 Sep"
+    if "Abr" in period_txt: return "30 Abr / 31 Oct"
+    if "May" in period_txt: return "31 May / 30 Nov"
+    if "Jun" in period_txt: return "30 Jun / 31 Dic"
+    
+    return "N/A"
 
 client = OpenAI(api_key=OPENAI_API_KEY, timeout=20.0)
 dynamodb = boto3.resource('dynamodb')
@@ -862,7 +871,8 @@ def lambda_handler(event, context):
                         send_telegram(chat_id, card)
                         return {'statusCode': 200, 'body': 'OK'}
 
-                # --- NUEVA TOOL: MIS UBICACIONES (CON BOTONES) ---
+
+                # --- NUEVA TOOL: MIS UBICACIONES (URL FIX) ---
                 elif fn == "consultar_ubicaciones_guardadas":
                     user = get_user_profile(user_id)
                     locs = user.get('locations', {})
@@ -874,7 +884,12 @@ def lambda_handler(event, context):
                         # Crear lista visual
                         lista_txt = ""
                         for k, v in locs.items():
-                            lista_txt += f"🏠 **{k.capitalize()}:** {v.get('display_name', 'Ubicación')}\n🔗 [Ver en Mapa](http://maps.google.com/?q={v['lat']},{v['lon']})\n\n"
+                            # FIX URL: Usamos formato estándar ?q=lat,lon
+                            lat_safe = v.get('lat', 0)
+                            lon_safe = v.get('lon', 0)
+                            display = v.get('display_name', 'Ubicación').replace("_", " ") # Limpiar guiones bajos para Markdown
+                            
+                            lista_txt += f"🏠 **{k.capitalize()}:** {display}\n🔗 [Ver en Mapa](https://www.google.com/maps?q={lat_safe},{lon_safe})\n\n"
                         
                         card = cards.CARD_MY_LOCATIONS.format(
                             user_name=first_name,
@@ -882,7 +897,7 @@ def lambda_handler(event, context):
                             footer=cards.BOT_FOOTER
                         )
                         
-                        # Generar botones de acción (Check/Delete)
+                        # Generar botones de acción
                         markup = cards.get_locations_buttons(locs)
                         
                         send_telegram(chat_id, card, markup)
