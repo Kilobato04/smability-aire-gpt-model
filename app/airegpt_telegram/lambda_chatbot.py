@@ -22,6 +22,18 @@ def get_mexico_time():
 def get_verification_period(plate_digit, hologram):
     if str(hologram).lower() in ['00', 'exento', 'hibrido']:
         return "🟢 **EXENTO** (No verifica)"
+
+def get_verification_deadline(period_txt):
+    """Extrae el mes límite del texto del periodo"""
+    if "EXENTO" in period_txt: return "N/A"
+    # Ejemplo entrada: "🟡 Ene-Feb / Jul-Ago"
+    # Lógica simple: Tomamos los meses finales
+    if "Feb" in period_txt: return "28 de Febrero / 31 de Agosto"
+    if "Mar" in period_txt: return "31 de Marzo / 30 de Septiembre"
+    if "Abr" in period_txt: return "30 de Abril / 31 de Octubre"
+    if "May" in period_txt: return "31 de Mayo / 30 de Noviembre"
+    if "Jun" in period_txt: return "30 de Junio / 31 de Diciembre"
+    return "Revisar Calendario"
     
     try:
         d = int(plate_digit)
