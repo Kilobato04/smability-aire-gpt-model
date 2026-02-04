@@ -144,11 +144,14 @@ CARD_SUMMARY = """
 🚗 **Tu Auto:**
 {vehicle_info}
 
-🔔 **Alertas Calidad del Aire (IAS):**
-{alerts_ias}
+🔔 **Alertas Aire (Por Nivel/Umbral):**
+{alerts_threshold}
 
-⏰ **Recordatorios HNC:**
-{alerts_hnc}
+⏰ **Reportes Aire (Programados):**
+{alerts_schedule}
+
+🚫 **Aviso Hoy No Circula:**
+{hnc_reminder}
 
 💡 *{tip_footer}*
 """
@@ -161,28 +164,17 @@ def format_days_text(days_list):
     names = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"]
     return ",".join([names[i] for i in days_list])
 
-# --- 2. HELPER DE BOTONES (Sin botón de Riesgo) ---
-def get_summary_buttons(has_home, has_work):
-    keyboard = []
-    row = []
-    if has_home: row.append({"text": "☁️ Ver Casa", "callback_data": "CHECK_HOME"})
-    if has_work: row.append({"text": "🏢 Ver Oficina", "callback_data": "CHECK_WORK"})
-    if row: keyboard.append(row)
-    return {"inline_keyboard": keyboard}
 
-
-# --- 3. ACTUALIZAR FUNCIÓN GENERADORA DE RESUMEN ---
-def generate_summary_card(user_name, alerts, vehicle, exposure, plan_status):
+# --- 2. ACTUALIZAR FUNCIÓN GENERADORA DE RESUMEN ---
+def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
     # a) Status Contingencia
-    is_premium = "PREMIUM" in plan_status.upper()
+    is_premium = "PREMIUM" in plan_status.upper() or "TRIAL" in plan_status.upper()
     contingency_status = "✅ **ACTIVA**" if is_premium else "🔒 **INACTIVA** (Solo Premium)"
     
     # b) Ubicaciones
     locs = []
-    # Aquí asumimos que pasas el dict de locations, no el exposure profile directo
-    # Si pasas exposure profile, adáptalo. Asumiré que pasas el dict 'locations' de la DB.
-    if isinstance(exposure, dict): # Parche si pasas locations directo
-        for k, v in exposure.items():
+    if isinstance(locations, dict):
+        for k, v in locations.items():
             locs.append(f"• **{k.capitalize()}:** {v.get('display_name','Ubicación')}")
     loc_str = "\n".join(locs) if locs else "• *Sin ubicaciones guardadas*"
 
@@ -191,24 +183,40 @@ def generate_summary_card(user_name, alerts, vehicle, exposure, plan_status):
     if vehicle and vehicle.get('active'):
         veh_str = f"• Placa **{vehicle.get('plate_last_digit')}** (Holo {vehicle.get('hologram')})"
 
-    # d) Alertas IAS
-    ias_list = []
+    # d) Alertas de Aire por UMBRAL (Threshold)
+    # Ejemplo: "Avísame si Casa pasa de 100 puntos"
+    threshold_list = []
     thresholds = alerts.get('threshold', {})
     for k, v in thresholds.items():
-        if v.get('active'): ias_list.append(f"• {k.capitalize()}: > {v.get('umbral')} pts")
-    ias_str = "\n".join(ias_list) if ias_list else "• *Sin alertas configuradas*"
+        if v.get('active'): 
+            threshold_list.append(f"• {k.capitalize()}: > {v.get('umbral')} pts")
+    threshold_str = "\n".join(threshold_list) if threshold_list else "• *Sin alertas de umbral*"
 
-    # e) Alertas HNC
-    hnc_list = []
+    # e) Reportes de Aire PROGRAMADOS (Schedule)
+    # Ejemplo: "Dime cómo está el aire a las 7am"
+    # CORRECCIÓN: Antes esto salía en HNC, ahora va en su propia sección de Aire
+    schedule_list = []
     schedules = alerts.get('schedule', {})
     for k, v in schedules.items():
         if v.get('active'): 
-            # Parsear días
             days = v.get('days', [])
-            days_txt = "Diario" if len(days)==7 else "Personalizado"
-            hnc_list.append(f"• {k.capitalize()}: {v.get('time')} hrs ({days_txt})")
-    hnc_str = "\n".join(hnc_list) if hnc_list else "• *Sin recordatorios*"
+            days_txt = "Diario" if len(days)==7 else "Días selec."
+            schedule_list.append(f"• {k.capitalize()}: {v.get('time')} hrs ({days_txt})")
+    schedule_str = "\n".join(schedule_list) if schedule_list else "• *Sin reportes programados*"
 
+    # f) Recordatorio HOY NO CIRCULA (Exclusivo del Auto)
+    # Se lee directo de la configuración del vehículo, no de 'alerts' general
+    hnc_str = "• *Sin recordatorio activo*"
+    if vehicle and vehicle.get('active'):
+        config = vehicle.get('alert_config', {})
+        if config.get('enabled'):
+            hnc_str = f"• Te aviso a las **{config.get('time', '20:00')} hrs** si no circulas."
+        else:
+            hnc_str = "• 🔕 Recordatorio desactivado."
+    elif not vehicle:
+        hnc_str = "" # Si no tiene auto, dejamos esto vacío para no ensuciar
+
+    # Footer
     tip = "💡 Tip: Escribe 'Cambiar hora alertas' para ajustar." if is_premium else "💎 Tip: Hazte Premium para activar Contingencias."
 
     return CARD_SUMMARY.format(
@@ -217,12 +225,13 @@ def generate_summary_card(user_name, alerts, vehicle, exposure, plan_status):
         contingency_status=contingency_status,
         locations_list=loc_str,
         vehicle_info=veh_str,
-        alerts_ias=ias_str,
-        alerts_hnc=hnc_str,
+        alerts_threshold=threshold_str, # Nueva variable
+        alerts_schedule=schedule_str,   # Nueva variable (antes confundida con HNC)
+        hnc_reminder=hnc_str,           # Nueva variable exclusiva HNC
         tip_footer=tip
     )
 
-# --- 4. ACTUALIZAR BOTONES DE RESUMEN (UPSELLING) ---
+# --- 3. ACTUALIZAR BOTONES DE RESUMEN (UPSELLING) ---
 def get_summary_buttons(has_home, has_work, is_premium=False):
     # Fila 1: Accesos directos a Aire
     row1 = []
