@@ -265,6 +265,56 @@ def check_driving_status(plate_last_digit, hologram, date_str, contingency_phase
         print(f"❌ Error HNC Logic: {e}")
         return False, "Error en cálculo de fecha."
 
+# --- CONSTANTES HNC ---
+VALOR_UMA_2025 = 108.57 # Actualizar cada febrero
+MULTA_CDMX_MIN = VALOR_UMA_2025 * 20
+MULTA_CDMX_MAX = VALOR_UMA_2025 * 30
+MULTA_EDOMEX = VALOR_UMA_2025 * 20
+
+def get_monthly_prohibited_dates(plate, holo, year, month):
+    """
+    Genera la lista de fechas prohibidas del mes completo.
+    """
+    import calendar
+    prohibited_dates = []
+    num_days = calendar.monthrange(year, month)[1]
+    
+    # Barrer todo el mes
+    for day in range(1, num_days + 1):
+        date_obj = datetime(year, month, day)
+        date_str = date_obj.strftime("%Y-%m-%d")
+        
+        # Usamos tu motor existente check_driving_status
+        can_drive, _ = check_driving_status(plate, holo, date_str)
+        
+        if not can_drive:
+            # Formato bonito: "Lun 03", "Sáb 15"
+            dias_abr = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"]
+            prohibited_dates.append(f"• {dias_abr[date_obj.weekday()]} {day}")
+            
+    return prohibited_dates
+
+def get_restriction_summary(plate, holo):
+    """Calcula texto genérico de reglas (ej. 'Todos los Lunes')"""
+    plate = int(plate)
+    holo = str(holo).lower()
+    
+    # Texto Semanal
+    dias_map = {0:"Lunes", 1:"Martes", 2:"Miércoles", 3:"Jueves", 4:"Viernes"}
+    dia_idx = MATRIZ_SEMANAL.get(plate)
+    texto_semanal = f"• Todos los **{dias_map[dia_idx]}**"
+    
+    # Texto Sábados
+    texto_sabados = "• Ningún sábado" # Default para Holo 2
+    if holo == '1':
+        es_impar = (plate % 2 != 0)
+        texto_sabados = "• Sábados: **1º y 3º** (Impares)" if es_impar else "• Sábados: **2º y 4º** (Pares)"
+    elif holo in ['0', '00', 'exento']:
+        texto_semanal = "• Ninguno (Exento)"
+        texto_sabados = "• Ninguno"
+        
+    return texto_semanal, texto_sabados
+
 def save_vehicle_profile(user_id, digit, hologram):
     """Guarda auto y calcula color de engomado"""
     try:
@@ -559,11 +609,44 @@ def lambda_handler(event, context):
                 elif fn == "configurar_auto":
                     digit = args.get('ultimo_digito')
                     holo = args.get('hologram') or args.get('holograma')
+                    
                     if digit is None or holo is None:
                         r = "⚠️ Faltan datos. Necesito último dígito y holograma."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                     else:
-                        r = save_vehicle_profile(user_id, digit, holo)
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        # 1. GUARDAR (Acción Silenciosa)
+                        save_resp = save_vehicle_profile(user_id, digit, holo)
+                        
+                        # 2. GENERAR REPORTE MENSUAL (Acción Visible)
+                        now = datetime.now()
+                        lista_dias = get_monthly_prohibited_dates(digit, holo, now.year, now.month)
+                        txt_sem, txt_sab = get_restriction_summary(digit, holo)
+                        
+                        # Colores y Multas
+                        colors = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
+                        
+                        # --- CÁLCULO DEL MES (Hacerlo ANTES del format) ---
+                        meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
+                        nombre_mes_actual = meses_es[now.month]
+
+                        # Formatear Tarjeta
+                        card = cards.CARD_HNC_DETAILED.format(
+                            mes_nombre=nombre_mes_actual,  # Aquí pasamos la variable ya lista
+                            plate=digit,
+                            color=colors.get(int(digit), ""),
+                            holo=str(holo).upper(),
+                            dias_semana_txt=txt_sem,
+                            sabados_txt=txt_sab,
+                            lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
+                            multa_cdmx=f"${MULTA_CDMX_MIN:,.0f} - ${MULTA_CDMX_MAX:,.0f}",
+                            multa_edomex=f"${MULTA_EDOMEX:,.0f}",
+                            footer=cards.BOT_FOOTER
+                        )
+                        
+                        # 3. ENVIAR Y CORTAR
+                        send_telegram(chat_id, f"✅ **Datos guardados.** Aquí tienes tu proyección del mes:\n\n{save_resp}") # Confirmación texto breve
+                        send_telegram(chat_id, card) # Tarjeta detallada
+                        return {'statusCode': 200, 'body': 'OK'}
 
                 elif fn == "consultar_hoy_no_circula":
                     user = get_user_profile(user_id)
