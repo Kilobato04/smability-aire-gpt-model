@@ -478,30 +478,50 @@ def lambda_handler(event, context):
             chat_id = cb['message']['chat']['id']
             user_id = cb['from']['id']
             data = cb['data']
-            print(f"👆 [CALLBACK] User: {user_id} | Data: {data}") # LOG
+            first_name = cb['from'].get('first_name', 'Usuario')
             
+            print(f"👆 [CALLBACK] User: {user_id} | Data: {data}") 
             requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/answerCallbackQuery", json={"callback_query_id": cb['id']})
+            
             resp = ""
+            
+            # --- GUARDADO ---
             if data == "SAVE_HOME": resp = confirm_saved_location(user_id, 'casa')
             elif data == "SAVE_WORK": resp = confirm_saved_location(user_id, 'trabajo')
             elif data == "RESET": resp = "🗑️ Cancelado."
-            # --- AGREGAR ESTO (Lógica de Botones Resumen) ---
-            elif data in ["CHECK_HOME", "CHECK_WORK"]:
+            
+            # --- ACCESOS RÁPIDOS (Resumen y Ubicaciones) ---
+            elif data.startswith("CHECK_HOME") or data == "CHECK_AIR_CASA":
+                key = "casa"
+                # ... (Lógica de consultar aire existente) ...
+                # COPIAR TU LÓGICA DE ABAJO AQUÍ O REDIRIGIR
+                # Para simplificar, te doy el bloque genérico:
                 user = get_user_profile(user_id)
                 locs = user.get('locations', {})
-                key = 'casa' if data == "CHECK_HOME" else 'trabajo'
-                
                 if key in locs:
                     lat, lon = float(locs[key]['lat']), float(locs[key]['lon'])
-                    first_name = cb['from'].get('first_name', 'Usuario')
-                    # Generamos reporte visual
-                    report_card = generate_report_card(first_name, key.capitalize(), lat, lon)
-                    send_telegram(chat_id, report_card)
-                    return {'statusCode': 200, 'body': 'OK'} # Salimos para no enviar resp texto
-                else:
-                    resp = f"⚠️ No tienes ubicación de {key} guardada."
-            
-            # Enviar respuesta de texto simple si no fue reporte
+                    report = generate_report_card(first_name, key.capitalize(), lat, lon)
+                    send_telegram(chat_id, report)
+                    return {'statusCode': 200, 'body': 'OK'}
+                else: resp = "⚠️ Ubicación no encontrada."
+
+            elif data.startswith("CHECK_WORK") or data == "CHECK_AIR_TRABAJO":
+                key = "trabajo"
+                # (Misma lógica de arriba para trabajo)
+                user = get_user_profile(user_id)
+                locs = user.get('locations', {})
+                if key in locs:
+                    lat, lon = float(locs[key]['lat']), float(locs[key]['lon'])
+                    report = generate_report_card(first_name, key.capitalize(), lat, lon)
+                    send_telegram(chat_id, report)
+                    return {'statusCode': 200, 'body': 'OK'}
+                else: resp = "⚠️ Ubicación no encontrada."
+
+            # --- MENÚ AVANZADO (Placeholder) ---
+            elif data == "CONFIG_ADVANCED":
+                resp = "⚙️ **Configuración Avanzada**\n\nAquí podrás gestionar tu suscripción y métodos de pago.\n*(Próximamente)*"
+
+            # --- RESPUESTA DEFAULT ---
             send_telegram(chat_id, resp)
             return {'statusCode': 200, 'body': 'OK'}
 
@@ -813,6 +833,59 @@ def lambda_handler(event, context):
                         
                         # Enviar y Cortar
                         send_telegram(chat_id, card)
+                        return {'statusCode': 200, 'body': 'OK'}
+                # --- NUEVA TOOL: TARJETA DE VERIFICACIÓN ---
+                elif fn == "consultar_verificacion":
+                    user = get_user_profile(user_id)
+                    veh = user.get('vehicle')
+                    
+                    if not veh or not veh.get('active'):
+                        r = "⚠️ No tienes auto guardado. Dime: 'Mi placa termina en 5 y es holograma 1'."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    else:
+                        plate = veh.get('plate_last_digit')
+                        holo = veh.get('hologram')
+                        color = veh.get('engomado', 'Desconocido')
+                        
+                        periodo = get_verification_period(plate, holo)
+                        limite = get_verification_deadline(periodo)
+                        multa_aprox = f"{20 * 108.57:,.2f}" # Valor UMA 2025 aprox
+                        
+                        card = cards.CARD_VERIFICATION.format(
+                            plate_info=f"Terminación {plate}",
+                            engomado=f"Engomado {color}",
+                            period_txt=periodo,
+                            deadline=limite,
+                            fine_amount=multa_aprox,
+                            footer=cards.BOT_FOOTER
+                        )
+                        send_telegram(chat_id, card)
+                        return {'statusCode': 200, 'body': 'OK'}
+
+                # --- NUEVA TOOL: MIS UBICACIONES (CON BOTONES) ---
+                elif fn == "consultar_ubicaciones_guardadas":
+                    user = get_user_profile(user_id)
+                    locs = user.get('locations', {})
+                    
+                    if not locs:
+                        r = "📭 No tienes ubicaciones guardadas. Envíame tu ubicación para empezar."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    else:
+                        # Crear lista visual
+                        lista_txt = ""
+                        for k, v in locs.items():
+                            lista_txt += f"🏠 **{k.capitalize()}:** {v.get('display_name', 'Ubicación')}\n🔗 [Ver en Mapa](http://maps.google.com/?q={v['lat']},{v['lon']})\n\n"
+                        
+                        card = cards.CARD_MY_LOCATIONS.format(
+                            user_name=first_name,
+                            locations_list=lista_txt.strip(),
+                            footer=cards.BOT_FOOTER
+                        )
+                        
+                        # Generar botones de acción (Check/Delete)
+                        markup = cards.get_locations_buttons(locs)
+                        
+                        send_telegram(chat_id, card, markup)
                         return {'statusCode': 200, 'body': 'OK'}
 
                 else: 
