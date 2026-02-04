@@ -519,16 +519,21 @@ def lambda_handler(event, context):
         
         # Preparar memoria para GPT
         locs = user_profile.get('locations', {})
+        if isinstance(locs, str): locs = {} 
         alerts = user_profile.get('alerts', {})
-
-        # --- 🛡️ FIX DE BLINDAJE (Inserta esto aquí) ---
-        if isinstance(locs, str): locs = {}
-        if isinstance(alerts, str): alerts = {}
-        # ----------------------------------------------
+        if isinstance(alerts, str): alerts = {} 
+        
+        # --- FIX: RECUPERAR DATOS DEL AUTO ---
+        veh = user_profile.get('vehicle', {})
+        veh_info = "No registrado"
+        if veh and veh.get('active'):
+            veh_info = f"Placa terminación {veh.get('plate_last_digit')} (Holo {veh.get('hologram')})"
+        # -------------------------------------
 
         plan_status = user_profile.get('subscription',{}).get('status','FREE')
         
         memoria_str = "**Tus lugares:**\n" + "\n".join([f"- {v.get('display_name')}" for k, v in locs.items()])
+        memoria_str += f"\n**Auto:** {veh_info}" # <--- AQUÍ SE LO RECORDAMOS
         memoria_str += f"\n**Alertas:** {alerts}"
         memoria_str += f"\n**Plan:** {plan_status}"
         
