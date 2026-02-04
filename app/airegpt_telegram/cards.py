@@ -156,6 +156,29 @@ CARD_SUMMARY = """
 💡 *{tip_footer}*
 """
 
+CARD_VERIFICATION = """🚗 **ESTATUS DE VERIFICACIÓN**
+🚘 **Auto:** {plate_info} | {engomado}
+
+📅 **Tu Periodo:**
+{period_txt}
+
+⚠️ **Fecha Límite:** {deadline}
+
+💰 **MULTA (Extemporánea):**
+💸 **${fine_amount} MXN** (20 UMAS)
++ Corralón si eres detenido circulando.
+
+💡 *Recuerda agendar tu cita una semana antes.*
+{footer}"""
+
+CARD_MY_LOCATIONS = """📍 **MIS UBICACIONES GUARDADAS**
+👤 {user_name}
+
+{locations_list}
+
+👇 *Usa los botones para consultar o eliminar.*
+{footer}"""
+
 # --- 1. HELPER VISUAL DE DÍAS ---
 def format_days_text(days_list):
     if not days_list or len(days_list) == 7: return "Diario"
@@ -248,4 +271,25 @@ def get_summary_buttons(has_home, has_work, is_premium=False):
     else:
         keyboard.append([{"text": "⚙️ Configuración Avanzada", "callback_data": "CONFIG_ADVANCED"}])
 
+    return {"inline_keyboard": keyboard}
+
+# --- HELPER PARA BOTONES DE UBICACIONES ---
+def get_locations_buttons(locations_dict):
+    keyboard = []
+    # Fila de "Consultar Aire"
+    row_check = []
+    # Fila de "Eliminar"
+    row_delete = []
+    
+    for key, val in locations_dict.items():
+        label = key.capitalize()
+        row_check.append({"text": f"💨 Aire {label}", "callback_data": f"CHECK_AIR_{key.upper()}"})
+        row_delete.append({"text": f"🗑️ Borrar {label}", "callback_data": f"DELETE_LOC_{key.upper()}"})
+    
+    if row_check: keyboard.append(row_check)
+    if row_delete: keyboard.append(row_delete)
+    
+    # Botón universal para volver
+    keyboard.append([{"text": "🔙 Volver al Menú", "callback_data": "Consultar_resumen_configuracion"}]) # Truco: simula llamar al resumen
+    
     return {"inline_keyboard": keyboard}
