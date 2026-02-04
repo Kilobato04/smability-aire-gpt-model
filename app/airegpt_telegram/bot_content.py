@@ -137,6 +137,18 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
+            "name": "obtener_calendario_mensual",
+            "description": "Genera el reporte visual con TODOS los días del mes que el auto no circula y la tabla de multas. Usar cuando el usuario pida: 'calendario', 'días que no circulo', 'mi programa mensual'.",
+            "parameters": {
+                "type": "object", 
+                "properties": {}, 
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "configurar_hora_alerta_auto",
             "description": "Cambia la hora a la que se envía el recordatorio de Hoy No Circula (ej. cambiar de 20:00 a 07:00).",
             "parameters": {
