@@ -19,6 +19,21 @@ def get_mexico_time():
     """Retorna la hora actual en CDMX (UTC-6)"""
     return datetime.utcnow() - timedelta(hours=6)
 
+def get_verification_period(plate_digit, hologram):
+    if str(hologram).lower() in ['00', 'exento', 'hibrido']:
+        return "🟢 **EXENTO** (No verifica)"
+    
+    try:
+        d = int(plate_digit)
+    except:
+        return "⚠️ Error en placa"
+    if d in [5, 6]: return "🟡 Ene-Feb / Jul-Ago"
+    if d in [7, 8]: return "🌸 Feb-Mar / Ago-Sep"
+    if d in [3, 4]: return "🔴 Mar-Abr / Sep-Oct"
+    if d in [1, 2]: return "🟢 Abr-May / Oct-Nov"
+    if d in [9, 0]: return "🔵 May-Jun / Nov-Dic"
+    return "Desconocido"
+
 client = OpenAI(api_key=OPENAI_API_KEY, timeout=20.0)
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
@@ -611,32 +626,34 @@ def lambda_handler(event, context):
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
                 elif fn == "consultar_resumen_configuracion":
-                    # GATEKEEPER DE RESUMEN
+                    # 1. Obtener datos del usuario
                     user = get_user_profile(user_id)
-                    status = user.get('subscription', {}).get('status', 'FREE')
+                    sub_data = user.get('subscription', {})
+                    status_str = sub_data.get('status', 'FREE')
                     
-                    if "PREMIUM" not in status.upper() and "TRIAL" not in status.upper():
-                        # CASO FREE: Dejamos que el LLM explique
-                        r = "🚫 El usuario es FREE. Dile amablemente que no tiene alertas activas y que requiere Premium."
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
-                    else:
-                        # CASO PREMIUM: Generamos la tarjeta visual
-                        r = cards.generate_summary_card(
-                            first_name, 
-                            user.get('alerts', {}), 
-                            user.get('vehicle', None), 
-                            user.get('exposure_profile', None)
-                        )
-                        markup = cards.get_summary_buttons(
-                            'casa' in user.get('locations',{}), 
-                            'trabajo' in user.get('locations',{})
-                        )
-                        
-                        # 1. Enviar tarjeta visual
-                        send_telegram(chat_id, r, markup)
-                        
-                        # 2. 🛑 HARD STOP: Detenemos la Lambda aquí.
-                        return {'statusCode': 200, 'body': 'OK'}
+                    # Detectar si es Premium o Trial para la lógica visual
+                    is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
+                    
+                    # 2. Generar Tarjeta Visual (Ahora funciona para FREE y PREMIUM)
+                    # La diferencia visual la maneja cards.py internamente usando 'status_str'
+                    r = cards.generate_summary_card(
+                        first_name, 
+                        user.get('alerts', {}), 
+                        user.get('vehicle', None), 
+                        user.get('locations', {}), # OJO: Pasamos locations para listar "Casa/Trabajo"
+                        status_str # Nuevo argumento vital para el Tag de Contingencia
+                    )
+                    
+                    # 3. Generar Botones Inteligentes (Upselling si es Free)
+                    markup = cards.get_summary_buttons(
+                        'casa' in user.get('locations',{}), 
+                        'trabajo' in user.get('locations',{}),
+                        is_prem # Esto decide si muestra botones de "Comprar" o de "Configurar"
+                    )
+                    
+                    # 4. Enviar y Cortar (Hard Stop)
+                    send_telegram(chat_id, r, markup)
+                    return {'statusCode': 200, 'body': 'OK'}
 
                 # --- NUEVOS BLOQUES HNC (PEGAR AQUÍ) ---
                 elif fn == "configurar_hora_alerta_auto":
@@ -686,13 +703,15 @@ def lambda_handler(event, context):
                         # --- CÁLCULO DEL MES (Hacerlo ANTES del format) ---
                         meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
                         nombre_mes_actual = meses_es[now.month]
+                        verif_txt = get_verification_period(digit, holo)
 
                         # Formatear Tarjeta
                         card = cards.CARD_HNC_DETAILED.format(
-                            mes_nombre=nombre_mes_actual,  # Aquí pasamos la variable ya lista
+                            mes_nombre=nombre_mes_actual,
                             plate=digit,
-                            color=colors.get(int(digit), ""),
+                            color=engomado if 'engomado' in locals() else colors.get(int(digit), ""), # Manejo seguro
                             holo=str(holo).upper(),
+                            verificacion_txt=verif_txt, # <--- NUEVO CAMPO
                             dias_semana_txt=txt_sem,
                             sabados_txt=txt_sab,
                             lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
@@ -763,13 +782,15 @@ def lambda_handler(event, context):
                         # Traducir Mes
                         meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
                         nombre_mes_actual = meses_es[now_mx.month]
+                        verif_txt = get_verification_period(digit, holo)
                         
                         # Generar Tarjeta Detallada
                         card = cards.CARD_HNC_DETAILED.format(
                             mes_nombre=nombre_mes_actual,
                             plate=digit,
-                            color=engomado,
+                            color=engomado if 'engomado' in locals() else colors.get(int(digit), ""), # Manejo seguro
                             holo=str(holo).upper(),
+                            verificacion_txt=verif_txt, # <--- NUEVO CAMPO
                             dias_semana_txt=txt_sem,
                             sabados_txt=txt_sab,
                             lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
