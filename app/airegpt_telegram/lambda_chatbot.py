@@ -487,7 +487,8 @@ def lambda_handler(event, context):
             chat_id = cb['message']['chat']['id']
             user_id = cb['from']['id']
             data = cb['data']
-            first_name = cb['from'].get('first_name', 'Usuario')
+            raw_name = cb['from'].get('first_name', 'Usuario')
+            first_name = str(raw_name).replace("_", " ").replace("*", "").replace("`", "")
             
             print(f"👆 [CALLBACK] User: {user_id} | Data: {data}") 
             requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/answerCallbackQuery", json={"callback_query_id": cb['id']})
@@ -539,7 +540,8 @@ def lambda_handler(event, context):
         msg = body['message']
         chat_id = msg['chat']['id']
         user_id = msg['from']['id']
-        first_name = msg['from'].get('first_name', 'Usuario')
+        raw_name = msg['from'].get('first_name', 'Usuario')
+        first_name = str(raw_name).replace("_", " ").replace("*", "").replace("`", "")
         
         lat, lon = None, None
         user_content = ""
@@ -878,28 +880,33 @@ def lambda_handler(event, context):
                     locs = user.get('locations', {})
                     
                     if not locs:
-                        r = "📭 No tienes ubicaciones guardadas. Envíame tu ubicación para empezar."
+                        r = "📭 No tienes ubicaciones guardadas."
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                     else:
-                        # Crear lista visual
                         lista_txt = ""
                         for k, v in locs.items():
-                            # FIX URL: Usamos formato estándar ?q=lat,lon
-                            lat_safe = v.get('lat', 0)
-                            lon_safe = v.get('lon', 0)
-                            display = v.get('display_name', 'Ubicación').replace("_", " ") # Limpiar guiones bajos para Markdown
+                            # --- FIX: SANITIZACIÓN DE TEXTO Y URL ---
+                            # 1. Limpiamos caracteres peligrosos del nombre
+                            raw_disp = v.get('display_name', 'Ubicación')
+                            display = str(raw_disp).replace("_", " ").replace("*", "").replace("[", "").replace("]", "")
+                            key_clean = str(k).capitalize().replace("_", " ")
                             
-                            lista_txt += f"🏠 **{k.capitalize()}:** {display}\n🔗 [Ver en Mapa](https://www.google.com/maps?q={lat_safe},{lon_safe})\n\n"
+                            # 2. Validamos coordenadas para evitar None
+                            lat = v.get('lat', 0)
+                            lon = v.get('lon', 0)
+                            
+                            # 3. URL Segura (Formato API Google Maps Universal)
+                            maps_url = f"http://www.google.com/maps/place/{lat},{lon}"
+                            
+                            lista_txt += f"🏠 **{key_clean}:** {display}\n🔗 [Ver en Mapa]({maps_url})\n\n"
                         
                         card = cards.CARD_MY_LOCATIONS.format(
-                            user_name=first_name,
+                            user_name=first_name, # Ya viene limpio del FIX 1
                             locations_list=lista_txt.strip(),
                             footer=cards.BOT_FOOTER
                         )
                         
-                        # Generar botones de acción
                         markup = cards.get_locations_buttons(locs)
-                        
                         send_telegram(chat_id, card, markup)
                         return {'statusCode': 200, 'body': 'OK'}
 
