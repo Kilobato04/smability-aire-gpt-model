@@ -163,6 +163,22 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
+            "name": "consultar_verificacion",
+            "description": "Muestra la tarjeta oficial de verificación vehicular con fechas y multas. Usar si preguntan: '¿Cuándo verifico?', '¿Me toca verificar?', 'Multa por no verificar'.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "consultar_ubicaciones_guardadas",
+            "description": "Muestra la lista de lugares guardados (Casa, Trabajo, etc.) con opciones para ver su aire o borrarlos.",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "consultar_resumen_configuracion",
             "description": "Muestra tarjeta con resumen de alertas, horarios, auto y status. Usar cuando el usuario pregunte 'qué tengo configurado' o 'mis alertas'.",
             "parameters": {"type": "object", "properties": {}}
