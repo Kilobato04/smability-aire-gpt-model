@@ -111,10 +111,13 @@ CARD_HNC_RESULT = """🚗 **HOY NO CIRCULA**
 ⚠️ *Razón:* {reason}
 {footer}"""
 
-CARD_HNC_DETAILED = """🚗 **TU CALENDARIO HNC ({mes_nombre})**
-🚘 **Placa:** ..{plate} ({color}) | **Holo:** {holo}
+CARD_HNC_DETAILED = """🚗 **Reporte Mensual HNC: {mes_nombre}**
+🚘 **Placa:** ...{plate} | **Engomado:** {color}
+**Holograma:** {holo}
 
-📅 **DÍAS SIN CIRCULAR:**
+📅 **VERIFICACIÓN:** {verificacion_txt}
+
+📅 **DÍAS QUE NO CIRCULAS:**
 {dias_semana_txt}
 {sabados_txt}
 🕒 **Horario:** 05:00 - 22:00 hrs
@@ -129,7 +132,28 @@ CARD_HNC_DETAILED = """🚗 **TU CALENDARIO HNC ({mes_nombre})**
 📝 *Alertas automáticas activadas a las 20:00 hrs.*
 {footer}"""
 
-# --- HELPER VISUAL DE DÍAS ---
+CARD_SUMMARY = """
+📊 **RESUMEN DE CUENTA**
+👤 {user_name} | Plan: {plan_status}
+
+🚨 **Alerta Contingencia:** {contingency_status}
+
+📍 **Tus Ubicaciones:**
+{locations_list}
+
+🚗 **Tu Auto:**
+{vehicle_info}
+
+🔔 **Alertas Calidad del Aire (IAS):**
+{alerts_ias}
+
+⏰ **Recordatorios HNC:**
+{alerts_hnc}
+
+💡 *{tip_footer}*
+"""
+
+# --- 1. HELPER VISUAL DE DÍAS ---
 def format_days_text(days_list):
     if not days_list or len(days_list) == 7: return "Diario"
     if days_list == [0,1,2,3,4]: return "Lun-Vie"
@@ -137,7 +161,7 @@ def format_days_text(days_list):
     names = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"]
     return ",".join([names[i] for i in days_list])
 
-# --- HELPER DE BOTONES (Sin botón de Riesgo) ---
+# --- 2. HELPER DE BOTONES (Sin botón de Riesgo) ---
 def get_summary_buttons(has_home, has_work):
     keyboard = []
     row = []
@@ -146,50 +170,73 @@ def get_summary_buttons(has_home, has_work):
     if row: keyboard.append(row)
     return {"inline_keyboard": keyboard}
 
-# --- TARJETA PRINCIPAL ---
-def generate_summary_card(user_name, alerts, vehicle=None, exposure=None):
-    msg = f"⚙️ **TUS ALERTAS Y SERVICIOS**\n*Resumen para {user_name}:*\n\n"
+
+# --- 3. ACTUALIZAR FUNCIÓN GENERADORA DE RESUMEN ---
+def generate_summary_card(user_name, alerts, vehicle, exposure, plan_status):
+    # a) Status Contingencia
+    is_premium = "PREMIUM" in plan_status.upper()
+    contingency_status = "✅ **ACTIVA**" if is_premium else "🔒 **INACTIVA** (Solo Premium)"
     
-    # 1. UMBRALES
-    thresh = alerts.get('threshold', {})
-    active = False
-    msg += "📉 **Vigilancia IAS (24/7):**\n"
-    for loc, cfg in thresh.items():
-        if cfg.get('active'):
-            active = True
-            msg += f"• *{loc.capitalize()}:* > {cfg.get('umbral')} IAS\n"
-    if not active: msg += "_(Sin vigilancia activa)_\n"
-    msg += "\n"
+    # b) Ubicaciones
+    locs = []
+    # Aquí asumimos que pasas el dict de locations, no el exposure profile directo
+    # Si pasas exposure profile, adáptalo. Asumiré que pasas el dict 'locations' de la DB.
+    if isinstance(exposure, dict): # Parche si pasas locations directo
+        for k, v in exposure.items():
+            locs.append(f"• **{k.capitalize()}:** {v.get('display_name','Ubicación')}")
+    loc_str = "\n".join(locs) if locs else "• *Sin ubicaciones guardadas*"
 
-    # 2. HORARIOS
-    sched = alerts.get('schedule', {})
-    msg += "⏰ **Reportes Programados:**\n"
-    if not sched:
-        msg += "_(Sin horarios)_\n"
-    else:
-        for loc, data in sched.items():
-            hora = data.get('time', '00:00')
-            dias = data.get('days', [0,1,2,3,4,5,6])
-            msg += f"• *{loc.capitalize()}:* {hora} ({format_days_text(dias)})\n"
-    msg += "\n"
-
-    # 3. AUTO
+    # c) Vehículo
+    veh_str = "• *Sin auto registrado*"
     if vehicle and vehicle.get('active'):
-        plate = vehicle.get('plate_last_digit')
-        msg += f"🚗 **Tu Auto (..{plate}):**\n"
-        hnc_on = "✅" if vehicle.get('alert_config', {}).get('enabled') else "🔕"
-        msg += f"🔔 Aviso HNC: {hnc_on} (20:00)\n\n"
+        veh_str = f"• Placa **{vehicle.get('plate_last_digit')}** (Holo {vehicle.get('hologram')})"
 
-    # 4. EXPOSICIÓN (Solo DATOS, sin cálculo)
-    if exposure:
-        mode = exposure.get('mode', 'Transporte').capitalize()
-        duration = exposure.get('duration', '?')
-        msg += f"🫁 **Perfil de Exposición:**\n"
-        msg += f"• Medio: {mode}\n"
-        msg += f"• Tiempo: {duration}\n\n"
+    # d) Alertas IAS
+    ias_list = []
+    thresholds = alerts.get('threshold', {})
+    for k, v in thresholds.items():
+        if v.get('active'): ias_list.append(f"• {k.capitalize()}: > {v.get('umbral')} pts")
+    ias_str = "\n".join(ias_list) if ias_list else "• *Sin alertas configuradas*"
 
-    # 5. FOOTER CONVERSACIONAL
-    msg += "📝 *¿Quieres cambios?* Solo pídelo.\n"
-    msg += "_Ej: \"Ajusta el umbral de Casa a 100\" o \"Avísame en Trabajo a las 9am\"._"
+    # e) Alertas HNC
+    hnc_list = []
+    schedules = alerts.get('schedule', {})
+    for k, v in schedules.items():
+        if v.get('active'): 
+            # Parsear días
+            days = v.get('days', [])
+            days_txt = "Diario" if len(days)==7 else "Personalizado"
+            hnc_list.append(f"• {k.capitalize()}: {v.get('time')} hrs ({days_txt})")
+    hnc_str = "\n".join(hnc_list) if hnc_list else "• *Sin recordatorios*"
+
+    tip = "💡 Tip: Escribe 'Cambiar hora alertas' para ajustar." if is_premium else "💎 Tip: Hazte Premium para activar Contingencias."
+
+    return CARD_SUMMARY.format(
+        user_name=user_name,
+        plan_status=plan_status,
+        contingency_status=contingency_status,
+        locations_list=loc_str,
+        vehicle_info=veh_str,
+        alerts_ias=ias_str,
+        alerts_hnc=hnc_str,
+        tip_footer=tip
+    )
+
+# --- 4. ACTUALIZAR BOTONES DE RESUMEN (UPSELLING) ---
+def get_summary_buttons(has_home, has_work, is_premium=False):
+    # Fila 1: Accesos directos a Aire
+    row1 = []
+    if has_home: row1.append({"text": "🏠 Aire Casa", "callback_data": "CHECK_HOME"})
+    if has_work: row1.append({"text": "🏢 Aire Trabajo", "callback_data": "CHECK_WORK"})
     
-    return msg
+    keyboard = []
+    if row1: keyboard.append(row1)
+    
+    # Fila 2: Lógica Premium vs Free
+    if not is_premium:
+        keyboard.append([{"text": "💎 Activar Premium ($49)", "callback_data": "GO_PREMIUM"}])
+        keyboard.append([{"text": "❓ Ver Beneficios", "callback_data": "SHOW_BENEFITS"}])
+    else:
+        keyboard.append([{"text": "⚙️ Configuración Avanzada", "callback_data": "CONFIG_ADVANCED"}])
+
+    return {"inline_keyboard": keyboard}
