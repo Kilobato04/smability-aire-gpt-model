@@ -556,15 +556,25 @@ def lambda_handler(event, context):
                     in_lon = args.get('lon', 0)
                     in_name = args.get('nombre_ubicacion', 'Ubicación')
                     
+                    # 1. Intentar resolver coordenadas si vienen vacías
                     if in_lat == 0 or in_lon == 0:
                         key = resolve_location_key(user_id, in_name)
                         if key and key in locs:
                             in_lat = float(locs[key]['lat'])
                             in_lon = float(locs[key]['lon'])
-                        else: r = "⚠️ No encontré coordenadas válidas para esa ubicación."
                     
+                    # 2. DECISIÓN: ¿Tenemos datos válidos?
                     if in_lat != 0 and in_lon != 0:
+                        # ✅ ÉXITO: Generamos tarjeta, enviamos y CORTAMOS (Hard Stop)
+                        # Esto soluciona el Error 400 porque ya no llamamos a OpenAI de nuevo
                         r = generate_report_card(first_name, in_name, in_lat, in_lon)
+                        send_telegram(chat_id, r)
+                        return {'statusCode': 200, 'body': 'OK'}
+                    else:
+                        # ❌ FALLO: No hay coordenadas. Avisamos al LLM para que pregunte al usuario.
+                        r = f"⚠️ No encontré coordenadas para '{in_name}'. Pide al usuario que guarde la ubicación o envíe su ubicación actual."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        # Aquí NO hacemos return, dejamos que el flujo baje para que GPT explique el error en texto.
                     
                 elif fn == "configurar_alerta_ias": 
                     r = configure_ias_alert(user_id, args['nombre_ubicacion'], args['umbral_ias'])
