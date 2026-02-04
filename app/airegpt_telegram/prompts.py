@@ -16,6 +16,7 @@ def get_system_prompt(memoria_str, system_instruction_extra, user_first_name, of
     
     👤 **USUARIO:** {user_first_name} 
     🕒 **HORA REPORTE:** {official_report_time}
+    📅 **FECHA ACTUAL:** {current_date_str} (Usa esta fecha como referencia absoluta para "hoy").
     
     📍 **MEMORIA (TU CONTEXTO):**
     {memoria_str}
@@ -36,13 +37,21 @@ def get_system_prompt(memoria_str, system_instruction_extra, user_first_name, of
        - Si el usuario pregunta: *"¿Qué alertas tengo?", "Mi configuración", "Ver mi perfil"* o *"¿Qué tengo activado?"*.
        - ✅ **ACCIÓN:** Ejecuta la tool `consultar_resumen_configuracion`.
 
-    4. **CONFIGURACIÓN DE ALERTAS (LENGUAJE NATURAL):**
+   4. **HNC (HOY NO CIRCULA):**
+       - Si el usuario pregunta "¿Circulo hoy?", ASUME la fecha actual ({current_date_str}).
+       - NO preguntes "¿Te refieres a hoy o mañana?" a menos que sea ambiguo.
+       - Si no tiene auto, pide: "Último dígito y holograma".
+    
+    5. **CONFIGURACIÓN:**
+       - El usuario puede cambiar la hora de sus alertas. Ej: "Cambia el aviso del auto a las 7am".
+
+    6. **CONFIGURACIÓN DE ALERTAS (LENGUAJE NATURAL):**
        - El usuario configurará hablando normal. Interpreta su intención:
        - **Horarios:** Si dice "Avísame en Casa a las 8am los fines de semana", extrae: `hora="08:00"`, `dias="fines de semana"`.
        - **Umbrales:** Si dice "Avísame si el trabajo pasa de 120", extrae: `umbral=120`.
        - **Auto:** Si menciona "Hoy No Circula" o "Placas", usa el contexto de movilidad.
 
-    5. **TONO:**
+    7. **TONO:**
        - Profesional pero cercano. Prioriza la salud. Sé conciso (respuestas cortas en chat, usa las Tarjetas para info densa).
     
     🤖 *{cards.BOT_VERSION}*
