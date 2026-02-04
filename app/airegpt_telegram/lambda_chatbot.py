@@ -14,6 +14,11 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 API_LIGHT_URL = os.environ.get('API_LIGHT_URL', 'https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/')
 DYNAMODB_TABLE = 'SmabilityUsers'
 
+# --- HELPER TIMEZONE ---
+def get_mexico_time():
+    """Retorna la hora actual en CDMX (UTC-6)"""
+    return datetime.utcnow() - timedelta(hours=6)
+
 client = OpenAI(api_key=OPENAI_API_KEY, timeout=20.0)
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
@@ -227,6 +232,10 @@ MATRIZ_SEMANAL = {5:0, 6:0, 7:1, 8:1, 3:2, 4:2, 1:3, 2:3, 9:4, 0:4} # Key:Digito
 def check_driving_status(plate_last_digit, hologram, date_str, contingency_phase=0):
     """Calcula si circula o no (Motor HNC)"""
     try:
+        # SI LA FECHA ES "HOY" O VACÍA, USAR TIEMPO MÉXICO
+        if not date_str or date_str.lower() == "hoy":
+            date_str = get_mexico_time().strftime("%Y-%m-%d")
+            
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         day_week = dt.weekday() # 0=Lun, 6=Dom
         day_month = dt.day
@@ -534,9 +543,18 @@ def lambda_handler(event, context):
             if not has_casa: system_extra = "ONBOARDING 1: Pide CASA"
             elif not has_trabajo: system_extra = "ONBOARDING 2: Pide TRABAJO"
 
-        gpt_msgs = [{"role": "system", "content": prompts.get_system_prompt(memoria_str, system_extra, first_name, get_official_report_time(None))}, {"role": "user", "content": user_content}]
+        now_mx = get_mexico_time()
+        fecha_str = now_mx.strftime("%Y-%m-%d") # Ej: 2026-02-03
+        hora_str = now_mx.strftime("%H:%M")     # Ej: 19:45
+
+        # Llamada Actualizada al Prompt (5 argumentos)
+        gpt_msgs = [
+            {"role": "system", "content": prompts.get_system_prompt(memoria_str, system_extra, first_name, hora_str, fecha_str)}, 
+            {"role": "user", "content": user_content}
+        ]
         
-        print(f"🤖 [GPT] Calling OpenAI... (Plan: {plan_status})")
+        print(f"🤖 [GPT] Calling OpenAI... (Date: {fecha_str})")
+        
         res = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_msgs, tools=bot_content.TOOLS_SCHEMA, tool_choice="auto", temperature=0.3)
         ai_msg = res.choices[0].message
         
@@ -616,6 +634,31 @@ def lambda_handler(event, context):
                         return {'statusCode': 200, 'body': 'OK'}
 
                 # --- NUEVOS BLOQUES HNC (PEGAR AQUÍ) ---
+                elif fn == "configurar_hora_alerta_auto":
+                    new_time = args.get('nueva_hora')
+                    # Validación simple de formato HH:MM
+                    if not new_time or ":" not in new_time or len(new_time) > 5:
+                        r = "⚠️ Formato inválido. Usa HH:MM (ej. 07:00)."
+                    else:
+                        try:
+                            # Actualizar solo la hora y activar la alerta
+                            table.update_item(
+                                Key={'user_id': str(user_id)},
+                                UpdateExpression="SET vehicle.alert_config.#t = :t, vehicle.alert_config.enabled = :e",
+                                ExpressionAttributeNames={'#t': 'time'},
+                                ExpressionAttributeValues={':t': new_time, ':e': True}
+                            )
+                            r = f"✅ **Configurado.** Te avisaré a las **{new_time} hrs** si no circulas al día siguiente."
+                        except Exception as e:
+                            print(f"❌ Error update time: {e}")
+                            r = "Error al guardar la hora en la base de datos."
+                    
+                    # ⚠️ FIX: AGREGAR ESTA LÍNEA (FALTABA)
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
+                    # Recordatorio: Aquí usamos la lógica 'should_append_result = True' (default)
+                    # para que se agregue al historial al final del bucle.
+                
                 elif fn == "configurar_auto":
                     digit = args.get('ultimo_digito')
                     holo = args.get('hologram') or args.get('holograma')
@@ -692,17 +735,18 @@ def lambda_handler(event, context):
                             footer=cards.BOT_FOOTER
                         )
                         send_telegram(chat_id, card)
-                        return {'statusCode': 200, 'body': 'OK'} # Hard Stop para evitar texto redundante
+                        return {'statusCode': 200, 'body': 'OK'} # Hard Stop
 
-                # --- FIN NUEVOS BLOQUES ---
                 else: 
-                    # Para cualquier otra tool genérica
+                    # Para cualquier otra tool genérica no contemplada arriba
                     r = "Acción realizada."
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
             
             # --- FINAL DEL PROCESAMIENTO DE TOOLS ---
+            # Solo llegamos aquí si NO hubo un Hard Stop (return)
             final_text = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_msgs, temperature=0.3).choices[0].message.content
         else:
+            # Si no hubo tools, usamos el contenido directo
             final_text = ai_msg.content
 
         markup = None
@@ -712,6 +756,7 @@ def lambda_handler(event, context):
         
         send_telegram(chat_id, final_text, markup)
         return {'statusCode': 200, 'body': 'OK'}
+        
     except Exception as e:
         print(f"🔥 [CRITICAL FAIL]: {e}")
         return {'statusCode': 500, 'body': str(e)}
