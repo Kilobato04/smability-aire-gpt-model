@@ -134,7 +134,20 @@ TOOLS_SCHEMA = [
             }
         }
     },
-    # 2. AGREGAR ESTA NUEVA (Para la tarjeta resumen)
+    {
+        "type": "function",
+        "function": {
+            "name": "configurar_hora_alerta_auto",
+            "description": "Cambia la hora a la que se envía el recordatorio de Hoy No Circula (ej. cambiar de 20:00 a 07:00).",
+            "parameters": {
+                "type": "object", 
+                "properties": {
+                    "nueva_hora": {"type": "string", "description": "Hora en formato HH:MM (24hrs). Ej: '07:00', '19:30'."}
+                }, 
+                "required": ["nueva_hora"]
+            }
+        }
+    },
     {
         "type": "function",
         "function": {
