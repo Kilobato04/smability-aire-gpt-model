@@ -717,7 +717,7 @@ def lambda_handler(event, context):
                         plate = veh.get('plate_last_digit')
                         holo = veh.get('hologram')
                         # Default a 'hoy' si no especifica fecha, pero el prompt suele mandar fecha
-                        fecha = args.get('fecha_referencia', datetime.now().strftime("%Y-%m-%d"))
+                        fecha = args.get('fecha_referencia', get_mexico_time().strftime("%Y-%m-%d"))
                         
                         can_drive, reason = check_driving_status(plate, holo, fecha)
                         
@@ -741,6 +741,46 @@ def lambda_handler(event, context):
                         )
                         send_telegram(chat_id, card)
                         return {'statusCode': 200, 'body': 'OK'} # Hard Stop
+                # --- NUEVA TOOL: CALENDARIO MENSUAL (READ ONLY) ---
+                elif fn == "obtener_calendario_mensual":
+                    user = get_user_profile(user_id)
+                    veh = user.get('vehicle')
+                    
+                    if not veh or not veh.get('active'):
+                        r = "⚠️ No tienes auto configurado. Pide al usuario: 'Dime tu terminación de placa y holograma'."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    else:
+                        # Extraer datos de la DB
+                        digit = veh.get('plate_last_digit')
+                        holo = veh.get('hologram')
+                        engomado = veh.get('engomado', 'Desconocido') # Leemos el color guardado
+                        
+                        # Generar Cálculos (Igual que en configurar_auto)
+                        now_mx = get_mexico_time()
+                        lista_dias = get_monthly_prohibited_dates(digit, holo, now_mx.year, now_mx.month)
+                        txt_sem, txt_sab = get_restriction_summary(digit, holo)
+                        
+                        # Traducir Mes
+                        meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
+                        nombre_mes_actual = meses_es[now_mx.month]
+                        
+                        # Generar Tarjeta Detallada
+                        card = cards.CARD_HNC_DETAILED.format(
+                            mes_nombre=nombre_mes_actual,
+                            plate=digit,
+                            color=engomado,
+                            holo=str(holo).upper(),
+                            dias_semana_txt=txt_sem,
+                            sabados_txt=txt_sab,
+                            lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
+                            multa_cdmx=f"${MULTA_CDMX_MIN:,.0f} - ${MULTA_CDMX_MAX:,.0f}",
+                            multa_edomex=f"${MULTA_EDOMEX:,.0f}",
+                            footer=cards.BOT_FOOTER
+                        )
+                        
+                        # Enviar y Cortar
+                        send_telegram(chat_id, card)
+                        return {'statusCode': 200, 'body': 'OK'}
 
                 else: 
                     # Para cualquier otra tool genérica no contemplada arriba
