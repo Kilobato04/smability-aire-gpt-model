@@ -194,12 +194,12 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
     def clean(text):
         return str(text).replace("_", " ").replace("*", "").replace("[", "").replace("]", "")
 
-    # a) Status Contingencia & Plan (Saneados)
+    # a) Status Contingencia & Plan
     safe_plan = clean(plan_status)
     is_premium = "PREMIUM" in safe_plan.upper() or "TRIAL" in safe_plan.upper()
     contingency_status = "✅ **ACTIVA**" if is_premium else "🔒 **INACTIVA** (Solo Premium)"
     
-    # b) Ubicaciones (Saneados keys y values)
+    # b) Ubicaciones
     locs = []
     if isinstance(locations, dict):
         for k, v in locations.items():
@@ -215,20 +215,23 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
         holo = clean(vehicle.get('hologram'))
         veh_str = f"• Placa **{digit}** (Holo {holo})"
 
-    # d) Alertas de Aire por UMBRAL
+    # d) Alertas de Aire por UMBRAL (FILTRADO)
     threshold_list = []
     thresholds = alerts.get('threshold', {})
     for k, v in thresholds.items():
-        if v.get('active'): 
+        # --- FIX: VALIDAR QUE LA UBICACIÓN EXISTA ---
+        # Solo mostramos la alerta si 'k' (ej. 'trabajo') sigue existiendo en tus ubicaciones
+        if v.get('active') and k in locations: 
             safe_k = clean(k.capitalize())
             threshold_list.append(f"• {safe_k}: > {v.get('umbral')} pts")
     threshold_str = "\n".join(threshold_list) if threshold_list else "• *Sin alertas de umbral*"
 
-    # e) Reportes de Aire PROGRAMADOS
+    # e) Reportes de Aire PROGRAMADOS (FILTRADO)
     schedule_list = []
     schedules = alerts.get('schedule', {})
     for k, v in schedules.items():
-        if v.get('active'): 
+        # --- FIX: VALIDAR QUE LA UBICACIÓN EXISTA ---
+        if v.get('active') and k in locations: 
             safe_k = clean(k.capitalize())
             days = v.get('days', [])
             days_txt = "Diario" if len(days)==7 else "Días selec."
@@ -250,7 +253,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
     tip = "💡 Tip: Escribe 'Cambiar hora alertas' para ajustar." if is_premium else "💎 Tip: Hazte Premium para activar Contingencias."
 
     return CARD_SUMMARY.format(
-        user_name=clean(user_name), # Limpieza final del usuario
+        user_name=clean(user_name),
         plan_status=safe_plan,
         contingency_status=contingency_status,
         locations_list=loc_str,
