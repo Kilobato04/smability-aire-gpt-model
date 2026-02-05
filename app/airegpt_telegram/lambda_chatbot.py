@@ -694,26 +694,42 @@ def lambda_handler(event, context):
         # -------------------------------------
 
         plan_status = user_profile.get('subscription',{}).get('status','FREE')
-        
+
         memoria_str = "**Tus lugares:**\n" + "\n".join([f"- {v.get('display_name')}" for k, v in locs.items()])
-        memoria_str += f"\n**Auto:** {veh_info}" # <--- AQUÍ SE LO RECORDAMOS
+        memoria_str += f"\n**Auto:** {veh_info}" 
         memoria_str += f"\n**Alertas:** {alerts}"
         memoria_str += f"\n**Plan:** {plan_status}"
         
         has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
-        forced_tag, system_extra = None, "NORMAL"
+        forced_tag = None
+
+        # --- MAQUINA DE ESTADOS (STATE MACHINE) ---
+        system_extra = "NORMAL"
         
+        # 1. Prioridad: Si hay mapa en este mensaje (Override total)
         if lat:
             if not has_casa: forced_tag = "CONFIRM_HOME"
             elif not has_trabajo: forced_tag = "CONFIRM_WORK"
             else: forced_tag = "SELECT_TYPE"
+        
+        # 2. Prioridad: Si NO hay mapa, revisamos si hay uno pendiente en la DB
         else:
-            if not has_casa: system_extra = "ONBOARDING 1: Pide CASA"
+            # Obtenemos el draft directamente del perfil recien cargado
+            draft = user_profile.get('draft_location')
+            
+            # FIX: Validamos que draft no sea None y tenga datos
+            if draft and isinstance(draft, dict) and 'lat' in draft:
+                # INYECTAMOS EL ESTADO DE PERMISO PARA EL PROMPT
+                system_extra = "ESTADO: PENDING_NAME_FOR_LOCATION (Tengo coordenadas en memoria esperando nombre)."
+                print(f"🔓 [STATE] Draft found in DB. Unlocking Save Flow.")
+            
+            # 3. Prioridad: Onboarding (solo si no hay draft pendiente)
+            elif not has_casa: system_extra = "ONBOARDING 1: Pide CASA"
             elif not has_trabajo: system_extra = "ONBOARDING 2: Pide TRABAJO"
 
         now_mx = get_mexico_time()
         fecha_str = now_mx.strftime("%Y-%m-%d") # Ej: 2026-02-03
-        hora_str = now_mx.strftime("%H:%M")     # Ej: 19:45
+        hora_str = now_mx.strftime("%H:%M")      # Ej: 19:45
 
         # Llamada Actualizada al Prompt (5 argumentos)
         gpt_msgs = [
