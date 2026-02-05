@@ -168,18 +168,22 @@ def save_interaction_and_draft(user_id, first_name, lat=None, lon=None):
     except Exception as e: print(f"❌ [DB SAVE ERROR]: {e}")
 
 def delete_location_from_db(user_id, location_name):
-    """Borra una llave específica del mapa 'locations' en DynamoDB"""
+    """
+    Borra ubicación Y sus alertas asociadas (Cascading Delete).
+    Elimina: locations.key, alerts.threshold.key, alerts.schedule.key
+    """
     key = location_name.lower().strip()
     try:
         table.update_item(
             Key={'user_id': str(user_id)},
-            UpdateExpression="REMOVE locations.#k",
+            # BORRADO TRIPLE EN UNA SOLA OPERACIÓN ATÓMICA
+            UpdateExpression="REMOVE locations.#k, alerts.threshold.#k, alerts.schedule.#k",
             ExpressionAttributeNames={'#k': key},
             ReturnValues="UPDATED_NEW"
         )
         return True
     except Exception as e:
-        print(f"❌ Error deleting location: {e}")
+        print(f"❌ Error deleting location cascade: {e}")
         return False
 
 # --- TOOLS ---
@@ -544,13 +548,37 @@ def lambda_handler(event, context):
 
             # --- BORRADO DE UBICACIONES (BOTONES) ---
             elif data.startswith("DELETE_LOC_"):
-                # El callback viene como "DELETE_LOC_CASA"
+                # Viene de: "DELETE_LOC_CASA"
                 loc_name = data.replace("DELETE_LOC_", "").lower()
+                # Mostramos advertencia antes de borrar
+                resp = (
+                    f"⚠️ **¿Estás seguro de borrar '{loc_name.capitalize()}'?**\n\n"
+                    "🛑 Al hacerlo, **también se eliminarán** todas las alertas y recordatorios configurados para esta ubicación."
+                )
+                # Botones de Si/No
+                markup = cards.get_delete_confirmation_buttons(loc_name)
+                send_telegram(chat_id, resp, markup)
+                return {'statusCode': 200, 'body': 'OK'}
+
+            # --- PASO 2: EJECUTAR BORRADO (CASCADA) ---
+            elif data.startswith("CONFIRM_DEL_"):
+                # Viene de: "CONFIRM_DEL_CASA"
+                loc_name = data.replace("CONFIRM_DEL_", "").lower()
                 
                 if delete_location_from_db(user_id, loc_name):
-                    resp = f"🗑️ **{loc_name.capitalize()} eliminada correctamente.**"
+                    resp = f"🗑️ **{loc_name.capitalize()} y sus alertas han sido eliminadas.**"
+                    # Opcional: Mostrar menú principal de nuevo
+                    markup = cards.get_summary_buttons('casa' in user.get('locations',{}), 'trabajo' in user.get('locations',{}))
                 else:
                     resp = "⚠️ Error al eliminar. Intenta de nuevo."
+                    markup = None
+                
+                send_telegram(chat_id, resp, markup)
+                return {'statusCode': 200, 'body': 'OK'}
+
+            # --- CANCELAR ---
+            elif data == "CANCEL_DELETE":
+                resp = "✅ Operación cancelada. Tu ubicación sigue segura."
 
             # --- MENÚ AVANZADO (Placeholder) ---
             elif data == "CONFIG_ADVANCED":
