@@ -520,7 +520,13 @@ def generate_report_card(user_name, location_name, lat, lon):
 def get_inline_markup(tag):
     if tag == "CONFIRM_HOME": return {"inline_keyboard": [[{"text": "✅ Sí, es Casa", "callback_data": "SAVE_HOME"}], [{"text": "🔄 Cambiar", "callback_data": "RESET"}]]}
     if tag == "CONFIRM_WORK": return {"inline_keyboard": [[{"text": "✅ Sí, es Trabajo", "callback_data": "SAVE_WORK"}], [{"text": "🔄 Cambiar", "callback_data": "RESET"}]]}
-    if tag == "SELECT_TYPE": return {"inline_keyboard": [[{"text": "🏠 Guardar Casa", "callback_data": "SAVE_HOME"}], [{"text": "🏢 Guardar Trabajo", "callback_data": "SAVE_WORK"}], [{"text": "❌ Cancelar", "callback_data": "RESET"}]]}
+    
+    # --- UPDATE: MENÚ DE 3 OPCIONES ---
+    if tag == "SELECT_TYPE": return {"inline_keyboard": [
+        [{"text": "🏠 Casa", "callback_data": "SAVE_HOME"}, {"text": "🏢 Trabajo", "callback_data": "SAVE_WORK"}],
+        [{"text": "📍 Guardar con otro nombre", "callback_data": "SAVE_OTHER"}], # <--- NUEVO BOTÓN
+        [{"text": "❌ Cancelar", "callback_data": "RESET"}]
+    ]}
     return None
 
 def send_telegram(chat_id, text, markup=None):
@@ -626,6 +632,9 @@ def lambda_handler(event, context):
             # --- MENÚ AVANZADO (Placeholder) ---
             elif data == "CONFIG_ADVANCED":
                 resp = "⚙️ **Configuración Avanzada**\n\nAquí podrás gestionar tu suscripción y métodos de pago.\n*(Próximamente)*"
+
+            elif data == "SAVE_OTHER":
+                resp = "✍️ **¿Qué nombre le ponemos?**\n\nEscribe el nombre que quieras (Ej. *'Escuela'*, *'Gym'*, *'Casa Mamá'*)."
 
             # --- RESPUESTA DEFAULT ---
             send_telegram(chat_id, resp)
@@ -984,7 +993,25 @@ def lambda_handler(event, context):
                         send_telegram(chat_id, card)
                         return {'statusCode': 200, 'body': 'OK'}
 
-
+                # --- NUEVA TOOL: GUARDADO PERSONALIZADO ---
+                elif fn == "guardar_ubicacion_personalizada":
+                    # Extraemos el nombre que dijo el usuario (ej. "Gym")
+                    nombre_raw = args.get('nombre', 'Personalizado')
+                    
+                    # Limpiamos el nombre para que sea una key válida en BD (sin espacios ni caracteres raros)
+                    # "Casa Mamá" -> "casa_mama" (para la key)
+                    nombre_key = str(nombre_raw).lower().strip().replace(" ", "_")
+                    
+                    # Llamamos a la misma función poderosa de guardado
+                    # Nota: confirm_saved_location usa 'nombre_key' para la base de datos
+                    # pero usará 'nombre_key.capitalize()' para mostrarlo.
+                    # FIX: Para que se vea bonito "Gym" y no "gym", pasamos el raw saneado visualmente luego.
+                    
+                    # Ejecutar guardado
+                    r = confirm_saved_location(user_id, nombre_key)
+                    
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
                 # --- NUEVA TOOL: MIS UBICACIONES (URL FIX) ---
                 elif fn == "consultar_ubicaciones_guardadas":
                     user = get_user_profile(user_id)
