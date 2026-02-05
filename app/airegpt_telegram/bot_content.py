@@ -179,6 +179,23 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
+            "name": "eliminar_ubicacion",
+            "description": "Elimina permanentemente una ubicación guardada (Casa, Trabajo, etc.) del perfil del usuario.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nombre_ubicacion": {
+                        "type": "string",
+                        "description": "El nombre del lugar a borrar (ej. 'casa', 'trabajo', 'escuela')."
+                    }
+                },
+                "required": ["nombre_ubicacion"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "consultar_resumen_configuracion",
             "description": "Muestra tarjeta con resumen de alertas, horarios, auto y status. Usar cuando el usuario pregunte 'qué tengo configurado' o 'mis alertas'.",
             "parameters": {"type": "object", "properties": {}}
