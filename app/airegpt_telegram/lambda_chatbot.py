@@ -562,13 +562,19 @@ def lambda_handler(event, context):
 
             # --- PASO 2: EJECUTAR BORRADO (CASCADA) ---
             elif data.startswith("CONFIRM_DEL_"):
-                # Viene de: "CONFIRM_DEL_CASA"
                 loc_name = data.replace("CONFIRM_DEL_", "").lower()
                 
                 if delete_location_from_db(user_id, loc_name):
                     resp = f"🗑️ **{loc_name.capitalize()} y sus alertas han sido eliminadas.**"
-                    # Opcional: Mostrar menú principal de nuevo
-                    markup = cards.get_summary_buttons('casa' in user.get('locations',{}), 'trabajo' in user.get('locations',{}))
+                    
+                    # --- FIX: Cargar el usuario actualizado para los botones ---
+                    user = get_user_profile(user_id) 
+                    
+                    # Ahora sí podemos usar 'user' sin que explote
+                    markup = cards.get_summary_buttons(
+                        'casa' in user.get('locations',{}), 
+                        'trabajo' in user.get('locations',{})
+                    )
                 else:
                     resp = "⚠️ Error al eliminar. Intenta de nuevo."
                     markup = None
