@@ -196,6 +196,23 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
+            "name": "guardar_ubicacion_personalizada",
+            "description": "Guarda la ubicación actual (draft) con un nombre específico proporcionado por el usuario. Usar cuando el usuario responde con un nombre como 'Gym', 'Escuela' o 'Casa Mamá' después de enviar una ubicación.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nombre": {
+                        "type": "string",
+                        "description": "El nombre que el usuario quiere dar al lugar (ej. 'Gym', 'Escuela')."
+                    }
+                },
+                "required": ["nombre"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "consultar_resumen_configuracion",
             "description": "Muestra tarjeta con resumen de alertas, horarios, auto y status. Usar cuando el usuario pregunte 'qué tengo configurado' o 'mis alertas'.",
             "parameters": {"type": "object", "properties": {}}
