@@ -167,6 +167,21 @@ def save_interaction_and_draft(user_id, first_name, lat=None, lon=None):
     try: table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=update_expr, ExpressionAttributeValues=vals)
     except Exception as e: print(f"❌ [DB SAVE ERROR]: {e}")
 
+def delete_location_from_db(user_id, location_name):
+    """Borra una llave específica del mapa 'locations' en DynamoDB"""
+    key = location_name.lower().strip()
+    try:
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="REMOVE locations.#k",
+            ExpressionAttributeNames={'#k': key},
+            ReturnValues="UPDATED_NEW"
+        )
+        return True
+    except Exception as e:
+        print(f"❌ Error deleting location: {e}")
+        return False
+
 # --- TOOLS ---
 def confirm_saved_location(user_id, tipo):
     try:
@@ -527,6 +542,16 @@ def lambda_handler(event, context):
                     return {'statusCode': 200, 'body': 'OK'}
                 else: resp = "⚠️ Ubicación no encontrada."
 
+            # --- BORRADO DE UBICACIONES (BOTONES) ---
+            elif data.startswith("DELETE_LOC_"):
+                # El callback viene como "DELETE_LOC_CASA"
+                loc_name = data.replace("DELETE_LOC_", "").lower()
+                
+                if delete_location_from_db(user_id, loc_name):
+                    resp = f"🗑️ **{loc_name.capitalize()} eliminada correctamente.**"
+                else:
+                    resp = "⚠️ Error al eliminar. Intenta de nuevo."
+
             # --- MENÚ AVANZADO (Placeholder) ---
             elif data == "CONFIG_ADVANCED":
                 resp = "⚙️ **Configuración Avanzada**\n\nAquí podrás gestionar tu suscripción y métodos de pago.\n*(Próximamente)*"
@@ -657,6 +682,21 @@ def lambda_handler(event, context):
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                         # Aquí NO hacemos return, dejamos que el flujo baje para que GPT explique el error en texto.
                     
+                # --- NUEVA TOOL: ELIMINAR UBICACIÓN (TEXTO) ---
+                elif fn == "eliminar_ubicacion":
+                    nombre = args.get('nombre_ubicacion')
+                    if not nombre:
+                        r = "⚠️ ¿Qué ubicación quieres borrar? (Casa, Trabajo...)"
+                    else:
+                        # Intentar borrar
+                        success = delete_location_from_db(user_id, nombre)
+                        if success:
+                            r = f"✅ Ubicación '{nombre}' eliminada de tu perfil."
+                        else:
+                            r = f"⚠️ No encontré '{nombre}' o ya estaba borrada."
+                    
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                
                 elif fn == "configurar_alerta_ias": 
                     r = configure_ias_alert(user_id, args['nombre_ubicacion'], args['umbral_ias'])
                     # IMPORTANTE: Avisar al LLM que ya se hizo
