@@ -191,7 +191,7 @@ def confirm_saved_location(user_id, tipo):
     try:
         user = get_user_profile(user_id)
         
-        # 🛡️ GATEKEEPER CHECK
+        # 1. GATEKEEPER CHECK
         can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_location')
         if not can_proceed: return msg_bloqueo
 
@@ -199,24 +199,50 @@ def confirm_saved_location(user_id, tipo):
         if not draft: return "⚠️ No encontré la ubicación en memoria."
         
         key = tipo.lower()
-        print(f"💾 [ACTION] Saving Location: {key} for {user_id}")
         
+        # 2. DETECTAR SI ES NUEVA O EDICIÓN
+        locs = user.get('locations', {})
+        is_new = key not in locs
+        
+        print(f"💾 [ACTION] Saving Location: {key} (New: {is_new})")
+        
+        # 3. CONSTRUIR EXPRESSION
+        # Si es NUEVA: 'REMOVE' borra alertas zombies que pudieran haber quedado huérfanas.
+        # Si es EDICIÓN: Solo 'SET' para actualizar coordenadas sin borrar alertas activas.
+        if is_new:
+            update_expr = "SET locations.#loc = :val REMOVE alerts.threshold.#loc, alerts.schedule.#loc"
+        else:
+            update_expr = "SET locations.#loc = :val"
+
+        # 4. EJECUTAR UPDATE
         table.update_item(
             Key={'user_id': str(user_id)}, 
-            UpdateExpression="set locations.#loc = :val", 
+            UpdateExpression=update_expr, 
             ExpressionAttributeNames={'#loc': key}, 
-            ExpressionAttributeValues={':val': {'lat': draft['lat'], 'lon': draft['lon'], 'display_name': key.capitalize(), 'active': True}}
+            ExpressionAttributeValues={':val': {
+                'lat': draft['lat'], 
+                'lon': draft['lon'], 
+                'display_name': key.capitalize(), 
+                'active': True
+            }}
         )
         
+        # 5. MENSAJE DE CONFIRMACIÓN
+        # Recargamos perfil para verificar estado final
         user_updated = get_user_profile(user_id)
-        locs = user_updated.get('locations', {})
-        has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
+        final_locs = user_updated.get('locations', {})
+        has_casa, has_trabajo = 'casa' in final_locs, 'trabajo' in final_locs
         
         msg = f"✅ **{key.capitalize()} guardada.**"
+        if is_new: msg += "\n🧹 *Configuración limpiada.*"
+        else: msg += "\n🔄 *Coordenadas actualizadas.*"
+
         if has_casa and has_trabajo: msg += "\n\n🎉 **¡Perfil Completo!**\n💬 Prueba: *\"¿Cómo está el aire en Casa?\"*"
         elif key == 'casa': msg += "\n\n🏢 **Falta:** Envíame la ubicación de tu **TRABAJO**."
         elif key == 'trabajo': msg += "\n\n🏠 **Falta:** Envíame la ubicación de tu **CASA**."
+        
         return msg
+
     except Exception as e:
         print(f"❌ [TOOL ERROR]: {e}")
         return f"Error DB: {str(e)}"
