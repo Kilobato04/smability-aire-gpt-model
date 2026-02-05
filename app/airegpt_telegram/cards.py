@@ -300,3 +300,13 @@ def get_locations_buttons(locations_dict):
     keyboard.append([{"text": "🔙 Volver al Menú", "callback_data": "Consultar_resumen_configuracion"}]) # Truco: simula llamar al resumen
     
     return {"inline_keyboard": keyboard}
+    
+# --- HELPER DE CONFIRMACIÓN DE BORRADO ---
+def get_delete_confirmation_buttons(location_key):
+    """Genera botones de SI/NO para confirmar borrado"""
+    return {"inline_keyboard": [
+        [
+            {"text": "✅ Sí, borrar todo", "callback_data": f"CONFIRM_DEL_{location_key.upper()}"},
+            {"text": "❌ Cancelar", "callback_data": "CANCEL_DELETE"}
+        ]
+    ]}
