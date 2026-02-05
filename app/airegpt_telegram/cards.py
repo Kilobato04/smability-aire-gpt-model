@@ -190,45 +190,52 @@ def format_days_text(days_list):
 
 # --- 2. ACTUALIZAR FUNCIÓN GENERADORA DE RESUMEN ---
 def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
-    # a) Status Contingencia
-    is_premium = "PREMIUM" in plan_status.upper() or "TRIAL" in plan_status.upper()
+    # Función auxiliar de limpieza local
+    def clean(text):
+        return str(text).replace("_", " ").replace("*", "").replace("[", "").replace("]", "")
+
+    # a) Status Contingencia & Plan (Saneados)
+    safe_plan = clean(plan_status)
+    is_premium = "PREMIUM" in safe_plan.upper() or "TRIAL" in safe_plan.upper()
     contingency_status = "✅ **ACTIVA**" if is_premium else "🔒 **INACTIVA** (Solo Premium)"
     
-    # b) Ubicaciones
+    # b) Ubicaciones (Saneados keys y values)
     locs = []
     if isinstance(locations, dict):
         for k, v in locations.items():
-            locs.append(f"• **{k.capitalize()}:** {v.get('display_name','Ubicación')}")
+            safe_k = clean(k.capitalize())
+            safe_name = clean(v.get('display_name','Ubicación'))
+            locs.append(f"• **{safe_k}:** {safe_name}")
     loc_str = "\n".join(locs) if locs else "• *Sin ubicaciones guardadas*"
 
     # c) Vehículo
     veh_str = "• *Sin auto registrado*"
     if vehicle and vehicle.get('active'):
-        veh_str = f"• Placa **{vehicle.get('plate_last_digit')}** (Holo {vehicle.get('hologram')})"
+        digit = vehicle.get('plate_last_digit')
+        holo = clean(vehicle.get('hologram'))
+        veh_str = f"• Placa **{digit}** (Holo {holo})"
 
-    # d) Alertas de Aire por UMBRAL (Threshold)
-    # Ejemplo: "Avísame si Casa pasa de 100 puntos"
+    # d) Alertas de Aire por UMBRAL
     threshold_list = []
     thresholds = alerts.get('threshold', {})
     for k, v in thresholds.items():
         if v.get('active'): 
-            threshold_list.append(f"• {k.capitalize()}: > {v.get('umbral')} pts")
+            safe_k = clean(k.capitalize())
+            threshold_list.append(f"• {safe_k}: > {v.get('umbral')} pts")
     threshold_str = "\n".join(threshold_list) if threshold_list else "• *Sin alertas de umbral*"
 
-    # e) Reportes de Aire PROGRAMADOS (Schedule)
-    # Ejemplo: "Dime cómo está el aire a las 7am"
-    # CORRECCIÓN: Antes esto salía en HNC, ahora va en su propia sección de Aire
+    # e) Reportes de Aire PROGRAMADOS
     schedule_list = []
     schedules = alerts.get('schedule', {})
     for k, v in schedules.items():
         if v.get('active'): 
+            safe_k = clean(k.capitalize())
             days = v.get('days', [])
             days_txt = "Diario" if len(days)==7 else "Días selec."
-            schedule_list.append(f"• {k.capitalize()}: {v.get('time')} hrs ({days_txt})")
+            schedule_list.append(f"• {safe_k}: {v.get('time')} hrs ({days_txt})")
     schedule_str = "\n".join(schedule_list) if schedule_list else "• *Sin reportes programados*"
 
-    # f) Recordatorio HOY NO CIRCULA (Exclusivo del Auto)
-    # Se lee directo de la configuración del vehículo, no de 'alerts' general
+    # f) Recordatorio HOY NO CIRCULA
     hnc_str = "• *Sin recordatorio activo*"
     if vehicle and vehicle.get('active'):
         config = vehicle.get('alert_config', {})
@@ -237,20 +244,20 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
         else:
             hnc_str = "• 🔕 Recordatorio desactivado."
     elif not vehicle:
-        hnc_str = "" # Si no tiene auto, dejamos esto vacío para no ensuciar
+        hnc_str = "" 
 
     # Footer
     tip = "💡 Tip: Escribe 'Cambiar hora alertas' para ajustar." if is_premium else "💎 Tip: Hazte Premium para activar Contingencias."
 
     return CARD_SUMMARY.format(
-        user_name=user_name,
-        plan_status=plan_status,
+        user_name=clean(user_name), # Limpieza final del usuario
+        plan_status=safe_plan,
         contingency_status=contingency_status,
         locations_list=loc_str,
         vehicle_info=veh_str,
-        alerts_threshold=threshold_str, # Nueva variable
-        alerts_schedule=schedule_str,   # Nueva variable (antes confundida con HNC)
-        hnc_reminder=hnc_str,           # Nueva variable exclusiva HNC
+        alerts_threshold=threshold_str,
+        alerts_schedule=schedule_str,
+        hnc_reminder=hnc_str,
         tip_footer=tip
     )
 
