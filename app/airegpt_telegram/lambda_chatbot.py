@@ -61,7 +61,7 @@ table = dynamodb.Table(DYNAMODB_TABLE)
 
 # --- 🧠 REGLAS DE NEGOCIO ---
 BUSINESS_RULES = {
-    "FREE": {"loc_limit": 2, "alert_limit": 0, "can_contingency": False},
+    "FREE": {"loc_limit": 1, "alert_limit": 0, "can_contingency": False},
     "PREMIUM": {"loc_limit": 3, "alert_limit": 10, "can_contingency": True}
 }
 
@@ -84,11 +84,15 @@ def check_quota_and_permissions(user_profile, action_type):
         
         if current_locs >= rules['loc_limit']:
             print(f"🚫 [BLOCK] Location limit reached for {user_id}")
-            return False, (
-                f"🛑 **Límite Alcanzado ({current_locs}/{rules['loc_limit']})**\n\n"
-                "Tu plan **Básico** solo permite 2 ubicaciones guardadas.\n"
-                "💎 **Cámbiate a Premium** para agregar más lugares y recibir alertas."
-            )
+            # Mensaje específico según el plan
+            if status == 'FREE':
+                return False, (
+                    f"🛑 **Límite Alcanzado ({current_locs}/{rules['loc_limit']})**\n\n"
+                    "Tu plan **Básico** solo permite 1 ubicación (Casa o Trabajo).\n"
+                    "💎 **Hazte Premium** para guardar hasta 3 lugares y recibir alertas."
+                )
+            else:
+                return False, f"🛑 **Has llenado tus {rules['loc_limit']} espacios Premium.** Borra uno para agregar otro."
 
     # 3. Validar Acción: CREAR ALERTA
     if action_type == 'add_alert':
@@ -190,31 +194,33 @@ def delete_location_from_db(user_id, location_name):
 def confirm_saved_location(user_id, tipo):
     try:
         user = get_user_profile(user_id)
-        
-        # 1. GATEKEEPER CHECK
-        can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_location')
-        if not can_proceed: return msg_bloqueo
-
         draft = user.get('draft_location')
-        if not draft: return "⚠️ No encontré la ubicación en memoria."
+        
+        if not draft: return "⚠️ No encontré la ubicación en memoria. Envíala de nuevo."
         
         key = tipo.lower()
-        
-        # 2. DETECTAR SI ES NUEVA O EDICIÓN
         locs = user.get('locations', {})
+        
+        # 1. DETECTAR SI ES NUEVA O EDICIÓN
         is_new = key not in locs
         
         print(f"💾 [ACTION] Saving Location: {key} (New: {is_new})")
-        
-        # 3. CONSTRUIR EXPRESSION
-        # Si es NUEVA: 'REMOVE' borra alertas zombies que pudieran haber quedado huérfanas.
-        # Si es EDICIÓN: Solo 'SET' para actualizar coordenadas sin borrar alertas activas.
+
+        # 2. GATEKEEPER (Solo si es NUEVA)
+        # Si es edición (ej. mudanza), no bloqueamos aunque esté al límite.
         if is_new:
+            can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_location')
+            if not can_proceed: return msg_bloqueo
+        
+        # 3. CONSTRUIR EXPRESSION (Limpieza de Zombies)
+        if is_new:
+            # Nueva: Borramos alertas viejas por si acaso
             update_expr = "SET locations.#loc = :val REMOVE alerts.threshold.#loc, alerts.schedule.#loc"
         else:
+            # Edición: Solo actualizamos coordenadas, mantenemos alertas
             update_expr = "SET locations.#loc = :val"
 
-        # 4. EJECUTAR UPDATE
+        # 4. EJECUTAR UPDATE EN DYNAMO
         table.update_item(
             Key={'user_id': str(user_id)}, 
             UpdateExpression=update_expr, 
@@ -228,18 +234,23 @@ def confirm_saved_location(user_id, tipo):
         )
         
         # 5. MENSAJE DE CONFIRMACIÓN
-        # Recargamos perfil para verificar estado final
+        # Recargamos para verificar estado final (útil para el upsell)
         user_updated = get_user_profile(user_id)
         final_locs = user_updated.get('locations', {})
-        has_casa, has_trabajo = 'casa' in final_locs, 'trabajo' in final_locs
+        count = len(final_locs)
         
         msg = f"✅ **{key.capitalize()} guardada.**"
-        if is_new: msg += "\n🧹 *Configuración limpiada.*"
-        else: msg += "\n🔄 *Coordenadas actualizadas.*"
+        if is_new: 
+            msg += "\n🧹 *Configuración nueva creada.*"
+        else: 
+            msg += "\n🔄 *Coordenadas actualizadas.*"
 
-        if has_casa and has_trabajo: msg += "\n\n🎉 **¡Perfil Completo!**\n💬 Prueba: *\"¿Cómo está el aire en Casa?\"*"
-        elif key == 'casa': msg += "\n\n🏢 **Falta:** Envíame la ubicación de tu **TRABAJO**."
-        elif key == 'trabajo': msg += "\n\n🏠 **Falta:** Envíame la ubicación de tu **CASA**."
+        # Footer inteligente
+        sub_status = user.get('subscription', {}).get('status', 'FREE')
+        if "FREE" in sub_status and count == 1 and is_new:
+            msg += "\n\n💡 **Tip:** Ya usaste tu único espacio disponible. Para agregar otro (ej. Trabajo), cámbiate a Premium."
+        elif has_casa and has_trabajo: 
+            msg += "\n\n🎉 **¡Perfil Completo!**"
         
         return msg
 
