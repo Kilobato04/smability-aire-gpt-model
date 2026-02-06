@@ -156,6 +156,7 @@ def update_user_status(user_id, new_status):
         print(f"❌ [DB UPDATE ERROR]: {e}")
         return False
 
+# --- FIX: PERSISTENCIA DEL DRAFT (Sustituye tu función actual por esta) ---
 def save_interaction_and_draft(user_id, first_name, lat=None, lon=None):
     update_expr = "SET first_name=:n, last_interaction=:t, locations=if_not_exists(locations,:e), alerts=if_not_exists(alerts,:al), subscription=if_not_exists(subscription,:sub)"
     vals = {
@@ -165,9 +166,13 @@ def save_interaction_and_draft(user_id, first_name, lat=None, lon=None):
         ':al': {'threshold': {}, 'schedule': {}},
         ':sub': {'status': 'FREE'}
     }
+    
+    # OJO: Solo tocamos 'draft_location' si realmente recibimos coordenadas nuevas
+    # Esto evita que un mensaje de texto ("Gym") borre las coordenadas pendientes.
     if lat and lon:
         update_expr += ", draft_location = :d"
         vals[':d'] = {'lat': str(lat), 'lon': str(lon), 'ts': datetime.now().isoformat()}
+    
     try: table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=update_expr, ExpressionAttributeValues=vals)
     except Exception as e: print(f"❌ [DB SAVE ERROR]: {e}")
 
@@ -608,18 +613,21 @@ def lambda_handler(event, context):
                 loc_name = data.replace("CONFIRM_DEL_", "").lower()
                 
                 if delete_location_from_db(user_id, loc_name):
-                    resp = f"🗑️ **{loc_name.capitalize()} y sus alertas han sido eliminadas.**"
+                    resp = f"🗑️ **{loc_name.capitalize()} eliminada.**"
                     
-                    # --- FIX: Cargar el usuario actualizado para los botones ---
-                    user = get_user_profile(user_id) 
+                    # FIX: Cargar usuario y detectar status para botones correctos
+                    user = get_user_profile(user_id)
+                    status = user.get('subscription', {}).get('status', 'FREE')
+                    is_prem = "PREMIUM" in status.upper() or "TRIAL" in status.upper()
                     
-                    # Ahora sí podemos usar 'user' sin que explote
+                    # Pasamos is_prem a la función de botones
                     markup = cards.get_summary_buttons(
                         'casa' in user.get('locations',{}), 
-                        'trabajo' in user.get('locations',{})
+                        'trabajo' in user.get('locations',{}), 
+                        is_prem
                     )
                 else:
-                    resp = "⚠️ Error al eliminar. Intenta de nuevo."
+                    resp = "⚠️ Error al eliminar."
                     markup = None
                 
                 send_telegram(chat_id, resp, markup)
@@ -702,8 +710,6 @@ def lambda_handler(event, context):
         
         has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
         forced_tag = None
-
-        # --- MAQUINA DE ESTADOS (STATE MACHINE) ---
         system_extra = "NORMAL"
         
         # 1. Prioridad: Si hay mapa en este mensaje (Override total)
@@ -714,16 +720,12 @@ def lambda_handler(event, context):
         
         # 2. Prioridad: Si NO hay mapa, revisamos si hay uno pendiente en la DB
         else:
-            # Obtenemos el draft directamente del perfil recien cargado
+            # FIX: Detectar draft pendiente en la DB para avisar al Prompt
             draft = user_profile.get('draft_location')
-            
-            # FIX: Validamos que draft no sea None y tenga datos
             if draft and isinstance(draft, dict) and 'lat' in draft:
-                # INYECTAMOS EL ESTADO DE PERMISO PARA EL PROMPT
                 system_extra = "ESTADO: PENDING_NAME_FOR_LOCATION (Tengo coordenadas en memoria esperando nombre)."
-                print(f"🔓 [STATE] Draft found in DB. Unlocking Save Flow.")
             
-            # 3. Prioridad: Onboarding (solo si no hay draft pendiente)
+            # Solo sugerimos onboarding si no hay draft pendiente
             elif not has_casa: system_extra = "ONBOARDING 1: Pide CASA"
             elif not has_trabajo: system_extra = "ONBOARDING 2: Pide TRABAJO"
 
