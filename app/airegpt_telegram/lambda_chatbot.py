@@ -31,6 +31,15 @@ def get_verification_period(plate_digit, hologram):
         d = int(plate_digit)
     except:
         return "⚠️ Revisar Placa"
+# --- HELPER TEXTO ---
+def normalize_key(text):
+    """Quita acentos y espacios para usar como llave en BD"""
+    if not text: return ""
+    text = text.lower().strip().replace(" ", "_")
+    replacements = (("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ñ", "n"))
+    for a, b in replacements:
+        text = text.replace(a, b)
+    return text
 
     # 3. Lógica Bimestral (CDMX/Edomex)
     if d in [5, 6]: return "🟡 Ene-Feb / Jul-Ago"
@@ -201,75 +210,69 @@ def confirm_saved_location(user_id, tipo):
         user = get_user_profile(user_id)
         draft = user.get('draft_location')
         
-        if not draft: return "⚠️ No encontré la ubicación en memoria. Envíala de nuevo."
+        # Validación de seguridad: Si no hay mapa, no guardamos nada.
+        if not draft: return "⚠️ No encontré coordenadas recientes. Por favor toca el clip 📎 y envía la ubicación de nuevo."
         
-        key = tipo.lower()
+        # 1. Normalización Robusta (Zócalo -> zocalo)
+        # IMPORTANTE: Asegúrate de haber agregado la función 'normalize_key' arriba (FIX 1)
+        key = normalize_key(tipo)
+        display_name = tipo.strip().capitalize() # Mantiene tilde visualmente (Zócalo)
+
         locs = user.get('locations', {})
-        
-        # 1. DETECTAR SI ES NUEVA O EDICIÓN
         is_new = key not in locs
         
-        print(f"💾 [ACTION] Saving Location: {key} (New: {is_new})")
-
-        # 2. GATEKEEPER (Solo si es NUEVA)
-        # Si es edición (ej. mudanza), no bloqueamos aunque esté al límite.
+        # 2. Gatekeeper (Límite de ubicaciones)
         if is_new:
             can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_location')
             if not can_proceed: return msg_bloqueo
         
-        # 3. CONSTRUIR EXPRESSION (Limpieza de Zombies)
-        if is_new:
-            # Nueva: Borramos alertas viejas por si acaso
-            update_expr = "SET locations.#loc = :val REMOVE alerts.threshold.#loc, alerts.schedule.#loc"
-        else:
-            # Edición: Solo actualizamos coordenadas, mantenemos alertas
-            update_expr = "SET locations.#loc = :val"
+        # 3. Query: Guardamos y BORRAMOS el draft para no reusarlo por error
+        # "alerts..." borra basura vieja. "draft_location" borra el mapa usado.
+        if is_new: 
+            update_expr = "SET locations.#loc = :val REMOVE alerts.threshold.#loc, alerts.schedule.#loc, draft_location"
+        else: 
+            update_expr = "SET locations.#loc = :val REMOVE draft_location"
 
-        # 4. EJECUTAR UPDATE EN DYNAMO
         table.update_item(
             Key={'user_id': str(user_id)}, 
             UpdateExpression=update_expr, 
             ExpressionAttributeNames={'#loc': key}, 
             ExpressionAttributeValues={':val': {
-                'lat': draft['lat'], 
-                'lon': draft['lon'], 
-                'display_name': key.capitalize(), 
-                'active': True
+                'lat': draft['lat'], 'lon': draft['lon'], 'display_name': display_name, 'active': True
             }}
         )
         
-        # 5. MENSAJE DE CONFIRMACIÓN
-        # Recargamos para verificar estado final (útil para el upsell)
-        user_updated = get_user_profile(user_id)
-        final_locs = user_updated.get('locations', {})
-        count = len(final_locs)
-        
-        msg = f"✅ **{key.capitalize()} guardada.**"
-        if is_new: 
-            msg += "\n🧹 *Configuración nueva creada.*"
-        else: 
-            msg += "\n🔄 *Coordenadas actualizadas.*"
-
-        # Footer inteligente
-        sub_status = user.get('subscription', {}).get('status', 'FREE')
-        if "FREE" in sub_status and count == 1 and is_new:
-            msg += "\n\n💡 **Tip:** Ya usaste tu único espacio disponible. Para agregar otro (ej. Trabajo), cámbiate a Premium."
-        elif has_casa and has_trabajo: 
-            msg += "\n\n🎉 **¡Perfil Completo!**"
+        # 4. Confirmación
+        user = get_user_profile(user_id)
+        count = len(user.get('locations', {}))
+        msg = f"✅ **{display_name} guardada.**"
+        if count >= 2: msg += f"\n\n🎉 **Tienes {count} lugares guardados.**"
         
         return msg
 
     except Exception as e:
         print(f"❌ [TOOL ERROR]: {e}")
-        return f"Error DB: {str(e)}"
+        return f"Error al guardar: {str(e)}"
 
+# --- HELPER DE BÚSQUEDA ---
 def resolve_location_key(user_id, input_name):
     user = get_user_profile(user_id)
     locs = user.get('locations', {})
-    input_clean = input_name.lower()
-    if input_clean in locs: return input_clean
-    if "casa" in input_clean: return "casa" if "casa" in locs else None
-    if "trabajo" in input_clean: return "trabajo" if "trabajo" in locs else None
+    
+    # 1. Búsqueda exacta normalizada (zocalo == zocalo)
+    target = normalize_key(input_name)
+    if target in locs: return target
+    
+    # 2. Búsqueda inteligente (alias comunes)
+    if "casa" in target and "casa" in locs: return "casa"
+    if "trabajo" in target and "trabajo" in locs: return "trabajo"
+    if "oficina" in target and "trabajo" in locs: return "trabajo"
+    
+    # 3. Búsqueda parcial (ej. usuario dice "el zocalo" -> encuentra "zocalo")
+    for k in locs.keys():
+        if k in target or target in k:
+            return k
+            
     return None
 
 def configure_ias_alert(user_id, nombre_ubicacion, umbral):
@@ -644,6 +647,10 @@ def lambda_handler(event, context):
             elif data == "SAVE_OTHER":
                 resp = "✍️ **¿Qué nombre le ponemos?**\n\nEscribe el nombre que quieras (Ej. *'Escuela'*, *'Gym'*, *'Casa Mamá'*)."
 
+            # Si ningun callback coincidió, evitar error 400
+            if not resp: 
+                resp = "⚠️ Opción no reconocida o sesión expirada."
+                
             # --- RESPUESTA DEFAULT ---
             send_telegram(chat_id, resp)
             return {'statusCode': 200, 'body': 'OK'}
