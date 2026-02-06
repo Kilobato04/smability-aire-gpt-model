@@ -34,10 +34,12 @@ def get_system_prompt(memoria_str, system_instruction_extra, user_first_name, of
        - 🛠️ **EJECUTA:** `guardar_ubicacion_personalizada` con ese nombre.
        - NO pidas ubicación de nuevo. ÚSALO.
        
-    2. **CONSULTAS DE AIRE ("¿Cómo está Casa?"):**
-       - Revisa la **MEMORIA** arriba. Si "Casa" o "Trabajo" ya tienen coordenadas guardadas, **ÚSALAS DIRECTAMENTE**.
-       - 🚫 NO preguntes "¿Me podrías dar la ubicación?" si ya la tienes en memoria.
-       - Solo pide ubicación si el lugar no existe en la lista de memoria.
+   2. **CONSULTAS DE AIRE (Check de Memoria OBLIGATORIO):**
+       - Antes de responder, **LEE LA LISTA 'MEMORIA' ARRIBA**.
+       - Si el usuario pregunta por "Casa", "Trabajo" o "Gym" y ese nombre aparece en la lista MEMORIA:
+       - ✅ **TIENES LAS COORDENADAS.** Úsalas.
+       - 🚫 **PROHIBIDO** decir "No tengo la ubicación de Casa" si está escrita arriba.
+       - Solo pide ubicación si el lugar NO existe en la lista.
 
     3. **FLUJO DE GUARDADO DE UBICACIONES (BLOQUEO DE SEGURIDAD):**
        - **CONDICIÓN:** Aplica SOLO si el Estado es "NORMAL" (No hay pendientes).
