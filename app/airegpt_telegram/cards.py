@@ -274,16 +274,14 @@ def get_summary_buttons(has_home, has_work, is_premium=False):
     keyboard = []
     if row1: keyboard.append(row1)
     
-    # Fila 2: Lógica Premium vs Free
+    # Fila 2: Upselling (SOLO SI ES FREE)
     if not is_premium:
         keyboard.append([{"text": "💎 Activar Premium ($49)", "callback_data": "GO_PREMIUM"}])
-        keyboard.append([{"text": "❓ Ver Beneficios", "callback_data": "SHOW_BENEFITS"}])
-    else:
-        keyboard.append([{"text": "⚙️ Configuración Avanzada", "callback_data": "CONFIG_ADVANCED"}])
-
+    
+    # Nota: Si es Premium, no mostramos botones extra por ahora (limpieza visual)
     return {"inline_keyboard": keyboard}
 
-# --- HELPER PARA BOTONES DE UBICACIONES ---
+# --- MODIFICADO: ELIMINAMOS BOTÓN DE VOLVER ---
 def get_locations_buttons(locations_dict):
     keyboard = []
     # Fila de "Consultar Aire"
@@ -293,20 +291,19 @@ def get_locations_buttons(locations_dict):
     
     for key, val in locations_dict.items():
         label = key.capitalize()
-        row_check.append({"text": f"💨 Aire {label}", "callback_data": f"CHECK_AIR_{key.upper()}"})
-        row_delete.append({"text": f"🗑️ Borrar {label}", "callback_data": f"DELETE_LOC_{key.upper()}"})
+        # Claves cortas para callback (evitar límite de bytes de Telegram)
+        safe_key = key.upper().replace(" ", "_")[:15] 
+        
+        row_check.append({"text": f"💨 {label}", "callback_data": f"CHECK_AIR_{safe_key}"})
+        row_delete.append({"text": f"🗑️ {label}", "callback_data": f"DELETE_LOC_{safe_key}"})
     
     if row_check: keyboard.append(row_check)
     if row_delete: keyboard.append(row_delete)
     
-    # Botón universal para volver
-    keyboard.append([{"text": "🔙 Volver al Menú", "callback_data": "Consultar_resumen_configuracion"}]) # Truco: simula llamar al resumen
-    
     return {"inline_keyboard": keyboard}
-    
-# --- HELPER DE CONFIRMACIÓN DE BORRADO ---
+
+#Helper para confirmación de borrado
 def get_delete_confirmation_buttons(location_key):
-    """Genera botones de SI/NO para confirmar borrado"""
     return {"inline_keyboard": [
         [
             {"text": "✅ Sí, borrar todo", "callback_data": f"CONFIRM_DEL_{location_key.upper()}"},
