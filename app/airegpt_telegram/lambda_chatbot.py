@@ -571,31 +571,34 @@ def lambda_handler(event, context):
             elif data == "RESET": resp = "🗑️ Cancelado."
             
             # --- ACCESOS RÁPIDOS (Resumen y Ubicaciones) ---
-            elif data.startswith("CHECK_HOME") or data == "CHECK_AIR_CASA":
-                key = "casa"
-                # ... (Lógica de consultar aire existente) ...
-                # COPIAR TU LÓGICA DE ABAJO AQUÍ O REDIRIGIR
-                # Para simplificar, te doy el bloque genérico:
+            # Detectamos cualquier botón que empiece con CHECK_AIR_ o los viejos CHECK_HOME/WORK
+            elif data.startswith("CHECK_AIR_") or data.startswith("CHECK_HOME") or data.startswith("CHECK_WORK"):
+                # 1. Normalizar la llave (Key)
+                if "HOME" in data: loc_key = "casa"
+                elif "WORK" in data: loc_key = "trabajo"
+                else: 
+                    # Extraer "unam" de "CHECK_AIR_unam"
+                    loc_key = data.replace("CHECK_AIR_", "").lower()
+                
+                # 2. Buscar en BD
                 user = get_user_profile(user_id)
                 locs = user.get('locations', {})
-                if key in locs:
-                    lat, lon = float(locs[key]['lat']), float(locs[key]['lon'])
-                    report = generate_report_card(first_name, key.capitalize(), lat, lon)
+                
+                # Intentamos buscar directo o normalizado
+                # (Usamos el helper normalize_key si ya lo agregaste, sino búsqueda directa)
+                found_key = None
+                if loc_key in locs: found_key = loc_key
+                
+                if found_key:
+                    lat, lon = float(locs[found_key]['lat']), float(locs[found_key]['lon'])
+                    # Usamos el display_name guardado o capitalizamos la llave
+                    disp_name = locs[found_key].get('display_name', found_key.capitalize())
+                    
+                    report = generate_report_card(first_name, disp_name, lat, lon)
                     send_telegram(chat_id, report)
                     return {'statusCode': 200, 'body': 'OK'}
-                else: resp = "⚠️ Ubicación no encontrada."
-
-            elif data.startswith("CHECK_WORK") or data == "CHECK_AIR_TRABAJO":
-                key = "trabajo"
-                # (Misma lógica de arriba para trabajo)
-                user = get_user_profile(user_id)
-                locs = user.get('locations', {})
-                if key in locs:
-                    lat, lon = float(locs[key]['lat']), float(locs[key]['lon'])
-                    report = generate_report_card(first_name, key.capitalize(), lat, lon)
-                    send_telegram(chat_id, report)
-                    return {'statusCode': 200, 'body': 'OK'}
-                else: resp = "⚠️ Ubicación no encontrada."
+                else:
+                    resp = f"⚠️ No encontré la ubicación '{loc_key}'. Intenta actualizar tu menú."
 
             # --- BORRADO DE UBICACIONES (BOTONES) ---
             elif data.startswith("DELETE_LOC_"):
@@ -624,11 +627,7 @@ def lambda_handler(event, context):
                     is_prem = "PREMIUM" in status.upper() or "TRIAL" in status.upper()
                     
                     # Pasamos is_prem a la función de botones
-                    markup = cards.get_summary_buttons(
-                        'casa' in user.get('locations',{}), 
-                        'trabajo' in user.get('locations',{}), 
-                        is_prem
-                    )
+                    markup = cards.get_summary_buttons(user.get('locations', {}), is_prem)
                 else:
                     resp = "⚠️ Error al eliminar."
                     markup = None
@@ -833,11 +832,7 @@ def lambda_handler(event, context):
                     )
                     
                     # 3. Generar Botones Inteligentes (Upselling si es Free)
-                    markup = cards.get_summary_buttons(
-                        'casa' in user.get('locations',{}), 
-                        'trabajo' in user.get('locations',{}),
-                        is_prem # Esto decide si muestra botones de "Comprar" o de "Configurar"
-                    )
+                    markup = cards.get_summary_buttons(user.get('locations', {}), is_prem)
                     
                     # 4. Enviar y Cortar (Hard Stop)
                     send_telegram(chat_id, r, markup)
