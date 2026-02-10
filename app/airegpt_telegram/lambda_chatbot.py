@@ -19,7 +19,17 @@ def get_mexico_time():
     """Retorna la hora actual en CDMX (UTC-6)"""
     return datetime.utcnow() - timedelta(hours=6)
 
-# --- HELPER VERIFICACIÓN (CORREGIDO) ---
+# --- HELPER TEXTO (PONER ESTO ANTES) ---
+def normalize_key(text):
+    """Quita acentos y espacios para usar como llave en BD"""
+    if not text: return ""
+    text = text.lower().strip().replace(" ", "_")
+    replacements = (("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ñ", "n"))
+    for a, b in replacements:
+        text = text.replace(a, b)
+    return text
+
+# --- HELPER VERIFICACIÓN (AHORA SÍ, LIMPIO) ---
 def get_verification_period(plate_digit, hologram):
     """Calcula el periodo de verificación bimestral"""
     # 1. Caso Exentos
@@ -31,15 +41,6 @@ def get_verification_period(plate_digit, hologram):
         d = int(plate_digit)
     except:
         return "⚠️ Revisar Placa"
-# --- HELPER TEXTO ---
-def normalize_key(text):
-    """Quita acentos y espacios para usar como llave en BD"""
-    if not text: return ""
-    text = text.lower().strip().replace(" ", "_")
-    replacements = (("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ñ", "n"))
-    for a, b in replacements:
-        text = text.replace(a, b)
-    return text
 
     # 3. Lógica Bimestral (CDMX/Edomex)
     if d in [5, 6]: return "🟡 Ene-Feb / Jul-Ago"
