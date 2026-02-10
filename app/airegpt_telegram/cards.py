@@ -265,20 +265,35 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
     )
 
 # --- 3. ACTUALIZAR BOTONES DE RESUMEN (UPSELLING) ---
-def get_summary_buttons(has_home, has_work, is_premium=False):
-    # Fila 1: Accesos directos a Aire
-    row1 = []
-    if has_home: row1.append({"text": "🏠 Aire Casa", "callback_data": "CHECK_HOME"})
-    if has_work: row1.append({"text": "🏢 Aire Trabajo", "callback_data": "CHECK_WORK"})
-    
+def get_summary_buttons(locations_dict, is_premium=False):
+    """
+    Genera botones de consulta para TODAS las ubicaciones guardadas.
+    Argumentos:
+      - locations_dict: El diccionario 'locations' directo de DynamoDB.
+      - is_premium: Booleano para mostrar/ocultar botón de pago.
+    """
     keyboard = []
-    if row1: keyboard.append(row1)
     
-    # Fila 2: Upselling (SOLO SI ES FREE)
+    # 1. Fila de Consultas (Dinámica)
+    # Creamos botones para CADA ubicación en el diccionario
+    row_locs = []
+    for key, val in locations_dict.items():
+        # Nombre bonito para el botón
+        label = val.get('display_name', key.capitalize())
+        # Llave segura para el callback (ej. "CHECK_AIR_casa")
+        safe_key = str(key).replace(" ", "_")
+        
+        row_locs.append({"text": f"💨 {label}", "callback_data": f"CHECK_AIR_{safe_key}"})
+    
+    # Si son muchas, las dividimos en filas de 2 para que no se vea feo
+    # (Chunking list into size 2)
+    for i in range(0, len(row_locs), 2):
+        keyboard.append(row_locs[i:i+2])
+    
+    # 2. Fila de Upselling (Solo si es FREE)
     if not is_premium:
         keyboard.append([{"text": "💎 Activar Premium ($49)", "callback_data": "GO_PREMIUM"}])
     
-    # Nota: Si es Premium, no mostramos botones extra por ahora (limpieza visual)
     return {"inline_keyboard": keyboard}
 
 # --- MODIFICADO: ELIMINAMOS BOTÓN DE VOLVER ---
