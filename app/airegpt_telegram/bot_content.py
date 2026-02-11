@@ -217,7 +217,7 @@ TOOLS_SCHEMA = [
             "description": "Muestra tarjeta con resumen de alertas, horarios, auto y status. Usar cuando el usuario pregunte 'qué tengo configurado' o 'mis alertas'.",
             "parameters": {"type": "object", "properties": {}}
         }
-    }
+    },
     {
         "type": "function",
         "function": {
