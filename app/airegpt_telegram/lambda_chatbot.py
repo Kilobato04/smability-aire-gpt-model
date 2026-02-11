@@ -292,6 +292,21 @@ def configure_ias_alert(user_id, nombre_ubicacion, umbral):
         print(f"❌ [ALERT ERROR]: {e}")
         return "Error guardando alerta."
 
+def toggle_contingency_alert(user_id, activar):
+    """Activa/Desactiva el flag de contingencia en DynamoDB"""
+    try:
+        # Guardamos el estado en alerts.contingency (Booleano)
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET alerts.contingency = :val",
+            ExpressionAttributeValues={':val': bool(activar)}
+        )
+        estado = "✅ ACTIVADA" if activar else "🔕 DESACTIVADA"
+        return f"Enterado. La alerta de contingencia ha sido {estado}."
+    except Exception as e:
+        print(f"❌ Error toggle contingency: {e}")
+        return "Hubo un error al actualizar tu preferencia."
+
 # --- HELPER DE DÍAS (NUEVO) ---
 def parse_days_input(dias_str):
     """Traduce texto natural a lista de días [0-6]"""
@@ -1068,6 +1083,15 @@ def lambda_handler(event, context):
                         markup = cards.get_locations_buttons(locs)
                         send_telegram(chat_id, card, markup)
                         return {'statusCode': 200, 'body': 'OK'}
+
+                elif fn == "configurar_alerta_contingencia":
+                    val = args.get('activar')
+                    # Manejo robusto de booleanos que vienen como string
+                    if isinstance(val, str): is_active = val.lower() == 'true'
+                    else: is_active = bool(val)
+                    
+                    r = toggle_contingency_alert(user_id, is_active)
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
                 else: 
                     # Para cualquier otra tool genérica no contemplada arriba
