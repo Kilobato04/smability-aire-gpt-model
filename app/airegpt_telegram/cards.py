@@ -194,10 +194,17 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
     def clean(text):
         return str(text).replace("_", " ").replace("*", "").replace("[", "").replace("]", "")
 
-    # a) Status Contingencia & Plan
+    # a) Status Contingencia & Plan (LÓGICA CORREGIDA)
     safe_plan = clean(plan_status)
     is_premium = "PREMIUM" in safe_plan.upper() or "TRIAL" in safe_plan.upper()
-    contingency_status = "✅ **ACTIVA**" if is_premium else "🔒 **INACTIVA** (Solo Premium)"
+    
+    if is_premium:
+        # Leemos el estado real de la BD. Si no existe la llave, asumimos False (Inactiva)
+        # OJO: Si prefieres que por defecto esté activa para nuevos, cambia False a True
+        is_active_db = alerts.get('contingency', False)
+        contingency_status = "✅ **ACTIVA**" if is_active_db else "🔕 **DESACTIVADA**"
+    else:
+        contingency_status = "🔒 **BLOQUEADA** (Solo Premium)"
     
     # b) Ubicaciones
     locs = []
@@ -219,8 +226,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
     threshold_list = []
     thresholds = alerts.get('threshold', {})
     for k, v in thresholds.items():
-        # --- FIX: VALIDAR QUE LA UBICACIÓN EXISTA ---
-        # Solo mostramos la alerta si 'k' (ej. 'trabajo') sigue existiendo en tus ubicaciones
+        # Validar que la ubicación exista
         if v.get('active') and k in locations: 
             safe_k = clean(k.capitalize())
             threshold_list.append(f"• {safe_k}: > {v.get('umbral')} pts")
@@ -230,7 +236,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
     schedule_list = []
     schedules = alerts.get('schedule', {})
     for k, v in schedules.items():
-        # --- FIX: VALIDAR QUE LA UBICACIÓN EXISTA ---
+        # Validar que la ubicación exista
         if v.get('active') and k in locations: 
             safe_k = clean(k.capitalize())
             days = v.get('days', [])
