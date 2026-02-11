@@ -218,4 +218,21 @@ TOOLS_SCHEMA = [
             "parameters": {"type": "object", "properties": {}}
         }
     }
+    {
+        "type": "function",
+        "function": {
+            "name": "configurar_alerta_contingencia",
+            "description": "Activa o desactiva la suscripción a alertas globales de Contingencia Ambiental.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "activar": {
+                        "type": "boolean",
+                        "description": "True para activar, False para desactivar."
+                    }
+                },
+                "required": ["activar"]
+            }
+        }
+    }
 ]
