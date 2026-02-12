@@ -75,73 +75,44 @@ BUSINESS_RULES = {
     "PREMIUM": {"loc_limit": 3, "alert_limit": 10, "can_contingency": True}
 }
 
-# --- GATEKEEPER: VERIFICADOR DE CUPOS (CON LOGS) ---
+# --- GATEKEEPER: VERIFICADOR DE CUPOS (VERSIÓN DESBLOQUEADA) ---
 def check_quota_and_permissions(user_profile, action_type):
     # 1. Identificar Plan
     sub = user_profile.get('subscription', {})
     status = sub.get('status', 'FREE')
     user_id = user_profile.get('user_id', 'unknown')
     
-    rule_key = "PREMIUM" if "PREMIUM" in status.upper() else "FREE"
-    rules = BUSINESS_RULES[rule_key]
-
-    print(f"🛡️ [GATEKEEPER] User: {user_id} | Plan Detected: {status} -> Using Rules: {rule_key}")
+    # Flags de Negocio
+    is_premium = "PREMIUM" in status.upper() or "TRIAL" in status.upper()
+    LIMIT_LOC_FREE = 1
+    LIMIT_LOC_PREM = 3
+    
+    print(f"🛡️ [GATEKEEPER] User: {user_id} | Plan: {status} | Premium: {is_premium}")
 
     # 2. Validar Acción: AGREGAR UBICACIÓN
     if action_type == 'add_location':
         current_locs = len(user_profile.get('locations', {}))
-        print(f"📊 [QUOTA] Locations: {current_locs} / {rules['loc_limit']}")
+        limit = LIMIT_LOC_PREM if is_premium else LIMIT_LOC_FREE
         
-        if current_locs >= rules['loc_limit']:
-            print(f"🚫 [BLOCK] Location limit reached for {user_id}")
-            # Mensaje específico según el plan
-            if status == 'FREE':
-                return False, (
-                    f"🛑 **Límite Alcanzado ({current_locs}/{rules['loc_limit']})**\n\n"
-                    "Tu plan **Básico** solo permite 1 ubicación (Casa o Trabajo).\n"
-                    "💎 **Hazte Premium** para guardar hasta 3 lugares y recibir alertas."
-                )
+        if current_locs >= limit:
+            if not is_premium:
+                return False, f"🛑 **Límite Alcanzado ({current_locs}/{limit})**\n\nTu plan Básico solo permite 1 ubicación.\n💎 **Hazte Premium** para guardar hasta 3."
             else:
-                return False, f"🛑 **Has llenado tus {rules['loc_limit']} espacios Premium.** Borra uno para agregar otro."
+                return False, f"🛑 **Espacios Llenos.** Tienes ocupados tus {limit} espacios. Borra uno para agregar otro."
 
-    # 3. Validar Acción: CREAR ALERTA
+    # 3. Validar Acción: CREAR ALERTA (Schedule o Threshold)
     if action_type == 'add_alert':
-        print(f"📊 [QUOTA] Checking Alert Permissions. Limit: {rules['alert_limit']}")
-        
-        if rules['alert_limit'] == 0:
-            print(f"🚫 [BLOCK] Feature restricted (Alerts) for {user_id}")
-            return False, (
+        # REGLA SIMPLE: Free = 0 alertas auto. Premium = Ilimitadas (dentro de lo lógico).
+        if not is_premium:
+             return False, (
                 "🔒 **Función Premium**\n\n"
-                "Las alertas automáticas (por horario o contaminación alta) son exclusivas de Smability Premium.\n"
+                "Las alertas automáticas (diarias o por contaminación) son exclusivas de Smability Premium.\n"
                 "💎 **Actívalo hoy por solo $49 MXN/mes.**"
             )
         
-        # Contar alertas actuales
-        alerts = user_profile.get('alerts', {})
-
-        # --- 🛡️ FIX CRÍTICO AQUÍ TAMBIÉN ---
-        if isinstance(alerts, str): 
-            alerts = {} # Si es string, lo ignoramos y asumimos 0 alertas
-        # -----------------------------------
-
-        total_used = 0
-        
-        # Ahora es seguro usar .get()
-        threshold_alerts = alerts.get('threshold', {})
-        if isinstance(threshold_alerts, dict):
-            for k, v in threshold_alerts.items():
-                if isinstance(v, dict) and v.get('active'): total_used += 1
-        
-        schedule_alerts = alerts.get('schedule', {})
-        if isinstance(schedule_alerts, dict):
-            for k, v in schedule_alerts.items():
-                if isinstance(v, dict) and v.get('active'): total_used += 1
-            
-        print(f"📊 [QUOTA] Alerts Used: {total_used} / {rules['alert_limit']}")
-
-        if total_used >= rules['alert_limit']:
-            print(f"🚫 [BLOCK] Alert limit reached for {user_id}")
-            return False, f"🛑 **Has alcanzado tu límite de {rules['alert_limit']} alertas.**"
+        # Si es Premium, ¡Pase usted! 
+        # No ponemos límite numérico porque la estructura de la DB (1 por key) ya evita el abuso.
+        return True, ""
 
     return True, ""
 
