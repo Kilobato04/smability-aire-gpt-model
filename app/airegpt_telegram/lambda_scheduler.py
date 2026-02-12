@@ -240,7 +240,7 @@ def process_user(user, current_hour_str, contingency_data):
                     continue
                 
                 # Regla de seguridad: Mínimo 40 - ajuste vs SPAM
-                umbral = max(umbral, 15)
+                umbral = max(umbral, 100)
 
                 # [LOG 3] Confirmación de matemáticas
                 print(f"   🔢 [MATH] {loc_name}: Umbral Final = {umbral} (Raw: {raw_umbral})")
@@ -259,7 +259,7 @@ def process_user(user, current_hour_str, contingency_data):
                         # [LOG 5] EL MOMENTO DE LA VERDAD
                         print(f"   ⚖️ [COMPARE] {loc_name}: ¿Actual {cur_ias} > Umbral {umbral}?")
                         
-                        if cur_ias > umbral:
+                        if cur_ias >= umbral:
                             count = int(config.get('consecutive_sent', 0))
                             print(f"   🚨 [TRIGGER] CONDICIÓN CUMPLIDA. Consecutive sent: {count}")
 
