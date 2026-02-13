@@ -535,6 +535,72 @@ def send_telegram(chat_id, text, markup=None):
 
 # --- HANDLER ---
 def lambda_handler(event, context):
+    # ---------------------------------------------------------
+    # 1. MODO BROADCAST (Invocado por Scheduler)
+    # ---------------------------------------------------------
+    if event.get('action') == "BROADCAST_CONTINGENCY":
+        print("📢 Iniciando Broadcast...")
+        data = event.get('data', {})
+        phase = data.get('phase')
+        now_mx = get_mexico_time().strftime("%H:%M")
+        
+        # A. Seleccionar y Llenar Tarjeta
+        if phase == "SUSPENDIDA":
+            msg = cards.CARD_CONTINGENCY_LIFTED.format(
+                report_time=now_mx,
+                footer=cards.BOT_FOOTER
+            )
+        else:
+            # 1. Datos del Contaminante
+            val = data.get('value', {}).get('value', '')
+            unit = data.get('value', {}).get('unit', '')
+            tipo = data.get('alert_type', 'Contaminación').capitalize()
+            pollutant_str = f"{tipo} ({val} {unit})"
+            
+            # 2. Extraer Restricciones (Parsing del JSON complejo)
+            recs = data.get('recommendations', {})
+            restricciones_list = []
+            for cat in recs.get('categories', []):
+                if "VEHICULAR" in cat.get('name', '').upper():
+                    restricciones_list = cat.get('items', [])
+                    break 
+            
+            res_txt = "\n".join([f"🚫 {item}" for item in restricciones_list]) if restricciones_list else "🚫 Consulta fuentes oficiales."
+
+            # 3. Formatear
+            msg = cards.CARD_CONTINGENCY.format(
+                report_time=now_mx,
+                phase=phase.upper(),
+                pollutant_info=pollutant_str,
+                restrictions_txt=res_txt,
+                footer=cards.BOT_FOOTER
+            )
+
+        # B. Enviar a Usuarios (Scan Eficiente)
+        try:
+            scan_kwargs = {
+                'FilterExpression': "alerts.contingency = :a",
+                'ExpressionAttributeValues': {":a": True},
+                'ProjectionExpression': "user_id"
+            }
+            done = False
+            start_key = None
+            count = 0
+            
+            while not done:
+                if start_key: scan_kwargs['ExclusiveStartKey'] = start_key
+                response = table.scan(**scan_kwargs)
+                for u in response.get('Items', []):
+                    send_telegram(u['user_id'], msg) # Usa tu función existente
+                    count += 1
+                start_key = response.get('LastEvaluatedKey')
+                if not start_key: done = True
+            
+            print(f"✅ Broadcast enviado a {count} usuarios.")
+            return {'statusCode': 200, 'body': f'Sent to {count}'}
+        except Exception as e:
+            print(f"❌ Error Broadcast: {e}")
+            return {'statusCode': 500, 'body': str(e)}
     try:
         body = json.loads(event.get('body', '{}'))
         
