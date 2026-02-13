@@ -248,6 +248,16 @@ def resolve_location_key(user_id, input_name):
     return None
 
 def configure_ias_alert(user_id, nombre_ubicacion, umbral):
+    # --- 🔒 CANDADO DE CALIDAD: MÍNIMO 100 ---
+    # Validamos antes de cualquier otra cosa para educar al usuario
+    try:
+        umbral_int = int(umbral)
+        if umbral_int < 100:
+            return "⚠️ **Umbral muy bajo.**\n\nPara que la alerta sea útil (Emergencia), el mínimo es **100 puntos** (Calidad Mala).\n\nPor favor, elige un valor de 100 o más."
+    except ValueError:
+        return "⚠️ El umbral debe ser un número entero (ej. 100, 150)."
+    # -----------------------------------------
+
     user = get_user_profile(user_id)
     can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_alert')
     if not can_proceed: return msg_bloqueo
@@ -256,9 +266,14 @@ def configure_ias_alert(user_id, nombre_ubicacion, umbral):
     if not key: return f"⚠️ Primero guarda '{nombre_ubicacion}'."
     
     try:
-        print(f"💾 [ACTION] Setting IAS Alert for {user_id} in {key} > {umbral}")
-        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET alerts.threshold.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': {'umbral': int(umbral), 'active': True, 'consecutive_sent': 0}})
-        return f"✅ **Alerta Configurada:** Te avisaré si el IAS en **{key.capitalize()}** supera {umbral}."
+        print(f"💾 [ACTION] Setting IAS Alert for {user_id} in {key} > {umbral_int}")
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET alerts.threshold.#loc = :val",
+            ExpressionAttributeNames={'#loc': key},
+            ExpressionAttributeValues={':val': {'umbral': umbral_int, 'active': True, 'consecutive_sent': 0}}
+        )
+        return f"✅ **Alerta Configurada:** Te avisaré si el IAS en **{key.capitalize()}** supera {umbral_int}."
     except Exception as e:
         print(f"❌ [ALERT ERROR]: {e}")
         return "Error guardando alerta."
