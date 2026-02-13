@@ -1,4 +1,3 @@
-import json
 import os
 import requests
 import boto3
@@ -309,6 +308,24 @@ def parse_days_input(dias_str):
 
 # --- FUNCIÓN ACTUALIZADA (SOPORTA DÍAS) ---
 def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
+    # --- 🔒 VALIDACIÓN DE HORARIO (6:00 AM - 11:00 PM) ---
+    # Sincronizado con el Scheduler para no prometer reportes que no saldrán
+    try:
+        # Extraemos la hora del string "HH:MM"
+        parts = hora.split(':')
+        h_int = int(parts[0])
+        
+        # Si es antes de las 6am o después de las 11pm (23h)
+        if h_int < 6 or h_int > 23:
+            return (
+                f"⚠️ **Horario fuera de rango.**\n\n"
+                f"Los reportes de calidad del aire solo están disponibles entre las **06:00 AM** y las **11:00 PM**.\n\n"
+                "Por favor, elige una hora dentro de este horario operativo."
+            )
+    except Exception:
+        return "⚠️ Formato de hora inválido. Intenta de nuevo (ej. 07:00)."
+    # -----------------------------------------------------
+
     user = get_user_profile(user_id)
     can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_alert')
     if not can_proceed: return msg_bloqueo
@@ -316,13 +333,19 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     key = resolve_location_key(user_id, nombre_ubicacion)
     if not key: return f"⚠️ Primero guarda '{nombre_ubicacion}'."
     
+    # Reutilizamos tu helper de parseo de días
     days_list = parse_days_input(dias_str)
     
     try:
         print(f"💾 [ACTION] Schedule {user_id} in {key} at {hora} days={days_list}")
-        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET alerts.schedule.#loc = :val", ExpressionAttributeNames={'#loc': key}, ExpressionAttributeValues={':val': {'time': str(hora), 'days': days_list, 'active': True}})
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET alerts.schedule.#loc = :val",
+            ExpressionAttributeNames={'#loc': key},
+            ExpressionAttributeValues={':val': {'time': str(hora), 'days': days_list, 'active': True}}
+        )
         
-        # Formatear respuesta bonita
+        # Importamos el formateador visual
         from cards import format_days_text
         return f"✅ **Recordatorio:** {key.capitalize()} a las {hora} ({format_days_text(days_list)})."
     except Exception as e:
