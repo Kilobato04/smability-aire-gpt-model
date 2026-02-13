@@ -93,12 +93,29 @@ CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
 🕒 {report_time}
 
 ⚠️ **FASE ACTIVA:** {phase}
-☣️ **Causa:** {pollutant}
+☣️ **Detalle:** {pollutant_info}
 
-🛑 **Restricciones:** Doble Hoy No Circula activo.
-🛡️ **Acción:** Cierra ventanas y evita salir.
+🛑 **Restricciones Vehiculares:**
+{restrictions_txt}
 
-_Fuente: SIMAT /Smability_
+🛡️ **Acción:**
+• Cierra ventanas y evita salir.
+• No realices ejercicio al aire libre.
+
+_Fuente: CAMe / Smability_
+{footer}"""
+
+CARD_CONTINGENCY_LIFTED = """🟢 **CONTINGENCIA SUSPENDIDA**
+🌎 Zona Metropolitana del Valle de México
+🕒 {report_time}
+
+🎉 **¡Buenas noticias!**
+La CAMe informa que las condiciones del aire han mejorado.
+
+🚗 **Movilidad:**
+Se levantan las restricciones del Doble Hoy No Circula. Tu auto vuelve a su calendario normal.
+
+_Fuente: CAMe / Smability_
 {footer}"""
 
 CARD_HNC_RESULT = """🚗 **HOY NO CIRCULA**
