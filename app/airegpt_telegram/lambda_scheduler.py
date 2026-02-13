@@ -12,7 +12,8 @@ import re
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 DYNAMODB_TABLE = 'SmabilityUsers'
 MASTER_API_URL = "https://y4zwdmw7vf.execute-api.us-east-1.amazonaws.com/prod/api/air-quality/current?type=reference"
-
+BOT_LAMBDA_NAME = 'lambda_chatbot'
+lambda_client = boto3.client('lambda')
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
 
@@ -66,18 +67,62 @@ def format_forecast_block(timeline):
         count += 1
     return block.strip()
 
-def check_master_api_contingency():
+# --- NUEVA FUNCIÓN DE DETECCIÓN Y DISPARO ---
+def check_and_broadcast_contingency():
     try:
-        r = requests.get(MASTER_API_URL, timeout=5)
-        if r.status_code == 200:
-            d = r.json().get('contingency')
-            if d and isinstance(d, dict):
-                p = "Ozono" if 'ozone' in str(d.get('alert_type')).lower() else "Partículas"
-                try: p += f" ({int(float(d['value']['value']))} {d['value']['unit']})"
-                except: pass
-                return True, d.get('phase','Fase I'), p
-    except: pass
-    return False, "", ""
+        # 1. Consultar API Maestra
+        r = requests.get(MASTER_API_URL, timeout=15)
+        if r.status_code != 200: return
+
+        data = r.json()
+        stations = data.get('stations', [])
+        
+        # 2. Análisis: Solo miramos la peor estación (índice 0)
+        current_phase = "None"
+        contingency_data = {}
+        
+        if stations:
+            cont = stations[0].get('contingency')
+            # Validamos si existe y es Fase I o II
+            if cont and cont.get('phase') in ['Fase I', 'Fase II']:
+                current_phase = cont.get('phase')
+                contingency_data = cont
+
+        # 3. Comparar con Estado en DB (Anti-Spam)
+        db_item = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+        last_phase = db_item.get('last_contingency_phase', 'None')
+        
+        print(f"🔍 Estado Contingencia: Actual={current_phase} | Anterior={last_phase}")
+        
+        # 4. Disparar si hubo cambio
+        if current_phase != last_phase:
+            print("🚨 CAMBIO DE ESTADO. Invocando Bot...")
+            payload = {}
+            
+            # CASO A: Se activó
+            if current_phase != "None":
+                payload = {"action": "BROADCAST_CONTINGENCY", "data": contingency_data}
+            # CASO B: Se suspendió
+            elif last_phase != "None":
+                payload = {"action": "BROADCAST_CONTINGENCY", "data": {"phase": "SUSPENDIDA"}}
+            
+            if payload:
+                # Invocar al Bot (Fire & Forget)
+                lambda_client.invoke(
+                    FunctionName=BOT_LAMBDA_NAME,
+                    InvocationType='Event', 
+                    Payload=json.dumps(payload)
+                )
+            
+            # Actualizar Estado
+            table.update_item(
+                Key={'user_id': 'SYSTEM_STATE'},
+                UpdateExpression="SET last_contingency_phase = :p, updated_at = :t",
+                ExpressionAttributeValues={':p': current_phase, ':t': datetime.now().isoformat()}
+            )
+
+    except Exception as e:
+        print(f"🔥 Error Check Contingencia: {e}")
 
 def get_location_air_data(lat, lon):
     # URL de tu API Light (Function URL)
@@ -314,25 +359,30 @@ def process_user(user, current_hour_str, contingency_data):
 
 def lambda_handler(event, context):
     now = get_cdmx_time()
-    # Ventana operativa: 6 AM a 11 PM para ahorrar ejecuciones nocturnas
+    
+    # 1. Ventana Operativa
     if now.hour < 6 or now.hour > 23: 
-        print("💤 [SLEEP] Fuera de horario operativo.")
+        print("💤 [SLEEP] Fuera de horario.")
         return {'statusCode': 200, 'body': 'Sleep'}
     
-    print(f"⏰ [SCHEDULER] Iniciando ciclo: {now.strftime('%H:%M')}")
+    print(f"⏰ [SCHEDULER] Ejecutando: {now.strftime('%H:%M')}")
     
-    cont_data = check_master_api_contingency()
-    if cont_data[0]: print(f"⚠️ [CONTINGENCIA DETECTADA]: {cont_data[1]}")
+    # 2. NUEVO PROCESO DE CONTINGENCIA (Global)
+    check_and_broadcast_contingency()
 
+    # 3. PROCESO DE ALERTAS INDIVIDUALES (Usuarios)
     try:
         paginator = dynamodb.meta.client.get_paginator('scan')
         count = 0
         for page in paginator.paginate(TableName=DYNAMODB_TABLE):
             for item in page['Items']: 
-                process_user(item, now.strftime("%H:%M"), cont_data)
+                if item['user_id'] == 'SYSTEM_STATE': continue
+                
+                # Pasamos datos dummy (False, "", "") porque contingency ya se manejó arriba
+                process_user(item, now.strftime("%H:%M"), (False, "", ""))
                 count += 1
-        print(f"✅ [DONE] Usuarios procesados: {count}")
+        print(f"✅ [DONE] Usuarios escaneados: {count}")
     except Exception as e: 
-        print(f"❌ [CRITICAL ERROR]: {e}")
+        print(f"❌ Error Loop Usuarios: {e}")
         
     return {'statusCode': 200, 'body': 'OK'}
