@@ -249,6 +249,15 @@ def process_user(user, current_hour_str, contingency_data):
                             info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Regular'])
                             
                             print(f"⏰ [NOTIFY] Enviando Reporte Diario a {first_name}")
+                            
+                            # Generar Píldora HNC
+                            db_item = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                            sys_phase = db_item.get('last_contingency_phase', 'None')
+                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase)
+                            
+                            # Armar footer combinado
+                            combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
+                            
                             card = cards.CARD_REMINDER.format(
                                 user_name=first_name, location_name=loc_data.get('display_name', loc_name),
                                 maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
@@ -256,7 +265,7 @@ def process_user(user, current_hour_str, contingency_data):
                                 ias_value=qa.get('ias', 0), risk_category=cat, risk_circle=info['emoji'],
                                 natural_message=info['msg'], forecast_block=f_block,
                                 health_recommendation=cards.get_health_advice(cat, h_str),
-                                footer=cards.BOT_FOOTER
+                                footer=combined_footer
                             )
                             send_telegram_push(user_id, card)
 
@@ -333,6 +342,14 @@ def process_user(user, current_hour_str, contingency_data):
                                 
                                 print(f"   📤 [SENDING] Enviando mensaje a Telegram...")
                                 
+                                # Generar Píldora HNC
+                                db_item = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                                sys_phase = db_item.get('last_contingency_phase', 'None')
+                                hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase)
+                                
+                                # Armar footer combinado
+                                combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
+
                                 card = cards.CARD_ALERT_IAS.format(
                                     user_name=first_name, location_name=loc_data.get('display_name', loc_name),
                                     maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
@@ -340,7 +357,7 @@ def process_user(user, current_hour_str, contingency_data):
                                     risk_category=cat, risk_circle=info['emoji'], ias_value=cur_ias,
                                     forecast_msg=f_short, natural_message=info['msg'],
                                     threshold=umbral, pollutant="N/A", health_recommendation=cards.get_health_advice(cat, h_str),
-                                    footer=cards.BOT_FOOTER
+                                    footer=combined_footer
                                 )
                                 send_telegram_push(user_id, card)
                                 
