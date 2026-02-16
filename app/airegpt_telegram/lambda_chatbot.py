@@ -521,56 +521,59 @@ def get_time_greeting():
 
 def get_maps_url(lat, lon): return f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
 
-# --- REPORT CARD ---
-def generate_report_card(user_name, location_name, lat, lon):
+# --- REPORTE DIARIO CON PÍLDORA HNC Y VERIFICACIÓN INTEGRADAS ---
+def generate_report_card(user_name, location_name, lat, lon, vehicle=None, contingency_phase="None"):
     try:
         url = f"{API_LIGHT_URL}?lat={lat}&lon={lon}"
-        print(f"🔌 [API CALL] {url}") # LOG CRITICO DE RED
-        
         r = requests.get(url, timeout=10)
-        if r.status_code != 200: 
-            print(f"❌ [API FAIL] Status: {r.status_code}")
-            return f"⚠️ Error de red ({r.status_code})."
+        if r.status_code != 200: return f"⚠️ Error de red ({r.status_code})."
         
         data = r.json()
-        if data.get('status') == 'out_of_bounds': 
-            print(f"⚠️ [API BOUNDS] Coordinates out of range: {lat}, {lon}")
-            return f"📍 **Fuera de rango.** ({lat:.2f}, {lon:.2f})"
+        if data.get('status') == 'out_of_bounds': return f"📍 **Fuera de rango.** ({lat:.2f}, {lon:.2f})"
 
-        qa = data.get('aire', {})
-        meteo = data.get('meteo', {})
-        ubic = data.get('ubicacion', {})
-        
-        ias_val = qa.get('ias', 0)
+        qa, meteo, ubic = data.get('aire', {}), data.get('meteo', {}), data.get('ubicacion', {})
         calidad = qa.get('calidad', 'Regular')
-        color_emoji = cards.get_emoji_for_quality(calidad)
-        mensaje_corto = qa.get('mensaje_corto', 'Sin datos.')
-        tendencia = qa.get('tendencia', 'Estable')
-        forecast_block = format_forecast_block(data.get('pronostico_timeline', []))
-        region_str = f"{ubic.get('mun', 'ZMVM')}, {ubic.get('edo', 'CDMX')}"
-
-        return cards.CARD_REPORT.format(
-            user_name=user_name, 
-            greeting=get_time_greeting(), 
-            location_name=location_name,
-            maps_url=get_maps_url(lat, lon), 
-            region=region_str, 
-            report_time=get_official_report_time(data.get('ts')),
-            ias_value=ias_val, 
-            risk_category=calidad, 
-            risk_circle=color_emoji, 
-            natural_message=mensaje_corto,
-            forecast_block=forecast_block, 
-            trend_arrow=tendencia,
-            health_recommendation=cards.get_health_advice(calidad),
-            temp=meteo.get('tmp', 0), 
-            humidity=meteo.get('rh', 0), 
-            wind_speed=meteo.get('wsp', 0), 
+        
+        # 1. Armar tarjeta base
+        base_card = cards.CARD_REPORT.format(
+            user_name=user_name, greeting=get_time_greeting(), location_name=location_name,
+            maps_url=get_maps_url(lat, lon), region=f"{ubic.get('mun', 'ZMVM')}, {ubic.get('edo', 'CDMX')}",
+            report_time=get_official_report_time(data.get('ts')), ias_value=qa.get('ias', 0),
+            risk_category=calidad, risk_circle=cards.get_emoji_for_quality(calidad),
+            natural_message=qa.get('mensaje_corto', 'Sin datos.'), forecast_block=format_forecast_block(data.get('pronostico_timeline', [])),
+            trend_arrow=qa.get('tendencia', 'Estable'), health_recommendation=cards.get_health_advice(calidad),
+            temp=meteo.get('tmp', 0), humidity=meteo.get('rh', 0), wind_speed=meteo.get('wsp', 0),
             footer=cards.BOT_FOOTER
         )
-    except Exception as e: 
-        print(f"❌ [VISUAL ERROR]: {e}")
-        return f"⚠️ Error visual: {str(e)}"
+
+        # 2. INYECCIÓN DINÁMICA DE LA PÍLDORA HNC + VERIFICACIÓN
+        hnc_pill = ""
+        if vehicle and vehicle.get('active'):
+            plate = vehicle.get('plate_last_digit')
+            holo = vehicle.get('hologram')
+            color_auto = ENGOMADOS.get(int(plate), "Desconocido")
+            
+            # --- A) Estatus de Circulación (HNC) ---
+            can_drive, r_short, r_detail = check_driving_status(plate, holo, "hoy", contingency_phase)
+            
+            if can_drive: hnc_status = f"🟢 CIRCULA"
+            else: hnc_status = f"⛔ NO CIRCULA ({r_short})"
+            
+            hnc_pill = f"🚗 **Tu Auto Hoy:** {hnc_status} \n*(Holo {holo} | Eng. {color_auto})*"
+
+            # --- B) Estatus de Verificación ---
+            periodo_verif = get_verification_period(plate, holo)
+            meses_map = {1:"Ene", 2:"Feb", 3:"Mar", 4:"Abr", 5:"May", 6:"Jun", 7:"Jul", 8:"Ago", 9:"Sep", 10:"Oct", 11:"Nov", 12:"Dic"}
+            mes_actual_txt = meses_map[get_mexico_time().month]
+
+            if mes_actual_txt in periodo_verif and "EXENTO" not in periodo_verif.upper():
+                hnc_pill += f"\n⚠️ **RECORDATORIO:** Estás en periodo de Verificación ({periodo_verif}). ¡No lo dejes al final!"
+
+            # Pegamos la píldora justo antes del footer
+            base_card = base_card.replace(cards.BOT_FOOTER, f"{hnc_pill}\n\n{cards.BOT_FOOTER}")
+
+        return base_card
+    except Exception as e: return f"⚠️ Error visual: {str(e)}"
 
 # --- SENDING ---
 def get_inline_markup(tag):
@@ -913,9 +916,10 @@ def lambda_handler(event, context):
                     
                     # 2. DECISIÓN: ¿Tenemos datos válidos?
                     if in_lat != 0 and in_lon != 0:
-                        # ✅ ÉXITO: Generamos tarjeta, enviamos y CORTAMOS (Hard Stop)
-                        # Esto soluciona el Error 400 porque ya no llamamos a OpenAI de nuevo
-                        r = generate_report_card(first_name, in_name, in_lat, in_lon)
+                        sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                        current_phase = sys_state.get('last_contingency_phase', 'None')
+                        
+                        r = generate_report_card(first_name, in_name, in_lat, in_lon, vehicle=veh, contingency_phase=current_phase)
                         send_telegram(chat_id, r)
                         return {'statusCode': 200, 'body': 'OK'}
                     else:
