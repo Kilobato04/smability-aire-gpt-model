@@ -352,53 +352,75 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     except Exception as e:
         print(f"❌ [SCHEDULE ERROR]: {e}")
         return "Error guardando recordatorio."
-# --- MOTOR HNC Y VEHÍCULO (NUEVO) ---
-MATRIZ_SEMANAL = {5:0, 6:0, 7:1, 8:1, 3:2, 4:2, 1:3, 2:3, 9:4, 0:4} # Key:Digito -> Val:DiaSemana (0=Lun)
+# =====================================================================
+# 🚗 MOTOR HNC V2 (CEREBRO VEHICULAR)
+# =====================================================================
+MATRIZ_SEMANAL = {5:0, 6:0, 7:1, 8:1, 3:2, 4:2, 1:3, 2:3, 9:4, 0:4}
+ENGOMADOS = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
 
-def check_driving_status(plate_last_digit, hologram, date_str, contingency_phase=0):
-    """Calcula si circula o no (Motor HNC)"""
+def check_driving_status(plate_last_digit, hologram, date_str=None, contingency_phase="None"):
+    """Retorna: (Puede_Circular: Bool, Razon_Corta: Str, Detalle_Visual: Str)"""
     try:
-        # SI LA FECHA ES "HOY" O VACÍA, USAR TIEMPO MÉXICO
         if not date_str or date_str.lower() == "hoy":
             date_str = get_mexico_time().strftime("%Y-%m-%d")
             
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         day_week = dt.weekday() # 0=Lun, 6=Dom
         day_month = dt.day
-        holo = str(hologram).lower()
+        
+        holo = str(hologram).lower().replace("holograma", "").strip()
         plate = int(plate_last_digit)
+        color = ENGOMADOS.get(plate, "Desconocido")
 
-        # 1. Domingo
-        if day_week == 6: return True, "Es domingo, todos circulan."
+        # Capa 1: Domingo
+        if day_week == 6: 
+            return True, "Domingo libre", "🟢 CIRCULA (Es domingo, no hay restricciones)."
 
-        # 2. Contingencia (MVP: Asumimos Fase 0 si no hay dato, Fase 1 si phase>=1)
-        if contingency_phase >= 1:
-            if holo == '2': return False, "⛔ CONTINGENCIA: Holo 2 no circula."
-            if holo == '1': return False, "⛔ CONTINGENCIA: Holo 1 no circula."
-            if MATRIZ_SEMANAL.get(plate) == day_week: return False, "⛔ CONTINGENCIA: Tu engomado descansa hoy."
+        # Capa 2: Contingencia Ambiental
+        if contingency_phase in ['Fase I', 'Fase 1', 'Fase II', 'Fase 2']:
+            is_fase2 = 'II' in contingency_phase.upper() or '2' in contingency_phase
+            
+            if holo in ['2', 'foraneo']: 
+                return False, "Restricción Fase I/II", f"🔴 NO CIRCULA. (Restricción total por {contingency_phase} para holograma 2)."
+            
+            if holo == '1':
+                es_impar = (plate % 2 != 0)
+                if is_fase2: return False, "Fase II Activa", "🔴 NO CIRCULA. (Restricción total por Fase II para holograma 1)."
+                if MATRIZ_SEMANAL.get(plate) == day_week: return False, "Día Habitual", f"🔴 NO CIRCULA. (Te toca descanso por engomado {color})."
+                if es_impar: return False, "Fase I (Placas Impares)", "🔴 NO CIRCULA. (Restricción especial por Fase I para placas impares)."
+            
+            if holo in ['0', '00', 'exento'] and not is_fase2:
+                if MATRIZ_SEMANAL.get(plate) == day_week: return False, f"Fase I (Eng. {color})", f"🔴 NO CIRCULA. (Restricción excepcional por Fase I a engomados {color})."
+            
+            if holo in ['0', '00'] and is_fase2:
+                if MATRIZ_SEMANAL.get(plate) == day_week: return False, f"Fase II (Eng. {color})", f"🔴 NO CIRCULA. (Restricción por Fase II a engomados {color})."
 
-        # 3. Exentos
-        if holo in ['0', '00', 'exento', 'hibrido']: return True, "Holograma Exento circula diario."
+        # Capa 3: Exentos
+        if holo in ['0', '00', 'exento', 'hibrido', 'eléctrico']: 
+            return True, "Holograma Exento", "🟢 CIRCULA (Tu holograma circula todos los días)."
 
-        # 4. Sábados
+        # Capa 4: Entre Semana
+        if day_week < 5:
+            if MATRIZ_SEMANAL.get(plate) == day_week: 
+                return False, f"Día Habitual", f"🔴 NO CIRCULA (Descanso semanal por terminación {plate} - {color})."
+            return True, "Día Permitido", "🟢 CIRCULA (Hoy no te toca descanso)."
+
+        # Capa 5: Sábados
         if day_week == 5:
-            if holo == '2' or holo == 'foraneo': return False, "🚫 Holo 2 no circula en sábado."
+            if holo in ['2', 'foraneo']: 
+                return False, "Sábado Holo 2", "🔴 NO CIRCULA (Los holograma 2 nunca circulan en sábado)."
             if holo == '1':
                 sat_idx = (day_month - 1) // 7 + 1
                 is_impar = (plate % 2 != 0)
-                if is_impar and sat_idx in [1, 3]: return False, f"🚫 Holo 1 Impar descansa el {sat_idx}º sábado."
-                if not is_impar and sat_idx in [2, 4]: return False, f"🚫 Holo 1 Par descansa el {sat_idx}º sábado."
-                if sat_idx == 5: return False, "🚫 5to Sábado: Descansan todos los Holo 1."
-            return True, "✅ Tu holograma circula este sábado."
+                if sat_idx == 5: return False, "5º Sábado", "🔴 NO CIRCULA (El 5º sábado del mes descansan todos los Holo 1)."
+                if is_impar and sat_idx in [1, 3]: return False, f"{sat_idx}º Sábado (Impar)", f"🔴 NO CIRCULA (Holo 1 Impar descansa el {sat_idx}º sábado)."
+                if not is_impar and sat_idx in [2, 4]: return False, f"{sat_idx}º Sábado (Par)", f"🔴 NO CIRCULA (Holo 1 Par descansa el {sat_idx}º sábado)."
+                return True, "Sábado Permitido", "🟢 CIRCULA (Este sábado sí te toca circular)."
 
-        # 5. Entre Semana
-        dia_no_circula = MATRIZ_SEMANAL.get(plate)
-        if dia_no_circula == day_week: return False, "🚫 Hoy no circulas por terminación de placa."
-            
-        return True, "✅ Puedes circular."
+        return True, "Sin Restricción", "🟢 CIRCULA (No encontré restricción activa)."
     except Exception as e:
-        print(f"❌ Error HNC Logic: {e}")
-        return False, "Error en cálculo de fecha."
+        print(f"❌ Error en Motor HNC V2: {e}")
+        return True, "Error", "⚠️ Error al calcular estatus."
 
 # --- CONSTANTES HNC ---
 VALOR_UMA_2025 = 108.57 # Actualizar cada febrero
@@ -420,7 +442,7 @@ def get_monthly_prohibited_dates(plate, holo, year, month):
         date_str = date_obj.strftime("%Y-%m-%d")
         
         # Usamos tu motor existente check_driving_status
-        can_drive, _ = check_driving_status(plate, holo, date_str)
+        can_drive, _, _ = check_driving_status(plate, holo, date_str)
         
         if not can_drive:
             # Formato bonito: "Lun 03", "Sáb 15"
@@ -1024,10 +1046,14 @@ def lambda_handler(event, context):
                     else:
                         plate = veh.get('plate_last_digit')
                         holo = veh.get('hologram')
-                        # Default a 'hoy' si no especifica fecha, pero el prompt suele mandar fecha
                         fecha = args.get('fecha_referencia', get_mexico_time().strftime("%Y-%m-%d"))
                         
-                        can_drive, reason = check_driving_status(plate, holo, fecha)
+                        # 1. Extraer fase para contingencia
+                        sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                        current_phase = sys_state.get('last_contingency_phase', 'None')
+                        
+                        # 2. Extraer 3 valores del nuevo motor
+                        can_drive, r_short, r_detail = check_driving_status(plate, holo, fecha, current_phase)
                         
                         # Visuales
                         dt_obj = datetime.strptime(fecha, "%Y-%m-%d")
@@ -1044,11 +1070,12 @@ def lambda_handler(event, context):
                             status_emoji=status_emoji,
                             status_title=status_title,
                             status_message=status_msg,
-                            reason=reason,
+                            reason=r_detail, # <--- Usamos el Detalle Visual
                             footer=cards.BOT_FOOTER
                         )
                         send_telegram(chat_id, card)
-                        return {'statusCode': 200, 'body': 'OK'} # Hard Stop
+                        return {'statusCode': 200, 'body': 'OK'}
+                
                 # --- NUEVA TOOL: CALENDARIO MENSUAL (READ ONLY) ---
                 elif fn == "obtener_calendario_mensual":
                     user = get_user_profile(user_id)
