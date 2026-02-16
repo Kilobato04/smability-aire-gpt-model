@@ -863,13 +863,18 @@ def lambda_handler(event, context):
             elif not has_casa: system_extra = "ONBOARDING 1: Pide CASA"
             elif not has_trabajo: system_extra = "ONBOARDING 2: Pide TRABAJO"
 
-        # --- FIX: ANCLAJE DE DÍAS PARA EL LLM ---
+        # --- FIX: MINI-CALENDARIO ANTI-ALUCINACIONES ---
         now_mx = get_mexico_time()
         dias_es = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-        dia_hoy = dias_es[now_mx.weekday()]
         
-        # Le mandamos "Lunes 2026-02-16" para que no se confunda con los días
-        fecha_str = f"{dia_hoy} {now_mx.strftime('%Y-%m-%d')}" 
+        # Generamos la "hoja de respuestas" para los próximos 7 días
+        calendario = []
+        for i in range(7):
+            d = now_mx + timedelta(days=i)
+            calendario.append(f"{dias_es[d.weekday()]} {d.strftime('%Y-%m-%d')}")
+        
+        # Ejemplo: "HOY: Lunes 2026-02-16 | PRÓXIMOS: Martes 2026-02-17, Miércoles 2026-02-18..."
+        fecha_str = f"HOY: {calendario[0]} | PRÓXIMOS DÍAS: " + ", ".join(calendario[1:])
         hora_str = now_mx.strftime("%H:%M")
 
         # Llamada Actualizada al Prompt (5 argumentos)
