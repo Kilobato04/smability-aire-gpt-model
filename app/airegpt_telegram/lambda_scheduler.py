@@ -67,52 +67,67 @@ def format_forecast_block(timeline):
         count += 1
     return block.strip()
 
-# --- NUEVA FUNCIÓN DE DETECCIÓN Y DISPARO ---
+# --- NUEVA FUNCIÓN DE DETECCIÓN Y DISPARO (CON ESTACIÓN OFICIAL) ---
 def check_and_broadcast_contingency():
+    print("🕵️‍♂️ [DEBUG CONTINGENCIA] Iniciando revisión a la API Maestra...")
     try:
-        # 1. Consultar API Maestra
         r = requests.get(MASTER_API_URL, timeout=15)
-        if r.status_code != 200: return
+        if r.status_code != 200: 
+            print(f"❌ [DEBUG] Error HTTP al consultar API Maestra: {r.status_code}")
+            return
 
         data = r.json()
         stations = data.get('stations', [])
+        print(f"📊 [DEBUG] Total estaciones recibidas de la API: {len(stations)}")
         
-        # 2. Análisis: Solo miramos la peor estación (índice 0)
         current_phase = "None"
         contingency_data = {}
         
         if stations:
-            cont = stations[0].get('contingency')
-            # Validamos si existe y es Fase I o II
-            if cont and cont.get('phase') in ['Fase I', 'Fase II']:
-                current_phase = cont.get('phase')
-                contingency_data = cont
+            for i, st in enumerate(stations):
+                cont = st.get('contingency')
+                
+                if cont and isinstance(cont, dict):
+                    raw_phase = cont.get('phase', '')
+                    clean_phase = str(raw_phase).strip().upper()
+                    
+                    if clean_phase in ['FASE I', 'FASE 1', 'FASE II', 'FASE 2']:
+                        current_phase = "Fase I" if "1" in clean_phase or "I" in clean_phase else "Fase II"
+                        contingency_data = cont
+                        
+                        # Inyectamos los datos de la estación oficial al payload
+                        contingency_data['trigger_station_name'] = st.get('station_name', 'SIMAT')
+                        contingency_data['trigger_station_id'] = st.get('station_id', 'N/A')
+                        
+                        print(f"✅ [DEBUG] Contingencia extraída en índice [{i}] - Estación: {contingency_data['trigger_station_name']}")
+                        break # Encontramos la contingencia, rompemos el ciclo
+        
+        if current_phase == "None":
+            print("🍃 [DEBUG] Ninguna estación reporta contingencia en este momento.")
 
-        # 3. Comparar con Estado en DB (Anti-Spam)
+        # Comparar con Estado en DB
         db_item = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
         last_phase = db_item.get('last_contingency_phase', 'None')
         
-        print(f"🔍 Estado Contingencia: Actual={current_phase} | Anterior={last_phase}")
+        print(f"🔍 [DEBUG] DB State: Anterior='{last_phase}' | Detectada='{current_phase}'")
         
-        # 4. Disparar si hubo cambio
+        # Disparar solo si hay cambio de estado
         if current_phase != last_phase:
-            print("🚨 CAMBIO DE ESTADO. Invocando Bot...")
+            print("🚨 [DEBUG] ¡CAMBIO DE ESTADO! Preparando Broadcast...")
             payload = {}
             
-            # CASO A: Se activó
             if current_phase != "None":
                 payload = {"action": "BROADCAST_CONTINGENCY", "data": contingency_data}
-            # CASO B: Se suspendió
             elif last_phase != "None":
                 payload = {"action": "BROADCAST_CONTINGENCY", "data": {"phase": "SUSPENDIDA"}}
             
             if payload:
-                # Invocar al Bot (Fire & Forget)
-                lambda_client.invoke(
+                response = lambda_client.invoke(
                     FunctionName=BOT_LAMBDA_NAME,
                     InvocationType='Event', 
                     Payload=json.dumps(payload)
                 )
+                print(f"🚀 [DEBUG] Broadcast enviado al Bot. Status: {response.get('StatusCode')}")
             
             # Actualizar Estado
             table.update_item(
@@ -120,9 +135,11 @@ def check_and_broadcast_contingency():
                 UpdateExpression="SET last_contingency_phase = :p, updated_at = :t",
                 ExpressionAttributeValues={':p': current_phase, ':t': datetime.now().isoformat()}
             )
+        else:
+            print("💤 [DEBUG] Sin cambios de fase. No se dispara alerta.")
 
     except Exception as e:
-        print(f"🔥 Error Check Contingencia: {e}")
+        print(f"🔥 [CRITICAL DEBUG] Fallo general en check_and_broadcast_contingency: {e}")
 
 def get_location_air_data(lat, lon):
     # URL de tu API Light (Function URL)
