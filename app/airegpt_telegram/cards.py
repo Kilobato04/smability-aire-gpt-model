@@ -349,3 +349,88 @@ def get_delete_confirmation_buttons(location_key):
             {"text": "❌ Cancelar", "callback_data": "CANCEL_DELETE"}
         ]
     ]}
+
+# =====================================================================
+# 🚗 MOTOR HNC V2 Y VERIFICACIÓN (COMPARTIDO BOT Y SCHEDULER)
+# =====================================================================
+from datetime import datetime, timedelta
+
+MATRIZ_SEMANAL = {5:0, 6:0, 7:1, 8:1, 3:2, 4:2, 1:3, 2:3, 9:4, 0:4}
+ENGOMADOS = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
+
+def get_verification_period(plate_digit, hologram):
+    if str(hologram).lower() in ['00', 'exento', 'hibrido']: return "🟢 EXENTO (No verifica)"
+    try: d = int(plate_digit)
+    except: return "⚠️ Revisar Placa"
+
+    if d in [5, 6]: return "🟡 Ene-Feb / Jul-Ago"
+    if d in [7, 8]: return "🌸 Feb-Mar / Ago-Sep"
+    if d in [3, 4]: return "🔴 Mar-Abr / Sep-Oct"
+    if d in [1, 2]: return "🟢 Abr-May / Oct-Nov"
+    if d in [9, 0]: return "🔵 May-Jun / Nov-Dic"
+    return "📅 Revisar Calendario"
+
+def check_driving_status(plate_last_digit, hologram, date_str=None, contingency_phase="None"):
+    """Retorna: (Puede_Circular: Bool, Razon_Corta: Str, Detalle_Visual: Str)"""
+    try:
+        if not date_str or date_str.lower() == "hoy":
+            date_str = (datetime.utcnow() - timedelta(hours=6)).strftime("%Y-%m-%d")
+            
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        day_week, day_month = dt.weekday(), dt.day
+        
+        holo = str(hologram).lower().replace("holograma", "").strip()
+        plate = int(plate_last_digit)
+        color = ENGOMADOS.get(plate, "Desconocido")
+
+        if day_week == 6: return True, "Domingo libre", "🟢 CIRCULA (Es domingo)."
+        
+        if contingency_phase in ['Fase I', 'Fase 1', 'Fase II', 'Fase 2']:
+            is_fase2 = 'II' in contingency_phase.upper() or '2' in contingency_phase
+            if holo in ['2', 'foraneo']: return False, "Restricción Fase I/II", f"🔴 NO CIRCULA."
+            if holo == '1':
+                if is_fase2: return False, "Fase II Activa", "🔴 NO CIRCULA."
+                if MATRIZ_SEMANAL.get(plate) == day_week: return False, "Día Habitual", f"🔴 NO CIRCULA."
+                if (plate % 2 != 0): return False, "Fase I (Placas Impares)", "🔴 NO CIRCULA."
+            if holo in ['0', '00', 'exento'] and not is_fase2:
+                if MATRIZ_SEMANAL.get(plate) == day_week: return False, f"Fase I (Eng. {color})", f"🔴 NO CIRCULA."
+            if holo in ['0', '00'] and is_fase2:
+                if MATRIZ_SEMANAL.get(plate) == day_week: return False, f"Fase II (Eng. {color})", f"🔴 NO CIRCULA."
+
+        if holo in ['0', '00', 'exento', 'hibrido', 'eléctrico']: return True, "Holograma Exento", "🟢 CIRCULA."
+        
+        if day_week < 5:
+            if MATRIZ_SEMANAL.get(plate) == day_week: return False, f"Día Habitual", f"🔴 NO CIRCULA."
+            return True, "Día Permitido", "🟢 CIRCULA."
+
+        if day_week == 5:
+            if holo in ['2', 'foraneo']: return False, "Sábado Holo 2", "🔴 NO CIRCULA."
+            if holo == '1':
+                sat_idx, is_impar = (day_month - 1) // 7 + 1, (plate % 2 != 0)
+                if sat_idx == 5: return False, "5º Sábado", "🔴 NO CIRCULA."
+                if is_impar and sat_idx in [1, 3]: return False, f"{sat_idx}º Sábado (Impar)", f"🔴 NO CIRCULA."
+                if not is_impar and sat_idx in [2, 4]: return False, f"{sat_idx}º Sábado (Par)", f"🔴 NO CIRCULA."
+                return True, "Sábado Permitido", "🟢 CIRCULA."
+        return True, "Sin Restricción", "🟢 CIRCULA."
+    except Exception: return True, "Error", "⚠️ Error al calcular."
+
+def build_hnc_pill(vehicle, contingency_phase="None"):
+    """Construye el texto a inyectar en las tarjetas automáticas."""
+    if not vehicle or not vehicle.get('active'): return ""
+    
+    plate = vehicle.get('plate_last_digit')
+    holo = vehicle.get('hologram')
+    color_auto = ENGOMADOS.get(int(plate), "Desconocido")
+    
+    # 1. Estatus HNC
+    can_drive, r_short, _ = check_driving_status(plate, holo, "hoy", contingency_phase)
+    hnc_status = "🟢 CIRCULA" if can_drive else f"⛔ NO CIRCULA ({r_short})"
+    pill = f"\n🚗 **Tu Auto Hoy:** {hnc_status} \n*(Holo {holo} | Eng. {color_auto})*"
+
+    # 2. Verificación
+    periodo_verif = get_verification_period(plate, holo)
+    mes_actual_txt = {1:"Ene", 2:"Feb", 3:"Mar", 4:"Abr", 5:"May", 6:"Jun", 7:"Jul", 8:"Ago", 9:"Sep", 10:"Oct", 11:"Nov", 12:"Dic"}[(datetime.utcnow() - timedelta(hours=6)).month]
+    if mes_actual_txt in periodo_verif and "EXENTO" not in periodo_verif.upper():
+        pill += f"\n⚠️ **RECORDATORIO:** Estás en periodo de Verificación ({periodo_verif})."
+        
+    return pill
