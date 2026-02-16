@@ -579,50 +579,51 @@ def lambda_handler(event, context):
     # ---------------------------------------------------------
     if event.get('action') == "BROADCAST_CONTINGENCY":
         print("📢 Iniciando Broadcast...")
-        try:
-            data = event.get('data', {})
-            phase = data.get('phase')
-            now_mx = get_mexico_time().strftime("%H:%M")
-            msg = ""
+        
+        # 👇 NOTA: Ya quitamos el 'try:' problemático de aquí.
+        data = event.get('data', {})
+        phase = data.get('phase')
+        now_mx = get_mexico_time().strftime("%H:%M")
+        msg = ""
 
-            if phase == "SUSPENDIDA":
-                msg = cards.CARD_CONTINGENCY_LIFTED.format(
-                    report_time=now_mx,
-                    footer=cards.BOT_FOOTER
-                )
-            else:
-                # 1. Datos del Contaminante
-                val = data.get('value', {}).get('value', '')
-                unit = data.get('value', {}).get('unit', '')
-                tipo = data.get('alert_type', 'Contaminación').capitalize()
-                pollutant_str = f"{tipo} ({val} {unit})"
-                
-                # --- NUEVO: Extraer nombre de la estación ---
-                station_name = data.get('trigger_station_name', 'Red Oficial SIMAT')
-                station_id = data.get('trigger_station_id', '')
-                station_display = f"{station_name} ({station_id})" if station_id else station_name
-                
-                # 2. Extraer Restricciones 
-                recs = data.get('recommendations', {})
-                categories = recs.get('categories', [])
-                restricciones_list = []
-                
-                for cat in categories:
-                    if "VEHICULAR" in cat.get('name', '').upper():
-                        restricciones_list = cat.get('items', [])
-                        break 
-                
-                res_txt = "\n".join([f"🚫 {item}" for item in restricciones_list]) if restricciones_list else "🚫 Consulta fuentes oficiales."
+        if phase == "SUSPENDIDA":
+            msg = cards.CARD_CONTINGENCY_LIFTED.format(
+                report_time=now_mx,
+                footer=cards.BOT_FOOTER
+            )
+        else:
+            # 1. Datos del Contaminante
+            val = data.get('value', {}).get('value', '')
+            unit = data.get('value', {}).get('unit', '')
+            tipo = data.get('alert_type', 'Contaminación').capitalize()
+            pollutant_str = f"{tipo} ({val} {unit})"
+            
+            # --- NUEVO: Extraer nombre de la estación ---
+            station_name = data.get('trigger_station_name', 'Red Oficial SIMAT')
+            station_id = data.get('trigger_station_id', '')
+            station_display = f"{station_name} ({station_id})" if station_id else station_name
+            
+            # 2. Extraer Restricciones 
+            recs = data.get('recommendations', {})
+            categories = recs.get('categories', [])
+            restricciones_list = []
+            
+            for cat in categories:
+                if "VEHICULAR" in cat.get('name', '').upper():
+                    restricciones_list = cat.get('items', [])
+                    break 
+            
+            res_txt = "\n".join([f"🚫 {item}" for item in restricciones_list]) if restricciones_list else "🚫 Consulta fuentes oficiales."
 
-                # 3. Formatear Tarjeta (Pasando el nuevo parámetro)
-                msg = cards.CARD_CONTINGENCY.format(
-                    report_time=now_mx,
-                    phase=phase.upper(),
-                    pollutant_info=pollutant_str,
-                    station_info=station_display, # <--- NUEVO CAMPO
-                    restrictions_txt=res_txt,
-                    footer=cards.BOT_FOOTER
-                )
+            # 3. Formatear Tarjeta (Pasando el nuevo parámetro)
+            msg = cards.CARD_CONTINGENCY.format(
+                report_time=now_mx,
+                phase=phase.upper(),
+                pollutant_info=pollutant_str,
+                station_info=station_display,
+                restrictions_txt=res_txt,
+                footer=cards.BOT_FOOTER
+            )
 
         # B. Enviar a Usuarios (Scan Eficiente)
         try:
@@ -639,7 +640,7 @@ def lambda_handler(event, context):
                 if start_key: scan_kwargs['ExclusiveStartKey'] = start_key
                 response = table.scan(**scan_kwargs)
                 for u in response.get('Items', []):
-                    send_telegram(u['user_id'], msg) # Usa tu función existente
+                    send_telegram(u['user_id'], msg)
                     count += 1
                 start_key = response.get('LastEvaluatedKey')
                 if not start_key: done = True
@@ -649,6 +650,10 @@ def lambda_handler(event, context):
         except Exception as e:
             print(f"❌ Error Broadcast: {e}")
             return {'statusCode': 500, 'body': str(e)}
+
+    # ---------------------------------------------------------
+    # 2. MESSAGES (Manejo de Telegram)
+    # ---------------------------------------------------------
     try:
         body = json.loads(event.get('body', '{}'))
         
