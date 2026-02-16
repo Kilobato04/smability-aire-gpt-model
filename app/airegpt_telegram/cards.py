@@ -94,6 +94,7 @@ CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
 
 ⚠️ **FASE ACTIVA:** {phase}
 ☣️ **Detalle:** {pollutant_info}
+📍 **Estación Crítica:** {station_info}
 
 🛑 **Restricciones Vehiculares:**
 {restrictions_txt}
@@ -101,8 +102,8 @@ CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
 🛡️ **Acción:**
 • Cierra ventanas y evita salir.
 • No realices ejercicio al aire libre.
+📌 *La contingencia se mantiene vigente hasta que la CAMe emita el comunicado oficial de suspensión. No saques tu auto hasta confirmarlo.*
 
-_Fuente: CAMe / Smability_
 {footer}"""
 
 CARD_CONTINGENCY_LIFTED = """🟢 **CONTINGENCIA SUSPENDIDA**
