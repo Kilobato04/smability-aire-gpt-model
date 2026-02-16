@@ -722,10 +722,14 @@ def lambda_handler(event, context):
                 
                 if found_key:
                     lat, lon = float(locs[found_key]['lat']), float(locs[found_key]['lon'])
-                    # Usamos el display_name guardado o capitalizamos la llave
                     disp_name = locs[found_key].get('display_name', found_key.capitalize())
                     
-                    report = generate_report_card(first_name, disp_name, lat, lon)
+                    # --- FIX: Inyectar datos para la Píldora HNC desde el botón ---
+                    veh = user.get('vehicle')
+                    sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                    current_phase = sys_state.get('last_contingency_phase', 'None')
+                    
+                    report = generate_report_card(first_name, disp_name, lat, lon, vehicle=veh, contingency_phase=current_phase)
                     send_telegram(chat_id, report)
                     return {'statusCode': 200, 'body': 'OK'}
                 else:
@@ -910,9 +914,16 @@ def lambda_handler(event, context):
                     # 1. Intentar resolver coordenadas si vienen vacías
                     if in_lat == 0 or in_lon == 0:
                         key = resolve_location_key(user_id, in_name)
+                        
+                        # --- FIX: ESCUDO ANTI-ALUCINACIÓN ---
+                        # Si el LLM olvidó pasar el nombre, lo buscamos en el texto original del usuario
+                        if not key:
+                            key = resolve_location_key(user_id, user_content)
+                            
                         if key and key in locs:
                             in_lat = float(locs[key]['lat'])
                             in_lon = float(locs[key]['lon'])
+                            in_name = locs[key].get('display_name', key.capitalize()) # Usa el nombre bonito real
                     
                     # 2. DECISIÓN: ¿Tenemos datos válidos?
                     if in_lat != 0 and in_lon != 0:
