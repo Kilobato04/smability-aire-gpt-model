@@ -5,6 +5,7 @@ env:
     ECR_REPO_NAME: "smability-telegram-core"
     LAMBDA_BOT_NAME: "Smability-Chatbot"
     LAMBDA_SCHEDULER_NAME: "Smability-Scheduler"
+    LAMBDA_SCRAPER_NAME: "Smability-CAMe-Scraper" # <--- NUEVA LAMBDA
     AWS_REGION: "us-east-1"
 
 phases:
@@ -50,5 +51,6 @@ phases:
       echo "🔄 Actualizando Lambdas..."
       aws lambda update-function-code --function-name $LAMBDA_BOT_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG
       aws lambda update-function-code --function-name $LAMBDA_SCHEDULER_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG
+      aws lambda update-function-code --function-name $LAMBDA_SCRAPER_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG # <--- NUEVA ACTUALIZACIÓN
       
       echo "✅ Despliegue completado."
