@@ -15,15 +15,28 @@ def get_emoji_for_quality(calidad):
     """Extrae el emoji de forma segura para el chatbot"""
     return IAS_INFO.get(calidad, {}).get("emoji", "⚪")
 
-def get_health_advice(category, user_condition=None):
-    base_rec = IAS_INFO.get(category, IAS_INFO["Regular"])["rec"]
-    if not user_condition or user_condition.lower() == "ninguno": return base_rec
-    if category in ["Mala", "Muy Mala", "Extremadamente Mala"]:
-        return f"⚠️ **Atención por tu {user_condition}:** {base_rec} El aire actual puede agravar tus síntomas."
-    elif category == "Regular":
+def get_health_advice(calidad, user_condition=None):
+    advice = {
+        "Buena": "Disfruta tus actividades al aire libre sin restricciones.",
+        "Regular": "Reduce actividades intensas si eres muy sensible a la contaminación.",
+        "Mala": "Evita el ejercicio vigoroso al aire libre. Grupos sensibles deben quedarse en interiores.",
+        "Muy Mala": "Permanece en interiores con ventanas cerradas. No realices esfuerzo físico afuera.",
+        "Extremadamente Mala": "¡Emergencia! Quédate en casa. Usa mascarilla N95/KN95 si necesitas salir."
+    }
+    cat = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
+    base_rec = advice.get(cat, "Toma precauciones al aire libre.")
+    
+    # Si el usuario no tiene perfil de salud, mandamos el texto limpio
+    if not user_condition or user_condition.lower() == "ninguno": 
+        return base_rec
+        
+    # Si el usuario TIENE perfil de salud (ej. Asma), personalizamos:
+    if cat in ["Mala", "Muy Mala", "Extremadamente Mala"]:
+        return f"⚠️ **Por tu {user_condition}:** {base_rec}"
+    elif cat == "Regular":
         return f"ℹ️ **Por tu {user_condition}:** Considera reducir el esfuerzo físico."
     else:
-        return f"✅ **Buena noticia:** El aire es seguro para tu **{user_condition}**."
+        return f"✅ **Buena noticia:** El aire es seguro para tu {user_condition}."
 
 # --- PLANTILLAS DE TARJETAS ---
 
@@ -359,16 +372,6 @@ from datetime import datetime, timedelta
 MATRIZ_SEMANAL = {5:0, 6:0, 7:1, 8:1, 3:2, 4:2, 1:3, 2:3, 9:4, 0:4}
 ENGOMADOS = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
 
-def get_health_advice(calidad, h_str=None):
-    advice = {
-        "Buena": "Disfruta tus actividades al aire libre sin restricciones.",
-        "Regular": "Reduce actividades intensas si eres muy sensible a la contaminación.",
-        "Mala": "Evita el ejercicio vigoroso al aire libre. Grupos sensibles deben quedarse en interiores.",
-        "Muy Mala": "Permanece en interiores con ventanas cerradas. No realices esfuerzo físico afuera.",
-        "Extremadamente Mala": "¡Emergencia! Quédate en casa. Usa mascarilla N95/KN95 si necesitas salir."
-    }
-    cat = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
-    return advice.get(cat, "Toma precauciones al aire libre.")
 
 def format_forecast_block(timeline):
     if not timeline or not isinstance(timeline, list): return "➡️ Estable"
