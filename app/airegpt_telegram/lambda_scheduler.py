@@ -12,7 +12,7 @@ import re
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 DYNAMODB_TABLE = 'SmabilityUsers'
 MASTER_API_URL = "https://y4zwdmw7vf.execute-api.us-east-1.amazonaws.com/prod/api/air-quality/current?type=reference"
-BOT_LAMBDA_NAME = 'lambda_chatbot'
+BOT_LAMBDA_NAME = 'Smability-Chatbot'
 lambda_client = boto3.client('lambda')
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
