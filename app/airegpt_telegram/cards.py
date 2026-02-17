@@ -45,47 +45,48 @@ Ahora, envíame la ubicación de tu **TRABAJO** (o escuela) para activar las ale
 {footer}"""
 
 # ACTUALIZADA: Se agregó {trend_arrow} para aprovechar el dato de la nueva API
-CARD_REPORT = """👋 **{greeting} {user_name}**
-📍 **[{location_name}]({maps_url})** | {region}
-🕒 {report_time}
+CARD_REPORT = """🌤️ **{greeting}, {user_name}!**
+Aquí tienes el reporte para **{location_name}**:
+[🔗 Abrir en Google Maps]({maps_url})
+📍 {region} • 🕒 {report_time}
 
-{risk_circle} **{ias_value} puntos IAS** ({risk_category})
-📈 Tendencia: {trend_arrow}
+{risk_circle} **Calidad {risk_category} ({ias_value} pts)**
+☣️ **Contaminante dominante:** {pollutant}
 
-🔮 **Pronóstico Próximas 4h:**
+🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
+
+📈 **Pronóstico (Próximas hrs):**
 {forecast_block}
 
-📝 {natural_message}
-🩺 **Recomendación:** {health_recommendation}
-
-📊 **Clima:** 🌡️ {temp}°C | 💧 {humidity}% | 💨 {wind_speed} m/s
+🛡️ **Salud:** {health_recommendation}
 {footer}"""
 
-CARD_ALERT_IAS = """🔔 **ALERTA: Límite Superado**
-📍 **[{location_name}]({maps_url})**
-🕒 {report_time} | {region}
+CARD_ALERT_IAS = """🚨 **¡ALERTA DE CALIDAD DEL AIRE!** 🚨
+Hola {user_name}, la contaminación en **{location_name}** ha superado tu límite de seguridad.
 
-🛑 **Nivel {risk_category} detectado**
-{risk_circle} **{ias_value} puntos IAS** (Tu límite: {threshold})
+{risk_circle} **Calidad {risk_category} ({ias_value} pts)**
+☣️ **Contaminante principal:** {pollutant}
+*(Tu umbral configurado es: {threshold} pts)*
 
-🔮 **Tendencia:** {forecast_msg}
-🩺 **Consejo:** {health_recommendation}
+📈 **Tendencia:** {forecast_msg}
 
-_Para silenciar: "Borrar alerta de {location_name}"_
+🛡️ **Acción inmediata:** {health_recommendation}
 {footer}"""
 
-CARD_REMINDER = """⏰ **Tu Reporte Diario**
-📍 **[{location_name}]({maps_url})**
-🕒 {report_time} | {region}
+CARD_REMINDER = """⏰ **{greeting}, {user_name}!**
+Aquí tienes el reporte para **{location_name}**:
+[🔗 Abrir en Google Maps]({maps_url})
+📍 {region} • 🕒 {report_time}
 
-{risk_circle} **{ias_value} puntos IAS** ({risk_category})
+{risk_circle} **Calidad {risk_category} ({ias_value} pts)**
+☣️ **Contaminante dominante:** {pollutant}
 
-🔮 **Pronóstico:**
+🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
+
+📈 **Pronóstico (Próximas hrs):**
 {forecast_block}
 
-📝 {natural_message}
-🩺 **Salud:** {health_recommendation}
-_Para cancelar: "Borrar recordatorio de {location_name}"_
+🛡️ **Salud:** {health_recommendation}
 {footer}"""
 
 CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
@@ -351,12 +352,39 @@ def get_delete_confirmation_buttons(location_key):
     ]}
 
 # =====================================================================
-# 🚗 MOTOR HNC V2 Y VERIFICACIÓN (COMPARTIDO BOT Y SCHEDULER)
+# 🚗 MOTOR HNC V2, SALUD Y PRONÓSTICO (COMPARTIDO BOT Y SCHEDULER)
 # =====================================================================
 from datetime import datetime, timedelta
 
 MATRIZ_SEMANAL = {5:0, 6:0, 7:1, 8:1, 3:2, 4:2, 1:3, 2:3, 9:4, 0:4}
 ENGOMADOS = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
+
+def get_health_advice(calidad, h_str=None):
+    advice = {
+        "Buena": "Disfruta tus actividades al aire libre sin restricciones.",
+        "Regular": "Reduce actividades intensas si eres muy sensible a la contaminación.",
+        "Mala": "Evita el ejercicio vigoroso al aire libre. Grupos sensibles deben quedarse en interiores.",
+        "Muy Mala": "Permanece en interiores con ventanas cerradas. No realices esfuerzo físico afuera.",
+        "Extremadamente Mala": "¡Emergencia! Quédate en casa. Usa mascarilla N95/KN95 si necesitas salir."
+    }
+    cat = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
+    return advice.get(cat, "Toma precauciones al aire libre.")
+
+def format_forecast_block(timeline):
+    if not timeline or not isinstance(timeline, list): return "➡️ Estable"
+    block = ""
+    cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extrema"}
+    emoji_map = {"Bajo": "🟢", "Moderado": "🟡", "Alto": "🟠", "Muy Alto": "🔴", "Extremadamente Alto": "🟣"}
+    count = 0
+    for t in timeline:
+        if count >= 4: break
+        riesgo = t.get('riesgo', 'Bajo')
+        cat = cat_map.get(riesgo, "Regular")
+        pol = t.get('dominante', '') # MATCH EXACTO CON TU JSON
+        pol_str = f" • {pol}" if pol else ""
+        block += f"`{t.get('hora')}` | {emoji_map.get(riesgo, '⚪')} {cat} ({t.get('ias')} pts){pol_str}\n"
+        count += 1
+    return block.strip()
 
 def get_verification_period(plate_digit, hologram):
     if str(hologram).lower() in ['00', 'exento', 'hibrido']: return "🟢 EXENTO (No verifica)"
@@ -415,19 +443,17 @@ def check_driving_status(plate_last_digit, hologram, date_str=None, contingency_
     except Exception: return True, "Error", "⚠️ Error al calcular."
 
 def build_hnc_pill(vehicle, contingency_phase="None"):
-    """Construye el texto a inyectar en las tarjetas automáticas."""
     if not vehicle or not vehicle.get('active'): return ""
     
     plate = vehicle.get('plate_last_digit')
     holo = vehicle.get('hologram')
     color_auto = ENGOMADOS.get(int(plate), "Desconocido")
     
-    # 1. Estatus HNC
     can_drive, r_short, _ = check_driving_status(plate, holo, "hoy", contingency_phase)
     hnc_status = "🟢 CIRCULA" if can_drive else f"⛔ NO CIRCULA ({r_short})"
-    pill = f"\n🚗 **Tu Auto Hoy:** {hnc_status} \n*(Holo {holo} | Eng. {color_auto})*"
+    
+    pill = f"\n🚗 **Tu Auto Hoy:** {hnc_status} \n*(Placa term. {plate} | Holo {holo} | Eng. {color_auto})*"
 
-    # 2. Verificación
     periodo_verif = get_verification_period(plate, holo)
     mes_actual_txt = {1:"Ene", 2:"Feb", 3:"Mar", 4:"Abr", 5:"May", 6:"Jun", 7:"Jul", 8:"Ago", 9:"Sep", 10:"Oct", 11:"Nov", 12:"Dic"}[(datetime.utcnow() - timedelta(hours=6)).month]
     if mes_actual_txt in periodo_verif and "EXENTO" not in periodo_verif.upper():
