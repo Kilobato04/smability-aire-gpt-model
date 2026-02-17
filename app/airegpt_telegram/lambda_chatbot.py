@@ -29,27 +29,6 @@ def normalize_key(text):
         text = text.replace(a, b)
     return text
 
-# --- HELPER VERIFICACIÓN (AHORA SÍ, LIMPIO) ---
-def get_verification_period(plate_digit, hologram):
-    """Calcula el periodo de verificación bimestral"""
-    # 1. Caso Exentos
-    if str(hologram).lower() in ['00', 'exento', 'hibrido']:
-        return "🟢 **EXENTO** (No verifica)"
-    
-    # 2. Validación de Placa
-    try:
-        d = int(plate_digit)
-    except:
-        return "⚠️ Revisar Placa"
-
-    # 3. Lógica Bimestral (CDMX/Edomex)
-    if d in [5, 6]: return "🟡 Ene-Feb / Jul-Ago"
-    if d in [7, 8]: return "🌸 Feb-Mar / Ago-Sep"
-    if d in [3, 4]: return "🔴 Mar-Abr / Sep-Oct"
-    if d in [1, 2]: return "🟢 Abr-May / Oct-Nov"
-    if d in [9, 0]: return "🔵 May-Jun / Nov-Dic"
-    
-    return "📅 Revisar Calendario"
 
 def get_verification_deadline(period_txt):
     """Extrae el mes límite del texto del periodo de forma segura"""
@@ -352,75 +331,6 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     except Exception as e:
         print(f"❌ [SCHEDULE ERROR]: {e}")
         return "Error guardando recordatorio."
-# =====================================================================
-# 🚗 MOTOR HNC V2 (CEREBRO VEHICULAR)
-# =====================================================================
-MATRIZ_SEMANAL = {5:0, 6:0, 7:1, 8:1, 3:2, 4:2, 1:3, 2:3, 9:4, 0:4}
-ENGOMADOS = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
-
-def check_driving_status(plate_last_digit, hologram, date_str=None, contingency_phase="None"):
-    """Retorna: (Puede_Circular: Bool, Razon_Corta: Str, Detalle_Visual: Str)"""
-    try:
-        if not date_str or date_str.lower() == "hoy":
-            date_str = get_mexico_time().strftime("%Y-%m-%d")
-            
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
-        day_week = dt.weekday() # 0=Lun, 6=Dom
-        day_month = dt.day
-        
-        holo = str(hologram).lower().replace("holograma", "").strip()
-        plate = int(plate_last_digit)
-        color = ENGOMADOS.get(plate, "Desconocido")
-
-        # Capa 1: Domingo
-        if day_week == 6: 
-            return True, "Domingo libre", "🟢 CIRCULA (Es domingo, no hay restricciones)."
-
-        # Capa 2: Contingencia Ambiental
-        if contingency_phase in ['Fase I', 'Fase 1', 'Fase II', 'Fase 2']:
-            is_fase2 = 'II' in contingency_phase.upper() or '2' in contingency_phase
-            
-            if holo in ['2', 'foraneo']: 
-                return False, "Restricción Fase I/II", f"🔴 NO CIRCULA. (Restricción total por {contingency_phase} para holograma 2)."
-            
-            if holo == '1':
-                es_impar = (plate % 2 != 0)
-                if is_fase2: return False, "Fase II Activa", "🔴 NO CIRCULA. (Restricción total por Fase II para holograma 1)."
-                if MATRIZ_SEMANAL.get(plate) == day_week: return False, "Día Habitual", f"🔴 NO CIRCULA. (Te toca descanso por engomado {color})."
-                if es_impar: return False, "Fase I (Placas Impares)", "🔴 NO CIRCULA. (Restricción especial por Fase I para placas impares)."
-            
-            if holo in ['0', '00', 'exento'] and not is_fase2:
-                if MATRIZ_SEMANAL.get(plate) == day_week: return False, f"Fase I (Eng. {color})", f"🔴 NO CIRCULA. (Restricción excepcional por Fase I a engomados {color})."
-            
-            if holo in ['0', '00'] and is_fase2:
-                if MATRIZ_SEMANAL.get(plate) == day_week: return False, f"Fase II (Eng. {color})", f"🔴 NO CIRCULA. (Restricción por Fase II a engomados {color})."
-
-        # Capa 3: Exentos
-        if holo in ['0', '00', 'exento', 'hibrido', 'eléctrico']: 
-            return True, "Holograma Exento", "🟢 CIRCULA (Tu holograma circula todos los días)."
-
-        # Capa 4: Entre Semana
-        if day_week < 5:
-            if MATRIZ_SEMANAL.get(plate) == day_week: 
-                return False, f"Día Habitual", f"🔴 NO CIRCULA (Descanso semanal por terminación {plate} - {color})."
-            return True, "Día Permitido", "🟢 CIRCULA (Hoy no te toca descanso)."
-
-        # Capa 5: Sábados
-        if day_week == 5:
-            if holo in ['2', 'foraneo']: 
-                return False, "Sábado Holo 2", "🔴 NO CIRCULA (Los holograma 2 nunca circulan en sábado)."
-            if holo == '1':
-                sat_idx = (day_month - 1) // 7 + 1
-                is_impar = (plate % 2 != 0)
-                if sat_idx == 5: return False, "5º Sábado", "🔴 NO CIRCULA (El 5º sábado del mes descansan todos los Holo 1)."
-                if is_impar and sat_idx in [1, 3]: return False, f"{sat_idx}º Sábado (Impar)", f"🔴 NO CIRCULA (Holo 1 Impar descansa el {sat_idx}º sábado)."
-                if not is_impar and sat_idx in [2, 4]: return False, f"{sat_idx}º Sábado (Par)", f"🔴 NO CIRCULA (Holo 1 Par descansa el {sat_idx}º sábado)."
-                return True, "Sábado Permitido", "🟢 CIRCULA (Este sábado sí te toca circular)."
-
-        return True, "Sin Restricción", "🟢 CIRCULA (No encontré restricción activa)."
-    except Exception as e:
-        print(f"❌ Error en Motor HNC V2: {e}")
-        return True, "Error", "⚠️ Error al calcular estatus."
 
 # --- CONSTANTES HNC ---
 VALOR_UMA_2025 = 108.57 # Actualizar cada febrero
@@ -442,7 +352,7 @@ def get_monthly_prohibited_dates(plate, holo, year, month):
         date_str = date_obj.strftime("%Y-%m-%d")
         
         # Usamos tu motor existente check_driving_status
-        can_drive, _, _ = check_driving_status(plate, holo, date_str)
+        can_drive, _, _ = cards.check_driving_status(plate, holo, date_str)
         
         if not can_drive:
             # Formato bonito: "Lun 03", "Sáb 15"
@@ -494,22 +404,6 @@ def save_vehicle_profile(user_id, digit, hologram):
         print(f"❌ Error Saving Vehicle: {e}")
         return "Error al guardar el vehículo."
 
-# --- VISUALES ---
-def format_forecast_block(timeline):
-    if not timeline or not isinstance(timeline, list): return "➡️ Estable"
-    block = ""
-    emoji_map = {"Bajo": "🟢", "Moderado": "🟡", "Alto": "🟠", "Muy Alto": "🔴", "Extremadamente Alto": "🟣"}
-    count = 0
-    for t in timeline:
-        if count >= 4: break 
-        hora = t.get('hora', '--:--')
-        riesgo = t.get('riesgo', 'Bajo')
-        ias = t.get('ias', 0)
-        emoji = emoji_map.get(riesgo, "⚪")
-        block += f"`{hora}` | {emoji} {ias} pts\n"
-        count += 1
-    return block.strip()
-
 def get_official_report_time(ts_str):
     if ts_str: return ts_str[11:16]
     now = datetime.utcnow() - timedelta(hours=6)
@@ -534,45 +428,21 @@ def generate_report_card(user_name, location_name, lat, lon, vehicle=None, conti
         qa, meteo, ubic = data.get('aire', {}), data.get('meteo', {}), data.get('ubicacion', {})
         calidad = qa.get('calidad', 'Regular')
         
-        # 1. Armar tarjeta base
-        base_card = cards.CARD_REPORT.format(
+        # Inyección HNC centralizada desde cards.py
+        hnc_pill = cards.build_hnc_pill(vehicle, contingency_phase)
+        combined_footer = f"{hnc_pill}\n\n{cards.BOT_FOOTER}" if hnc_pill else cards.BOT_FOOTER
+
+        return cards.CARD_REPORT.format(
             user_name=user_name, greeting=get_time_greeting(), location_name=location_name,
             maps_url=get_maps_url(lat, lon), region=f"{ubic.get('mun', 'ZMVM')}, {ubic.get('edo', 'CDMX')}",
             report_time=get_official_report_time(data.get('ts')), ias_value=qa.get('ias', 0),
             risk_category=calidad, risk_circle=cards.get_emoji_for_quality(calidad),
-            natural_message=qa.get('mensaje_corto', 'Sin datos.'), forecast_block=format_forecast_block(data.get('pronostico_timeline', [])),
-            trend_arrow=qa.get('tendencia', 'Estable'), health_recommendation=cards.get_health_advice(calidad),
+            pollutant=qa.get('dominante', 'N/A'),
+            forecast_block=cards.format_forecast_block(data.get('pronostico_timeline', [])),
+            health_recommendation=cards.get_health_advice(calidad), # Ya no requiere el perfil de salud aquí si no lo pasas, o puedes pasarle 'Ninguno'
             temp=meteo.get('tmp', 0), humidity=meteo.get('rh', 0), wind_speed=meteo.get('wsp', 0),
-            footer=cards.BOT_FOOTER
+            footer=combined_footer
         )
-
-        # 2. INYECCIÓN DINÁMICA DE LA PÍLDORA HNC + VERIFICACIÓN
-        hnc_pill = ""
-        if vehicle and vehicle.get('active'):
-            plate = vehicle.get('plate_last_digit')
-            holo = vehicle.get('hologram')
-            color_auto = ENGOMADOS.get(int(plate), "Desconocido")
-            
-            # --- A) Estatus de Circulación (HNC) ---
-            can_drive, r_short, r_detail = check_driving_status(plate, holo, "hoy", contingency_phase)
-            
-            if can_drive: hnc_status = f"🟢 CIRCULA"
-            else: hnc_status = f"⛔ NO CIRCULA ({r_short})"
-            
-            hnc_pill = f"🚗 **Tu Auto Hoy:** {hnc_status} \n*(Holo {holo} | Eng. {color_auto})*"
-
-            # --- B) Estatus de Verificación ---
-            periodo_verif = get_verification_period(plate, holo)
-            meses_map = {1:"Ene", 2:"Feb", 3:"Mar", 4:"Abr", 5:"May", 6:"Jun", 7:"Jul", 8:"Ago", 9:"Sep", 10:"Oct", 11:"Nov", 12:"Dic"}
-            mes_actual_txt = meses_map[get_mexico_time().month]
-
-            if mes_actual_txt in periodo_verif and "EXENTO" not in periodo_verif.upper():
-                hnc_pill += f"\n⚠️ **RECORDATORIO:** Estás en periodo de Verificación ({periodo_verif}). ¡No lo dejes al final!"
-
-            # Pegamos la píldora justo antes del footer
-            base_card = base_card.replace(cards.BOT_FOOTER, f"{hnc_pill}\n\n{cards.BOT_FOOTER}")
-
-        return base_card
     except Exception as e: return f"⚠️ Error visual: {str(e)}"
 
 # --- SENDING ---
@@ -1078,7 +948,7 @@ def lambda_handler(event, context):
                         current_phase = sys_state.get('last_contingency_phase', 'None')
                         
                         # 2. Extraer 3 valores del nuevo motor
-                        can_drive, r_short, r_detail = check_driving_status(plate, holo, fecha, current_phase)
+                        can_drive, r_short, r_detail = cards.check_driving_status(plate, holo, fecha, current_phase)
                         
                         # Visuales
                         dt_obj = datetime.strptime(fecha, "%Y-%m-%d")
@@ -1123,7 +993,7 @@ def lambda_handler(event, context):
                         # Traducir Mes
                         meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
                         nombre_mes_actual = meses_es[now_mx.month]
-                        verif_txt = get_verification_period(digit, holo)
+                        verif_txt = cards.get_verification_period(digit, holo)
                         
                         # Generar Tarjeta Detallada
                         card = cards.CARD_HNC_DETAILED.format(
@@ -1156,7 +1026,7 @@ def lambda_handler(event, context):
                         holo = veh.get('hologram')
                         color = veh.get('engomado', 'Desconocido')
                         
-                        periodo = get_verification_period(plate, holo)
+                        periodo = cards.get_verification_period(plate, holo)
                         limite = get_verification_deadline(periodo)
                         multa_aprox = f"{20 * 108.57:,.2f}" # Valor UMA 2025 aprox
                         
