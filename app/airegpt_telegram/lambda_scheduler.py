@@ -37,6 +37,10 @@ def get_user_permissions(user_item):
 def get_cdmx_time(): return datetime.utcnow() - timedelta(hours=6)
 def get_maps_url(lat, lon): return f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
 
+def get_time_greeting():
+    h = get_cdmx_time().hour
+    return "Buenos días" if 5<=h<12 else "Buenas tardes" if 12<=h<20 else "Buenas noches"
+
 def send_telegram_push(chat_id, text):
     try:
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
@@ -259,6 +263,7 @@ def process_user(user, current_hour_str, contingency_data):
                             combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
                             
                             card = cards.CARD_REMINDER.format(
+                                greeting=get_time_greeting(),
                                 user_name=first_name, location_name=loc_data.get('display_name', loc_name),
                                 maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
                                 report_time=f"{current_hour_str.split(':')[0]}:20", region="ZMVM",
