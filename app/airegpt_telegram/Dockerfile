@@ -8,6 +8,7 @@ RUN pip3 install -r requirements.txt --target "${LAMBDA_TASK_ROOT}"
 # 2. Copiar código fuente
 COPY lambda_chatbot.py ${LAMBDA_TASK_ROOT}
 COPY lambda_scheduler.py ${LAMBDA_TASK_ROOT}
+COPY lambda_came_scraper.py ${LAMBDA_TASK_ROOT}
 COPY cards.py ${LAMBDA_TASK_ROOT}
 COPY bot_content.py ${LAMBDA_TASK_ROOT}
 COPY prompts.py ${LAMBDA_TASK_ROOT}
