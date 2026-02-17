@@ -909,7 +909,7 @@ def lambda_handler(event, context):
                         # --- CÁLCULO DEL MES (Hacerlo ANTES del format) ---
                         meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
                         nombre_mes_actual = meses_es[now.month]
-                        verif_txt = get_verification_period(digit, holo)
+                        verif_txt = cards.get_verification_period(digit, holo) # <--- FIX APLICADO
 
                         # Formatear Tarjeta
                         card = cards.CARD_HNC_DETAILED.format(
