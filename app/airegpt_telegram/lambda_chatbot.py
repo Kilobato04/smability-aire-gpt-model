@@ -368,7 +368,7 @@ def get_restriction_summary(plate, holo):
     
     # Texto Semanal
     dias_map = {0:"Lunes", 1:"Martes", 2:"Miércoles", 3:"Jueves", 4:"Viernes"}
-    dia_idx = MATRIZ_SEMANAL.get(plate)
+    dia_idx = cards.MATRIZ_SEMANAL.get(plate) # <--- FIX AQUÍ
     texto_semanal = f"• Todos los **{dias_map[dia_idx]}**"
     
     # Texto Sábados
@@ -915,7 +915,7 @@ def lambda_handler(event, context):
                         card = cards.CARD_HNC_DETAILED.format(
                             mes_nombre=nombre_mes_actual,
                             plate=digit,
-                            color=colors.get(int(digit), "Desconocido"), # <--- ESTE ES EL FIX SEGURO
+                            color=cards.ENGOMADOS.get(int(digit), "Desconocido"), # <--- FIX LIMPIO Y SEGURO
                             holo=str(holo).upper(),
                             verificacion_txt=verif_txt, # <--- NUEVO CAMPO
                             dias_semana_txt=txt_sem,
@@ -999,7 +999,7 @@ def lambda_handler(event, context):
                         card = cards.CARD_HNC_DETAILED.format(
                             mes_nombre=nombre_mes_actual,
                             plate=digit,
-                            color=colors.get(int(digit), "Desconocido"), # <--- ESTE ES EL FIX SEGURO
+                            color=cards.ENGOMADOS.get(int(digit), "Desconocido"), # <--- FIX LIMPIO Y SEGURO
                             holo=str(holo).upper(),
                             verificacion_txt=verif_txt, # <--- NUEVO CAMPO
                             dias_semana_txt=txt_sem,
