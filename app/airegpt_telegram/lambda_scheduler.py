@@ -103,6 +103,15 @@ def check_and_broadcast_contingency():
                         contingency_data['trigger_station_name'] = st.get('station_name', 'SIMAT')
                         contingency_data['trigger_station_id'] = st.get('station_id', 'N/A')
                         
+                        # --- FIX: DIFERENCIADOR DE TARJETA (ALERTA DE SALUD TEMPRANA) ---
+                        contingency_data['alert_type'] = "Alerta Temprana (Sensores)"
+                        contingency_data['recommendations'] = {
+                            "categories": [{
+                                "name": "RESTRICCIONES VEHICULARES", 
+                                "items": ["⏳ A la espera de confirmación legal de la CAMe (Aplicarán mañana si se mantiene)."]
+                            }]
+                        }
+                        
                         print(f"✅ [DEBUG] Contingencia extraída en índice [{i}] - Estación: {contingency_data['trigger_station_name']}")
                         break # Encontramos la contingencia, rompemos el ciclo
         
@@ -112,8 +121,9 @@ def check_and_broadcast_contingency():
         # Comparar con Estado en DB
         db_item = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
         last_phase = db_item.get('last_contingency_phase', 'None')
+        came_status = db_item.get('came_oficial', {}).get('estatus', 'SIN_CONTINGENCIA') # <--- LEEMOS A LA CAME
         
-        print(f"🔍 [DEBUG] DB State: Anterior='{last_phase}' | Detectada='{current_phase}'")
+        print(f"🔍 [DEBUG] DB State: Anterior='{last_phase}' | Detectada='{current_phase}' | CAMe='{came_status}'")
         
         # Disparar solo si hay cambio de estado
         if current_phase != last_phase:
@@ -122,8 +132,14 @@ def check_and_broadcast_contingency():
             
             if current_phase != "None":
                 payload = {"action": "BROADCAST_CONTINGENCY", "data": contingency_data}
+            
             elif last_phase != "None":
-                payload = {"action": "BROADCAST_CONTINGENCY", "data": {"phase": "SUSPENDIDA"}}
+                # --- FIX: CANDADO JERÁRQUICO ---
+                if came_status in ['ACTIVA', 'MANTIENE']:
+                    print("🛑 [JERARQUÍA] Sensores limpios, pero CAMe MANTIENE. Bloqueando Tarjeta Verde.")
+                    return # ABORTAMOS. Ni actualizamos la BD ni mandamos el Broadcast Verde.
+                else:
+                    payload = {"action": "BROADCAST_CONTINGENCY", "data": {"phase": "SUSPENDIDA"}}
             
             if payload:
                 response = lambda_client.invoke(
