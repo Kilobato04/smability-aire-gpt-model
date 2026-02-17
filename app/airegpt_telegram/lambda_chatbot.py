@@ -915,7 +915,7 @@ def lambda_handler(event, context):
                         card = cards.CARD_HNC_DETAILED.format(
                             mes_nombre=nombre_mes_actual,
                             plate=digit,
-                            color=engomado if 'engomado' in locals() else colors.get(int(digit), ""), # Manejo seguro
+                            color=colors.get(int(digit), "Desconocido"), # <--- ESTE ES EL FIX SEGURO
                             holo=str(holo).upper(),
                             verificacion_txt=verif_txt, # <--- NUEVO CAMPO
                             dias_semana_txt=txt_sem,
@@ -999,7 +999,7 @@ def lambda_handler(event, context):
                         card = cards.CARD_HNC_DETAILED.format(
                             mes_nombre=nombre_mes_actual,
                             plate=digit,
-                            color=engomado if 'engomado' in locals() else colors.get(int(digit), ""), # Manejo seguro
+                            color=colors.get(int(digit), "Desconocido"), # <--- ESTE ES EL FIX SEGURO
                             holo=str(holo).upper(),
                             verificacion_txt=verif_txt, # <--- NUEVO CAMPO
                             dias_semana_txt=txt_sem,
