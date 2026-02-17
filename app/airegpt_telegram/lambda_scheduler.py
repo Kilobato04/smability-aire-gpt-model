@@ -246,7 +246,9 @@ def process_user(user, current_hour_str, contingency_data):
                         data = get_location_air_data(loc_data['lat'], loc_data['lon'])
                         if data:
                             qa = data.get('aire', {})
-                            f_block = format_forecast_block(data.get('pronostico_timeline', []))
+                            meteo = data.get('meteo', {}) # <--- NUEVO (Clima)
+                            ubic = data.get('ubicacion', {}) # <--- NUEVO (Ubicación)
+                            f_block = cards.format_forecast_block(data.get('pronostico_timeline', []))
                             
                             cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extrema"}
                             cat = cat_map.get(qa.get('riesgo'), "Regular")
@@ -266,10 +268,13 @@ def process_user(user, current_hour_str, contingency_data):
                                 greeting=get_time_greeting(),
                                 user_name=first_name, location_name=loc_data.get('display_name', loc_name),
                                 maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
-                                report_time=f"{current_hour_str.split(':')[0]}:20", region="ZMVM",
+                                region=f"{ubic.get('mun', 'ZMVM')}, {ubic.get('edo', 'CDMX')}",
+                                report_time=f"{current_hour_str.split(':')[0]}:20", 
                                 ias_value=qa.get('ias', 0), risk_category=cat, risk_circle=info['emoji'],
+                                pollutant=qa.get('dominante', 'N/A'), 
                                 forecast_block=f_block,
                                 health_recommendation=cards.get_health_advice(cat, h_str),
+                                temp=meteo.get('tmp', 0), humidity=meteo.get('rh', 0), wind_speed=meteo.get('wsp', 0),
                                 footer=combined_footer
                             )
                             send_telegram_push(user_id, card)
