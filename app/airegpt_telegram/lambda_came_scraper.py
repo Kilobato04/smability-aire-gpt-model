@@ -35,21 +35,30 @@ def obtener_contexto_completo():
             enlaces = art.find_all('a')
             for a_tag in enlaces:
                 if 'href' in a_tag.attrs:
-                    match = re.search(r'-(\d+)(?:\?|$)', a_tag['href'])
+                    # --- FIX: LIMPIEZA DE URL BASURA DEL GOBIERNO ---
+                    href_limpio = a_tag['href'].replace('\\"', '').replace('"', '').replace('\\', '').strip()
+                    # ------------------------------------------------
+                    
+                    match = re.search(r'-(\d+)(?:\?|$)', href_limpio)
                     if match:
                         post_id = int(match.group(1))
                         if post_id > max_id:
                             max_id = post_id
-                            best_link = BASE_URL + a_tag['href']
+                            # Aseguramos que se una bien con la base
+                            if href_limpio.startswith('/'):
+                                best_link = BASE_URL + href_limpio
+                            else:
+                                best_link = BASE_URL + '/' + href_limpio
         
         if not best_link: return None, "No hay enlaces."
         
         print(f"   ✅ ID más reciente: {max_id} | Link: {best_link}")
+        
         # Le subimos a 15s el timeout por si la página del gobierno está lenta
         r_art = requests.get(best_link, timeout=15) 
         soup_art = BeautifulSoup(r_art.text, 'html.parser')
         
-        # --- FIX: EXTRACCIÓN SÚPER SEGURA (A prueba de caídas) ---
+        # --- EXTRACCIÓN SÚPER SEGURA (A prueba de caídas) ---
         # 1. Título
         meta_title = soup_art.find('meta', property='og:title')
         if meta_title and meta_title.get('content'):
@@ -66,7 +75,6 @@ def obtener_contexto_completo():
             parrafos = soup_art.find_all('p')
             
         texto_limpio = " ".join([p.text.strip() for p in parrafos if len(p.text.strip()) > 15])[:6000]
-        # -------------------------------------------------------------
         
         return titulo_real, texto_limpio
     
