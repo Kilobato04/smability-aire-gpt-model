@@ -112,6 +112,7 @@ CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
 
 🛑 **Restricciones Vehiculares:**
 {restrictions_txt}
+📄 [Leer Comunicado Oficial]({oficial_link})
 
 🛡️ **Acción:**
 • Cierra ventanas y evita salir.
@@ -129,6 +130,7 @@ La CAMe informa que las condiciones del aire han mejorado.
 
 🚗 **Movilidad:**
 Se levantan las restricciones del Doble Hoy No Circula. Tu auto vuelve a su calendario normal.
+📄 [Leer Comunicado Oficial]({oficial_link})
 
 _Fuente: CAMe / Smability_
 {footer}"""
