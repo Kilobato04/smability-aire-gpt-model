@@ -76,6 +76,15 @@ def generate_daily_summary():
         resumen = {"fecha": fecha_ayer_str, "celdas": {}}
         archivos_procesados = 0
         
+        # --- FIX DE RENDIMIENTO: Función declarada AFUERA del loop ---
+        def safe_extract(c_dict, key1, key2):
+            val = c_dict.get(key1)
+            if val is None: val = c_dict.get(key2)
+            if val is None: return 0.0
+            try: return float(val)
+            except: return 0.0
+        # -------------------------------------------------------------
+        
         for obj in archivos:
             key = obj['Key']
             try:
@@ -97,18 +106,10 @@ def generate_daily_summary():
                     if geo_key not in resumen['celdas']:
                         resumen['celdas'][geo_key] = {"pm25_12h": [0.0]*24, "o3_1h": [0.0]*24, "pm10_12h": [0.0]*24}
                     
-                    # --- FIX: EXTRACCIÓN SÚPER SEGURA A PRUEBA DE NONES ---
-                    def safe_extract(c_dict, key1, key2):
-                        val = c_dict.get(key1)
-                        if val is None: val = c_dict.get(key2)
-                        if val is None: return 0.0
-                        try: return float(val)
-                        except: return 0.0
-
+                    # Usamos el extractor rápido
                     pm25 = safe_extract(celda, 'pm25 12h', 'pm25_12h')
                     o3 = safe_extract(celda, 'o3 1h', 'o3_1h')
                     pm10 = safe_extract(celda, 'pm10 12h', 'pm10_12h')
-                    # --------------------------------------------------------
                     
                     resumen['celdas'][geo_key]['pm25_12h'][hora_int] = pm25
                     resumen['celdas'][geo_key]['o3_1h'][hora_int] = o3
@@ -118,7 +119,7 @@ def generate_daily_summary():
             except Exception as e:
                 print(f"⚠️ Error procesando archivo {key}: {e}")
 
-        # Interpolación rápida de huecos (si la Lambda falló alguna hora, repite la hora anterior)
+        # Interpolación rápida de huecos
         for geo_key, series in resumen['celdas'].items():
             for param in ['pm25_12h', 'o3_1h', 'pm10_12h']:
                 for i in range(24):
@@ -142,7 +143,7 @@ def generate_daily_summary():
     except Exception as e:
         print(f"❌ [DAILY SUMMARY] Error crítico: {e}")
         return False
-
+        
 # --- 3. FUNCIONES DE CARGA Y PROCESAMIENTO ---
 def load_models():
     """Descarga modelos desde S3 y los carga en XGBoost"""
