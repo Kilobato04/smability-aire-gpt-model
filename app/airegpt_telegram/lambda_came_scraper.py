@@ -56,23 +56,25 @@ def obtener_contexto_completo():
 def analizar_contingencia_ia(titulo, texto_articulo):
     print("🤖 2. Procesando cruce de datos con IA...")
     
-    prompt_sistema = """Eres un analista legal de la CAMe. Lee el TÍTULO y el TEXTO del comunicado oficial y extrae los datos al formato JSON.
+    prompt_sistema = """Eres el Analista Legal en Jefe de la CAMe. 
+    Tu única tarea es leer el comunicado oficial y extraer la verdad legal en formato JSON.
     
-    REGLAS ESTRICTAS DE EXTRACCIÓN:
-    1. "estatus": Busca la orden legal, que SIEMPRE está en el TÍTULO o primer párrafo. 
-       - Si el título dice "SE SUSPENDE", "SUSPENDE" o "LEVANTA", el estatus DEBE SER "SUSPENDE" obligatoriamente (ignora por completo si abajo usan la palabra "mantiene" para describir el clima o la lluvia).
-       - Si el título dice "MANTIENE", "CONTINÚA" o "ACTIVA", el estatus es "MANTIENE".
-    2. "fase": Pon "None" si el estatus es SUSPENDE. Si es MANTIENE, pon "Fase I" o "Fase II".
-    3. "resumen_hnc": 
-       - Si el estatus es SUSPENDE, el valor DEBE SER exactamente: "Circulación normal". (Ignora las restricciones habituales de calendario).
-       - Si el estatus es MANTIENE, busca el apartado de "Restricciones a la circulación" y resume quién no circula.
-    4. "fecha_hora": Extrae la FECHA y HORA de emisión del boletín (Ej: "16 de febrero, 18:00 horas"). Búscala en el título o subtítulo. Ignora días pasados."""
+    REGLAS INFALIBLES PARA EL JSON (DEBES SEGUIR ESTE ORDEN):
+    1. "razonamiento": Extrae la frase exacta del TÍTULO o PRIMER PÁRRAFO que dicta la orden principal. (Ej: "El título dice explícitamente SE SUSPENDE").
+    2. "estatus": Basado en tu razonamiento, si la orden incluye "SUSPENDE" o "LEVANTA", el valor AQUÍ DEBE SER "SUSPENDE". Si dice "MANTIENE" o "CONTINÚA", pon "MANTIENE".
+    3. "fase": Si el estatus es "SUSPENDE", pon obligatoriamente "None". Si es "MANTIENE", pon "Fase I" o la fase correspondiente.
+    4. "resumen_hnc": Si el estatus es "SUSPENDE", pon estrictamente "Circulación normal". Si es "MANTIENE", resume qué autos no circulan.
+    5. "fecha_hora": Extrae la fecha y hora de emisión (Ej: "17 de febrero, 18:00 horas").
+    """
     
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             response_format={ "type": "json_object" },
-            messages=[{"role": "system", "content": prompt_sistema}, {"role": "user", "content": f"TÍTULO: {titulo}\n\nTEXTO:\n{texto_articulo}"}],
+            messages=[
+                {"role": "system", "content": prompt_sistema}, 
+                {"role": "user", "content": f"Devuelve el JSON estructurado basado en esta información:\n\nTÍTULO: {titulo}\n\nTEXTO:\n{texto_articulo}"}
+            ],
             temperature=0.0
         )
         return json.loads(response.choices[0].message.content)
