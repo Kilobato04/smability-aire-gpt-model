@@ -30,7 +30,7 @@ def obtener_contexto_completo():
         max_id = -1
         best_link = None
         
-        # Buscamos en todos los enlaces del artículo para no fallar
+        # Buscamos el ID dinámico más reciente
         for art in articulos:
             enlaces = art.find_all('a')
             for a_tag in enlaces:
@@ -48,13 +48,14 @@ def obtener_contexto_completo():
         r_art = requests.get(best_link, timeout=10)
         soup_art = BeautifulSoup(r_art.text, 'html.parser')
         
-        # --- FIX: EXTRAER SOLO EL CONTENIDO REAL (Bypass de Banners) ---
-        # 1. Buscamos el título principal real de la noticia
-        h1_tag = soup_art.find('h1')
-        titulo_real = h1_tag.text.strip() if h1_tag else "Comunicado Oficial"
+        # --- FIX: EXTRACCIÓN QUIRÚRGICA (Bypass de Banners) ---
+        # 1. Título desde la metadata oculta (100% confiable, libre de basura)
+        meta_title = soup_art.find('meta', property='og:title')
+        titulo_real = meta_title['content'] if meta_title else soup_art.find('h1').text
         
-        # 2. Extraemos ÚNICAMENTE los párrafos de texto, ignorando menús y alertas globales
-        parrafos = soup_art.find_all('p')
+        # 2. Texto SOLAMENTE desde dentro de la etiqueta <article>
+        articulo_html = soup_art.find('article')
+        parrafos = articulo_html.find_all('p') if articulo_html else soup_art.find_all('p')
         texto_limpio = " ".join([p.text.strip() for p in parrafos if len(p.text.strip()) > 15])[:6000]
         # -------------------------------------------------------------
         
@@ -66,15 +67,14 @@ def analizar_contingencia_ia(titulo, texto_articulo):
     print("🤖 2. Procesando cruce de datos con IA...")
     
     prompt_sistema = """Eres el Analista Legal en Jefe de la CAMe. 
-    Tu única tarea es leer el comunicado oficial y extraer la verdad legal en formato JSON.
+    Lee el TÍTULO y el TEXTO del comunicado oficial y extrae la verdad legal en formato JSON.
     
-    REGLAS INFALIBLES PARA EL JSON (DEBES SEGUIR ESTE ORDEN):
-    1. "razonamiento": Extrae la frase exacta del TÍTULO o PRIMER PÁRRAFO que dicta la orden principal. (Ej: "El título dice explícitamente SE SUSPENDE").
-    2. "estatus": Basado en tu razonamiento, si la orden incluye "SUSPENDE" o "LEVANTA", el valor AQUÍ DEBE SER "SUSPENDE". Si dice "MANTIENE" o "CONTINÚA", pon "MANTIENE".
-    3. "fase": Si el estatus es "SUSPENDE", pon obligatoriamente "None". Si es "MANTIENE", pon "Fase I" o la fase correspondiente.
-    4. "resumen_hnc": Si el estatus es "SUSPENDE", pon estrictamente "Circulación normal". Si es "MANTIENE", resume qué autos no circulan.
-    5. "fecha_hora": Extrae la fecha y hora de emisión (Ej: "17 de febrero, 18:00 horas").
-    """
+    REGLAS INFALIBLES PARA EL JSON:
+    1. "razonamiento": Escribe paso a paso tu lógica. ¿El título dice SE SUSPENDE o MANTIENE?
+    2. "estatus": Si el título o el primer párrafo dice "SUSPENDE" o "LEVANTA", pon "SUSPENDE" (ignora la palabra "mantiene" si hablan del clima). Si dice "MANTIENE", pon "MANTIENE".
+    3. "fase": Si el estatus es "SUSPENDE", pon "None". Si es "MANTIENE", pon "Fase I" o "Fase II".
+    4. "resumen_hnc": Si el estatus es "SUSPENDE", pon "Circulación normal". Si es "MANTIENE", resume qué autos no circulan.
+    5. "fecha_hora": Extrae la fecha y hora de emisión (Ej: "17 de febrero, 18:00 horas")."""
     
     try:
         response = client.chat.completions.create(
@@ -82,7 +82,7 @@ def analizar_contingencia_ia(titulo, texto_articulo):
             response_format={ "type": "json_object" },
             messages=[
                 {"role": "system", "content": prompt_sistema}, 
-                {"role": "user", "content": f"Devuelve el JSON estructurado basado en esta información:\n\nTÍTULO: {titulo}\n\nTEXTO:\n{texto_articulo}"}
+                {"role": "user", "content": f"TÍTULO: {titulo}\n\nTEXTO:\n{texto_articulo}"}
             ],
             temperature=0.0
         )
@@ -128,7 +128,7 @@ def lambda_handler(event, context):
             ExpressionAttributeValues={':c': resultado_ia, ':p': fase_db, ':t': datetime.now().isoformat()}
         )
             
-        # 2. Despertar al Chatbot (Con el formato que espera)
+        # 2. Despertar al Chatbot
         if fase_broadcast == "SUSPENDIDA":
             payload = {
                 "action": "BROADCAST_CONTINGENCY",
