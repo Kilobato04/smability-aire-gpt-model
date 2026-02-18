@@ -56,12 +56,17 @@ def obtener_contexto_completo():
 def analizar_contingencia_ia(titulo, texto_articulo):
     print("🤖 2. Procesando cruce de datos con IA...")
     
-    prompt_sistema = """Eres un analista legal de la CAMe. Lee el TITULO y el TEXTO del comunicado y devuelve un JSON.
-    REGLAS ESTRICTAS:
-    1. "estatus": Si el título o el texto dice "SE SUSPENDE" o "LEVANTAR", pon "SUSPENDE" (obligatorio). Si dice "MANTIENE" o "CONTINÚA", pon "MANTIENE".
-    2. "fase": "Fase I", "Fase II", o "None" (si se suspende).
-    3. "resumen_hnc": Si se SUSPENDE, pon "Circulación normal". Si se MANTIENE, resume quién NO circula.
-    4. "fecha_hora": Extrae la FECHA Y HORA de emisión del boletín (Ej: "17 de febrero, 18:00 horas"). Búscala en el título o en frases como "boletín de las 18:00 horas". Ignora menciones a días pasados dentro del contexto del texto."""
+    prompt_sistema = """Eres un analista legal de la CAMe. Lee el TÍTULO y el TEXTO del comunicado oficial y extrae los datos al formato JSON.
+    
+    REGLAS ESTRICTAS DE EXTRACCIÓN:
+    1. "estatus": Busca la orden legal, que SIEMPRE está en el TÍTULO o primer párrafo. 
+       - Si el título dice "SE SUSPENDE", "SUSPENDE" o "LEVANTA", el estatus DEBE SER "SUSPENDE" obligatoriamente (ignora por completo si abajo usan la palabra "mantiene" para describir el clima o la lluvia).
+       - Si el título dice "MANTIENE", "CONTINÚA" o "ACTIVA", el estatus es "MANTIENE".
+    2. "fase": Pon "None" si el estatus es SUSPENDE. Si es MANTIENE, pon "Fase I" o "Fase II".
+    3. "resumen_hnc": 
+       - Si el estatus es SUSPENDE, el valor DEBE SER exactamente: "Circulación normal". (Ignora las restricciones habituales de calendario).
+       - Si el estatus es MANTIENE, busca el apartado de "Restricciones a la circulación" y resume quién no circula.
+    4. "fecha_hora": Extrae la FECHA y HORA de emisión del boletín (Ej: "16 de febrero, 18:00 horas"). Búscala en el título o subtítulo. Ignora días pasados."""
     
     try:
         response = client.chat.completions.create(
