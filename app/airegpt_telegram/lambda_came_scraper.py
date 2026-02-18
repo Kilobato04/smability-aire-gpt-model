@@ -23,22 +23,24 @@ BASE_URL = "https://www.gob.mx"
 def obtener_contexto_completo():
     print("🌍 1. Consultando archivo de prensa de la CAMe...")
     try:
-        # Solo buscamos la fuente de verdad: La sección de prensa
         r_prensa = requests.get(PRENSA_URL, timeout=10)
         soup_prensa = BeautifulSoup(r_prensa.text, 'html.parser')
         
         articulos = soup_prensa.find_all('article', limit=10)
         max_id = -1
-        best_link, best_title = None, None
+        best_link = None
         
+        # Buscamos en todos los enlaces del artículo para no fallar
         for art in articulos:
-            a_tag = art.find('a')
-            if a_tag and 'href' in a_tag.attrs:
-                match = re.search(r'-(\d+)(?:\?|$)', a_tag['href'])
-                if match:
-                    post_id = int(match.group(1))
-                    if post_id > max_id:
-                        max_id, best_link, best_title = post_id, BASE_URL + a_tag['href'], a_tag.text.strip()
+            enlaces = art.find_all('a')
+            for a_tag in enlaces:
+                if 'href' in a_tag.attrs:
+                    match = re.search(r'-(\d+)(?:\?|$)', a_tag['href'])
+                    if match:
+                        post_id = int(match.group(1))
+                        if post_id > max_id:
+                            max_id = post_id
+                            best_link = BASE_URL + a_tag['href']
         
         if not best_link: return None, "No hay enlaces."
         
@@ -46,10 +48,17 @@ def obtener_contexto_completo():
         r_art = requests.get(best_link, timeout=10)
         soup_art = BeautifulSoup(r_art.text, 'html.parser')
         
-        # Extraemos solo el texto del artículo más nuevo
-        art_text_clean = " ".join(soup_art.text.split())[:7000]
+        # --- FIX: EXTRAER SOLO EL CONTENIDO REAL (Bypass de Banners) ---
+        # 1. Buscamos el título principal real de la noticia
+        h1_tag = soup_art.find('h1')
+        titulo_real = h1_tag.text.strip() if h1_tag else "Comunicado Oficial"
         
-        return best_title, art_text_clean
+        # 2. Extraemos ÚNICAMENTE los párrafos de texto, ignorando menús y alertas globales
+        parrafos = soup_art.find_all('p')
+        texto_limpio = " ".join([p.text.strip() for p in parrafos if len(p.text.strip()) > 15])[:6000]
+        # -------------------------------------------------------------
+        
+        return titulo_real, texto_limpio
     except Exception as e:
         return None, f"Error web: {e}"
 
