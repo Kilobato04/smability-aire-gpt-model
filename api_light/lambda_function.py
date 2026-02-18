@@ -3,8 +3,10 @@ import boto3
 import pandas as pd
 import numpy as np
 import os
+import gzip
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from zoneinfo import ZoneInfo
 
 # --- CONFIGURACIÓN ---
 S3_BUCKET = os.environ.get('S3_BUCKET', 'smability-data-lake')
@@ -21,6 +23,17 @@ def get_s3_json(key):
         return json.loads(obj['Body'].read())
     except:
         return None # Silencioso si no existe
+
+def get_s3_gzip_json(key):
+    """Descarga, descomprime y lee un JSON comprimido (.gz) de S3"""
+    try:
+        obj = s3.get_object(Bucket=S3_BUCKET, Key=key)
+        compressed_data = obj['Body'].read()
+        json_str = gzip.decompress(compressed_data).decode('utf-8')
+        return json.loads(json_str)
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar el resumen GZIP de S3: {e}")
+        return None
 
 def get_grid_data():
     global CACHED_GRID
@@ -193,6 +206,30 @@ def lambda_handler(event, context):
 
         calidad, color, mensaje_corto = get_contexto_aire(current_ias)
 
+        # =====================================================================
+        # 🌟 NUEVA SECCIÓN: EXTRAER VECTOR DE EXPOSICIÓN (AYER) 🌟
+        # =====================================================================
+        vector_exposicion = None
+        try:
+            # Determinamos la fecha de "Ayer"
+            tz = ZoneInfo("America/Mexico_City")
+            now_mx = datetime.now(tz)
+            ayer_str = (now_mx - timedelta(days=1)).strftime("%Y-%m-%d")
+            
+            # Redondeamos la lat/lon del usuario a 3 decimales para cruzar con el diccionario
+            geo_key = f"{round(u_lat, 3)},{round(u_lon, 3)}"
+            
+            # Buscamos el archivo en S3
+            resumen_diario = get_s3_gzip_json(f"daily_summaries/summary_{ayer_str}.json.gz")
+            
+            if resumen_diario and "celdas" in resumen_diario:
+                # Búsqueda directa ultrarrápida O(1)
+                if geo_key in resumen_diario["celdas"]:
+                    vector_exposicion = resumen_diario["celdas"][geo_key]
+        except Exception as e:
+            print(f"⚠️ Error extrayendo vector de exposición: {e}")
+        # =====================================================================
+
         response = {
             "status": "success" if dist <= MAX_DISTANCE_KM else "warning",
             "origen": "live",
@@ -223,7 +260,8 @@ def lambda_handler(event, context):
                 "rh": safe_float(p.get('rh')),
                 "wsp": safe_float(p.get('wsp'))
             },
-            "pronostico_timeline": future_forecast
+            "pronostico_timeline": future_forecast,
+            "vector_exposicion_ayer": vector_exposicion
         }
         
         return {'statusCode': 200, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': json.dumps(response)}
