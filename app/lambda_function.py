@@ -76,14 +76,14 @@ def generate_daily_summary():
         resumen = {"fecha": fecha_ayer_str, "celdas": {}}
         archivos_procesados = 0
         
-        # --- FIX DE RENDIMIENTO: Función declarada AFUERA del loop ---
+        # --- FIX: FUNCIÓN DECLARADA AFUERA DE LOS LOOPS (Optimización de Memoria) ---
         def safe_extract(c_dict, key1, key2):
             val = c_dict.get(key1)
             if val is None: val = c_dict.get(key2)
             if val is None: return 0.0
             try: return float(val)
             except: return 0.0
-        # -------------------------------------------------------------
+        # ----------------------------------------------------------------------------
         
         for obj in archivos:
             key = obj['Key']
@@ -106,7 +106,7 @@ def generate_daily_summary():
                     if geo_key not in resumen['celdas']:
                         resumen['celdas'][geo_key] = {"pm25_12h": [0.0]*24, "o3_1h": [0.0]*24, "pm10_12h": [0.0]*24}
                     
-                    # Usamos el extractor rápido
+                    # Llamamos a la función que ya existe en memoria
                     pm25 = safe_extract(celda, 'pm25 12h', 'pm25_12h')
                     o3 = safe_extract(celda, 'o3 1h', 'o3_1h')
                     pm10 = safe_extract(celda, 'pm10 12h', 'pm10_12h')
@@ -119,7 +119,7 @@ def generate_daily_summary():
             except Exception as e:
                 print(f"⚠️ Error procesando archivo {key}: {e}")
 
-        # Interpolación rápida de huecos
+        # Interpolación rápida de huecos (si la Lambda falló alguna hora, repite la hora anterior)
         for geo_key, series in resumen['celdas'].items():
             for param in ['pm25_12h', 'o3_1h', 'pm10_12h']:
                 for i in range(24):
