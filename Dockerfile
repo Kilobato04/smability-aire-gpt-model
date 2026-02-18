@@ -31,4 +31,4 @@ RUN pip install awslambdaric --target "${LAMBDA_TASK_ROOT}"
 
 # 6. CMD apuntando a la Lambda Maestra
 ENTRYPOINT [ "/usr/local/bin/python", "-m", "awslambdaric" ]
-CMD [ "lambda_function.lambda_handler" ]
+CMD [ "app.lambda_function.lambda_handler" ]
