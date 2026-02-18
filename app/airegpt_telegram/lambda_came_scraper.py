@@ -76,11 +76,11 @@ def obtener_contexto_completo():
             
         texto_limpio = " ".join([p.text.strip() for p in parrafos if len(p.text.strip()) > 15])[:6000]
         
-        return titulo_real, texto_limpio
+        return titulo_real, texto_limpio, best_link
     
     except Exception as e:
         print(f"❌ [CRITICAL ERROR] Falló la extracción en la web: {e}")
-        return None, f"Error web: {e}"
+        return None, f"Error web: {e}", None
 
 def analizar_contingencia_ia(titulo, texto_articulo):
     print("🤖 2. Procesando cruce de datos con IA...")
@@ -112,7 +112,7 @@ def analizar_contingencia_ia(titulo, texto_articulo):
 
 def lambda_handler(event, context):
     print("🚀 Iniciando CAMe Scraper...")
-    titulo, texto = obtener_contexto_completo()
+    titulo, texto, link_oficial = obtener_contexto_completo()
     
     if not titulo: 
         print(f"🚨 Abortando Lambda por error: {texto}")
@@ -158,13 +158,15 @@ def lambda_handler(event, context):
         if fase_broadcast == "SUSPENDIDA":
             payload = {
                 "action": "BROADCAST_CONTINGENCY",
-                "data": {"phase": "SUSPENDIDA"}
+                "data": {"phase": "SUSPENDIDA"},
+                "oficial_link":
             }
         else:
             payload = {
                 "action": "BROADCAST_CONTINGENCY",
                 "data": {
                     "phase": fase_broadcast,
+                    "oficial_link": link_oficial,
                     "alert_type": "Decreto Legal (CAMe)",
                     "trigger_station_name": "Portal CAMe",
                     "recommendations": {
