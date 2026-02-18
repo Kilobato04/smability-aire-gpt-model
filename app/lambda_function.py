@@ -4,10 +4,11 @@ import pandas as pd
 import numpy as np
 import xgboost as xgb
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import os
 from scipy.spatial import cKDTree
+from scipy.interpolate import griddata # <--- Movido aquí arriba (Buena práctica)
 import gzip
 
 # --- 1. CONFIGURACIÓN Y RUTAS ---
@@ -96,10 +97,18 @@ def generate_daily_summary():
                     if geo_key not in resumen['celdas']:
                         resumen['celdas'][geo_key] = {"pm25_12h": [0.0]*24, "o3_1h": [0.0]*24, "pm10_12h": [0.0]*24}
                     
-                    # Extraer asegurando que si es None ponga 0.0
-                    pm25 = float(celda.get('pm25 12h', celda.get('pm25_12h')) or 0.0)
-                    o3 = float(celda.get('o3 1h', celda.get('o3_1h')) or 0.0)
-                    pm10 = float(celda.get('pm10 12h', celda.get('pm10_12h')) or 0.0)
+                    # --- FIX: EXTRACCIÓN SÚPER SEGURA A PRUEBA DE NONES ---
+                    def safe_extract(c_dict, key1, key2):
+                        val = c_dict.get(key1)
+                        if val is None: val = c_dict.get(key2)
+                        if val is None: return 0.0
+                        try: return float(val)
+                        except: return 0.0
+
+                    pm25 = safe_extract(celda, 'pm25 12h', 'pm25_12h')
+                    o3 = safe_extract(celda, 'o3 1h', 'o3_1h')
+                    pm10 = safe_extract(celda, 'pm10 12h', 'pm10_12h')
+                    # --------------------------------------------------------
                     
                     resumen['celdas'][geo_key]['pm25_12h'][hora_int] = pm25
                     resumen['celdas'][geo_key]['o3_1h'][hora_int] = o3
