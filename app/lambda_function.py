@@ -8,6 +8,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import os
 from scipy.spatial import cKDTree
+import gzip
 
 # --- 1. CONFIGURACIÓN Y RUTAS ---
 BASE_PATH = os.environ.get('LAMBDA_TASK_ROOT', '/var/task')
@@ -35,6 +36,7 @@ BPS_O3 = [(0,58,0,50), (59,92,51,100), (93,135,101,150), (136,175,151,200), (176
 BPS_PM10 = [(0,45,0,50), (46,60,51,100), (61,132,101,150), (133,213,151,200), (214,354,201,300)]
 BPS_PM25 = [(0,25,0,50), (26,45,51,100), (46,79,101,150), (80,147,151,200), (148,250,201,300)]
 
+
 def get_ias_score(c, pollutant):
     try:
         c = float(c)
@@ -51,6 +53,86 @@ def get_risk_level(ias):
     if ias <= 200: return "Muy Alto"
     return "Extremadamente Alto"
 
+def generate_daily_summary():
+    """
+    Busca los archivos generados ayer y crea un json.gz consolidado.
+    """
+    print("🌅 [DAILY SUMMARY] Iniciando proceso de consolidación...")
+    try:
+        tz = ZoneInfo("America/Mexico_City")
+        hoy = datetime.now(tz)
+        ayer = hoy - timedelta(days=1)
+        fecha_ayer_str = ayer.strftime("%Y-%m-%d")
+        
+        prefix = f"live_grid/grid_{fecha_ayer_str}"
+        response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
+        archivos = response.get('Contents', [])
+        
+        if not archivos:
+            print(f"❌ [DAILY SUMMARY] No se encontraron archivos para {fecha_ayer_str}")
+            return False
+            
+        resumen = {"fecha": fecha_ayer_str, "celdas": {}}
+        archivos_procesados = 0
+        
+        for obj in archivos:
+            key = obj['Key']
+            try:
+                # Extraemos la hora: "live_grid/grid_2026-02-17_14-20.json" -> "14"
+                hora_str = key.split('_')[-1].split('-')[0]
+                hora_int = int(hora_str)
+            except: 
+                continue
+                
+            try:
+                resp = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
+                datos_hora = json.loads(resp['Body'].read().decode('utf-8'))
+                
+                for celda in datos_hora:
+                    lat = round(celda['lat'], 3)
+                    lon = round(celda['lon'], 3)
+                    geo_key = f"{lat},{lon}"
+                    
+                    if geo_key not in resumen['celdas']:
+                        resumen['celdas'][geo_key] = {"pm25_12h": [0.0]*24, "o3_1h": [0.0]*24, "pm10_12h": [0.0]*24}
+                    
+                    # Extraer asegurando que si es None ponga 0.0
+                    pm25 = float(celda.get('pm25 12h', celda.get('pm25_12h')) or 0.0)
+                    o3 = float(celda.get('o3 1h', celda.get('o3_1h')) or 0.0)
+                    pm10 = float(celda.get('pm10 12h', celda.get('pm10_12h')) or 0.0)
+                    
+                    resumen['celdas'][geo_key]['pm25_12h'][hora_int] = pm25
+                    resumen['celdas'][geo_key]['o3_1h'][hora_int] = o3
+                    resumen['celdas'][geo_key]['pm10_12h'][hora_int] = pm10
+                    
+                archivos_procesados += 1
+            except Exception as e:
+                print(f"⚠️ Error procesando archivo {key}: {e}")
+
+        # Interpolación rápida de huecos (si la Lambda falló alguna hora, repite la hora anterior)
+        for geo_key, series in resumen['celdas'].items():
+            for param in ['pm25_12h', 'o3_1h', 'pm10_12h']:
+                for i in range(24):
+                    if series[param][i] == 0.0 and i > 0: 
+                        series[param][i] = series[param][i-1]
+
+        # Comprimir y Subir a S3
+        json_str = json.dumps(resumen, separators=(',', ':'))
+        comprimido = gzip.compress(json_str.encode('utf-8'))
+        output_key = f"daily_summaries/summary_{fecha_ayer_str}.json.gz"
+        
+        s3_client.put_object(
+            Bucket=S3_BUCKET, 
+            Key=output_key, 
+            Body=comprimido, 
+            ContentType='application/json', 
+            ContentEncoding='gzip'
+        )
+        print(f"✅ [DAILY SUMMARY] Guardado en S3: {output_key} ({archivos_procesados} horas procesadas)")
+        return True
+    except Exception as e:
+        print(f"❌ [DAILY SUMMARY] Error crítico: {e}")
+        return False
 
 # --- 3. FUNCIONES DE CARGA Y PROCESAMIENTO ---
 def load_models():
@@ -220,8 +302,25 @@ def interpolate_grid(grid_df, x_points, y_points, z_values, method='linear'):
 
 # --- 4. HANDLER PRINCIPAL ---
 def lambda_handler(event, context):
-    VERSION = "V56.9" 
+    VERSION = "V58.4" 
     print(f"🚀 INICIANDO PREDICTOR MAESTRO {VERSION} - ESTABILIZACIÓN FINAL")
+    
+    # --- [NUEVO] RELOJ DEL DAILY SUMMARY ---
+    tz = ZoneInfo("America/Mexico_City")
+    now_mx = datetime.now(tz)
+    
+    # Condición 1: Ejecución automática de madrugada (1:00 AM a 1:25 AM)
+    is_summary_time = now_mx.hour == 1 and 0 <= now_mx.minute <= 25
+    # Condición 2: Ejecución forzada manual (para tus pruebas)
+    is_forced = event.get('force_daily_summary') == True
+    
+    if is_summary_time or is_forced:
+        generate_daily_summary()
+        
+        # Si fue un test manual forzado, detenemos la Lambda aquí para no hacer una predicción completa
+        if is_forced:
+            return {'statusCode': 200, 'body': 'Daily Summary Forzado Ejecutado.'}
+    # ----------------------------------------
     
     try:
         models = load_models()
