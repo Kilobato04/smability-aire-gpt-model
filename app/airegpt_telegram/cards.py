@@ -277,15 +277,10 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
     schedule_str = "\n".join(schedule_list) if schedule_list else "• *Sin reportes programados*"
 
     # f) Recordatorio HOY NO CIRCULA
-    hnc_str = "• *Sin recordatorio activo*"
     if vehicle and vehicle.get('active'):
-        config = vehicle.get('alert_config', {})
-        if config.get('enabled'):
-            hnc_str = f"• Te aviso a las **{config.get('time', '20:00')} hrs** si no circulas."
-        else:
-            hnc_str = "• 🔕 Recordatorio desactivado."
-    elif not vehicle:
-        hnc_str = "" 
+        hnc_str = "• 🚗 Encuentra las restricciones de HNC directamente en tus alertas y reportes de Aire."
+    else:
+        hnc_str = "• 🔕 Registra tu auto para ver restricciones." 
 
     # Footer
     tip = "💡 Tip: Escribe 'Cambiar hora alertas' para ajustar." if is_premium else "💎 Tip: Hazte Premium para activar Contingencias."
