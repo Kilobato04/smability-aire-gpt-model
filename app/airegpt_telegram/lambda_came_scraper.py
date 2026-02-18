@@ -17,17 +17,13 @@ dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
 lambda_client = boto3.client('lambda')
 
-HOME_URL = "https://www.gob.mx/comisionambiental"
 PRENSA_URL = "https://www.gob.mx/comisionambiental/es/archivo/prensa"
 BASE_URL = "https://www.gob.mx"
 
 def obtener_contexto_completo():
-    print("🌍 1. Consultando fuentes oficiales de la CAMe...")
+    print("🌍 1. Consultando archivo de prensa de la CAMe...")
     try:
-        r_home = requests.get(HOME_URL, timeout=10)
-        soup_home = BeautifulSoup(r_home.text, 'html.parser')
-        home_text_clean = " ".join(soup_home.text.split())[:3000] 
-        
+        # Solo buscamos la fuente de verdad: La sección de prensa
         r_prensa = requests.get(PRENSA_URL, timeout=10)
         soup_prensa = BeautifulSoup(r_prensa.text, 'html.parser')
         
@@ -49,27 +45,29 @@ def obtener_contexto_completo():
         print(f"   ✅ ID más reciente: {max_id}")
         r_art = requests.get(best_link, timeout=10)
         soup_art = BeautifulSoup(r_art.text, 'html.parser')
-        art_text_clean = " ".join(soup_art.text.split())[:6000]
         
-        texto_final = f"=== PORTADA PRINCIPAL ===\n{home_text_clean}\n\n=== COMUNICADO DETALLE ===\n{art_text_clean}"
-        return best_title, texto_final
+        # Extraemos solo el texto del artículo más nuevo
+        art_text_clean = " ".join(soup_art.text.split())[:7000]
+        
+        return best_title, art_text_clean
     except Exception as e:
         return None, f"Error web: {e}"
 
-def analizar_contingencia_ia(titulo, texto_combinado):
+def analizar_contingencia_ia(titulo, texto_articulo):
     print("🤖 2. Procesando cruce de datos con IA...")
-    prompt_sistema = """Eres un analista legal de la CAMe. Lee el texto y devuelve un JSON.
-    REGLAS:
-    1. "estatus": "ACTIVA", "MANTIENE", "SUSPENDE", o "SIN_CONTINGENCIA".
-    2. "fase": "Fase I", "Fase II", o "None".
-    3. "resumen_hnc": Resume EXACTAMENTE quién NO circula (Ej: "No circulan hologramas 2, 1 impar y 0/00 rojo"). Si se SUSPENDE, pon "Circulación normal".
-    4. "fecha_hora": Extrae la FECHA Y HORA REAL (Ej: "17 de febrero, 15:00 horas") basándote en la PORTADA PRINCIPAL y el título. Ignora fechas pasadas del texto."""
+    
+    prompt_sistema = """Eres un analista legal de la CAMe. Lee el TITULO y el TEXTO del comunicado y devuelve un JSON.
+    REGLAS ESTRICTAS:
+    1. "estatus": Si el título o el texto dice "SE SUSPENDE" o "LEVANTAR", pon "SUSPENDE" (obligatorio). Si dice "MANTIENE" o "CONTINÚA", pon "MANTIENE".
+    2. "fase": "Fase I", "Fase II", o "None" (si se suspende).
+    3. "resumen_hnc": Si se SUSPENDE, pon "Circulación normal". Si se MANTIENE, resume quién NO circula.
+    4. "fecha_hora": Extrae la FECHA Y HORA de emisión del boletín (Ej: "17 de febrero, 18:00 horas"). Búscala en el título o en frases como "boletín de las 18:00 horas". Ignora menciones a días pasados dentro del contexto del texto."""
     
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             response_format={ "type": "json_object" },
-            messages=[{"role": "system", "content": prompt_sistema}, {"role": "user", "content": f"TÍTULO: {titulo}\n\nTEXTO: {texto_combinado}"}],
+            messages=[{"role": "system", "content": prompt_sistema}, {"role": "user", "content": f"TÍTULO: {titulo}\n\nTEXTO:\n{texto_articulo}"}],
             temperature=0.0
         )
         return json.loads(response.choices[0].message.content)
@@ -92,32 +90,47 @@ def lambda_handler(event, context):
     fecha_nueva = resultado_ia.get('fecha_hora', '')
     fecha_vieja = estado_anterior.get('fecha_hora', '')
     
+    # Disparamos si la fecha cambió
     if fecha_nueva != fecha_vieja and fecha_nueva != "":
         print(f"🚨 ¡NUEVO BOLETÍN DETECTADO! Actualizando BD... ({fecha_vieja} -> {fecha_nueva})")
         
         fase_detectada = resultado_ia.get('fase', 'None')
         estatus = resultado_ia.get('estatus', 'MANTIENE')
-        fase_broadcast = "SUSPENDIDA" if estatus == "SUSPENDE" else fase_detectada
+        
+        # Lógica de Suspensión Segura
+        if estatus in ["SUSPENDE", "SIN_CONTINGENCIA"]:
+            fase_broadcast = "SUSPENDIDA"
+            fase_db = "None" 
+        else:
+            fase_broadcast = fase_detectada
+            fase_db = fase_detectada
             
         # 1. Guardar la verdad oficial en la BD
         table.update_item(
             Key={'user_id': 'SYSTEM_STATE'},
             UpdateExpression="SET came_oficial = :c, last_contingency_phase = :p, updated_at = :t",
-            ExpressionAttributeValues={':c': resultado_ia, ':p': fase_broadcast, ':t': datetime.now().isoformat()}
+            ExpressionAttributeValues={':c': resultado_ia, ':p': fase_db, ':t': datetime.now().isoformat()}
         )
             
-        # 2. Despertar al Chatbot para el Broadcast
-        payload = {
-            "action": "BROADCAST_CONTINGENCY",
-            "data": {
-                "phase": fase_broadcast,
-                "alert_type": "Comunicado CAMe",
-                "trigger_station_name": "Portal Oficial (CAMe)",
-                "recommendations": {
-                    "categories": [{"name": "RESTRICCIONES VEHICULARES", "items": [resultado_ia.get('resumen_hnc', 'Verificar oficial')]}]
+        # 2. Despertar al Chatbot (Con el formato que espera)
+        if fase_broadcast == "SUSPENDIDA":
+            payload = {
+                "action": "BROADCAST_CONTINGENCY",
+                "data": {"phase": "SUSPENDIDA"}
+            }
+        else:
+            payload = {
+                "action": "BROADCAST_CONTINGENCY",
+                "data": {
+                    "phase": fase_broadcast,
+                    "alert_type": "Decreto Legal (CAMe)",
+                    "trigger_station_name": "Portal CAMe",
+                    "recommendations": {
+                        "categories": [{"name": "RESTRICCIONES VEHICULARES", "items": [resultado_ia.get('resumen_hnc', 'Verificar oficial')]}]
+                    }
                 }
             }
-        }
+        
         lambda_client.invoke(FunctionName=BOT_LAMBDA_NAME, InvocationType='Event', Payload=json.dumps(payload))
         print("📢 Señal de Broadcast enviada al Chatbot.")
             
