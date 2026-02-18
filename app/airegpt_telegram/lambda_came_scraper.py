@@ -44,23 +44,34 @@ def obtener_contexto_completo():
         
         if not best_link: return None, "No hay enlaces."
         
-        print(f"   ✅ ID más reciente: {max_id}")
-        r_art = requests.get(best_link, timeout=10)
+        print(f"   ✅ ID más reciente: {max_id} | Link: {best_link}")
+        # Le subimos a 15s el timeout por si la página del gobierno está lenta
+        r_art = requests.get(best_link, timeout=15) 
         soup_art = BeautifulSoup(r_art.text, 'html.parser')
         
-        # --- FIX: EXTRACCIÓN QUIRÚRGICA (Bypass de Banners) ---
-        # 1. Título desde la metadata oculta (100% confiable, libre de basura)
+        # --- FIX: EXTRACCIÓN SÚPER SEGURA (A prueba de caídas) ---
+        # 1. Título
         meta_title = soup_art.find('meta', property='og:title')
-        titulo_real = meta_title['content'] if meta_title else soup_art.find('h1').text
+        if meta_title and meta_title.get('content'):
+            titulo_real = meta_title['content']
+        else:
+            h1_tag = soup_art.find('h1')
+            titulo_real = h1_tag.text.strip() if h1_tag else "Comunicado Oficial CAMe"
         
-        # 2. Texto SOLAMENTE desde dentro de la etiqueta <article>
+        # 2. Texto
         articulo_html = soup_art.find('article')
-        parrafos = articulo_html.find_all('p') if articulo_html else soup_art.find_all('p')
+        if articulo_html:
+            parrafos = articulo_html.find_all('p')
+        else:
+            parrafos = soup_art.find_all('p')
+            
         texto_limpio = " ".join([p.text.strip() for p in parrafos if len(p.text.strip()) > 15])[:6000]
         # -------------------------------------------------------------
         
         return titulo_real, texto_limpio
+    
     except Exception as e:
+        print(f"❌ [CRITICAL ERROR] Falló la extracción en la web: {e}")
         return None, f"Error web: {e}"
 
 def analizar_contingencia_ia(titulo, texto_articulo):
@@ -87,15 +98,22 @@ def analizar_contingencia_ia(titulo, texto_articulo):
             temperature=0.0
         )
         return json.loads(response.choices[0].message.content)
-    except Exception as e: return {"error": str(e)}
+    except Exception as e: 
+        print(f"❌ [IA ERROR] Falló OpenAI: {e}")
+        return {"error": str(e)}
 
 def lambda_handler(event, context):
     print("🚀 Iniciando CAMe Scraper...")
     titulo, texto = obtener_contexto_completo()
-    if not titulo: return {"statusCode": 500, "body": "Fallo extracción"}
+    
+    if not titulo: 
+        print(f"🚨 Abortando Lambda por error: {texto}")
+        return {"statusCode": 500, "body": "Fallo extracción"}
         
     resultado_ia = analizar_contingencia_ia(titulo, texto)
-    if "error" in resultado_ia: return {"statusCode": 500, "body": "Fallo IA"}
+    if "error" in resultado_ia: 
+        print("🚨 Abortando Lambda por error de IA.")
+        return {"statusCode": 500, "body": "Fallo IA"}
         
     print(f"✅ JSON Extraído: {json.dumps(resultado_ia, ensure_ascii=False)}")
     
