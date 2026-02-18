@@ -216,8 +216,10 @@ def lambda_handler(event, context):
             now_mx = datetime.now(tz)
             ayer_str = (now_mx - timedelta(days=1)).strftime("%Y-%m-%d")
             
-            # Redondeamos la lat/lon del usuario a 3 decimales para cruzar con el diccionario
-            geo_key = f"{round(u_lat, 3)},{round(u_lon, 3)}"
+            # FIX: Usamos las coordenadas de la celda de la malla (p), NO las del usuario
+            grid_lat = p.get('lat', 0.0)
+            grid_lon = p.get('lon', 0.0)
+            geo_key = f"{round(grid_lat, 3)},{round(grid_lon, 3)}"
             
             # Buscamos el archivo en S3
             resumen_diario = get_s3_gzip_json(f"daily_summaries/summary_{ayer_str}.json.gz")
