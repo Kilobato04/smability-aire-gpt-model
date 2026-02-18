@@ -158,8 +158,10 @@ def lambda_handler(event, context):
         if fase_broadcast == "SUSPENDIDA":
             payload = {
                 "action": "BROADCAST_CONTINGENCY",
-                "data": {"phase": "SUSPENDIDA"},
-                "oficial_link":
+                "data": {
+                    "phase": "SUSPENDIDA",
+                    "oficial_link": link_oficial  # <--- Adentro de "data" y con su valor
+                }
             }
         else:
             payload = {
