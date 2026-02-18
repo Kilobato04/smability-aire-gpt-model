@@ -1,0 +1,8 @@
+pandas
+numpy
+xgboost
+scipy
+requests
+boto3
+scikit-learn
+tzdata
