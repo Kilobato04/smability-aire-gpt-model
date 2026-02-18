@@ -481,9 +481,13 @@ def lambda_handler(event, context):
         now_mx = get_mexico_time().strftime("%H:%M")
         msg = ""
 
+        # --- FIX: EXTRAER EL LINK OFICIAL DE LA CAME ---
+        link_came = data.get('oficial_link', 'https://www.gob.mx/comisionambiental')
+
         if phase == "SUSPENDIDA":
             msg = cards.CARD_CONTINGENCY_LIFTED.format(
                 report_time=now_mx,
+                oficial_link=link_came, # <--- ENLACE INYECTADO
                 footer=cards.BOT_FOOTER
             )
         else:
@@ -517,6 +521,7 @@ def lambda_handler(event, context):
                 pollutant_info=pollutant_str,
                 station_info=station_display,
                 restrictions_txt=res_txt,
+                oficial_link=link_came, # <--- ENLACE INYECTADO
                 footer=cards.BOT_FOOTER
             )
 
