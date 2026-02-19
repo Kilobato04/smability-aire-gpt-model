@@ -157,6 +157,42 @@ def delete_location_from_db(user_id, location_name):
         print(f"❌ Error deleting location cascade: {e}")
         return False
 
+def rename_location_in_db(user_id, old_name, new_name):
+    """
+    Cambia la llave en DynamoDB para que el motor matemático la reconozca.
+    Ej. 'ecatepec' -> 'trabajo'
+    """
+    old_key = normalize_key(old_name)
+    new_key = normalize_key(new_name)
+
+    user = get_user_profile(user_id)
+    locs = user.get('locations', {})
+    
+    if old_key not in locs:
+        return False, f"⚠️ No encontré la ubicación '{old_name}' en tu perfil."
+        
+    if new_key in locs:
+        return False, f"⚠️ Ya tienes una ubicación llamada '{new_name}'. Por favor bórrala primero."
+
+    # 1. Extraemos los datos de la ubicación vieja
+    loc_data = locs[old_key]
+    loc_data['display_name'] = new_name.strip().capitalize() # Actualizamos el nombre visual
+    
+    # 2. Guardamos la nueva llave y borramos la vieja (en cascada)
+    update_expr = "SET locations.#newk = :val REMOVE locations.#oldk, alerts.threshold.#oldk, alerts.schedule.#oldk"
+    
+    try:
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames={'#newk': new_key, '#oldk': old_key},
+            ExpressionAttributeValues={':val': loc_data}
+        )
+        return True, f"✅ Listo. He renombrado '{old_name}' a '{new_name}'."
+    except Exception as e:
+        print(f"❌ Error rename DB: {e}")
+        return False, "⚠️ Hubo un error al actualizar la base de datos."
+
 
 class CalculadoraRiesgoSmability:
     def __init__(self):
@@ -1068,14 +1104,37 @@ def lambda_handler(event, context):
                 elif fn == "configurar_transporte":
                     medio = args.get('medio', 'auto_ventana')
                     horas_raw = args.get('horas_al_dia', 2)
-                    horas_db = Decimal(str(horas_raw)) # Protegemos el dato para DynamoDB
                     
+                    # 1. Validación y Redondeo de Horas (Convertimos a float y redondeamos a 1 decimal)
+                    try:
+                        horas_float = round(float(horas_raw), 1)
+                    except:
+                        horas_float = 2.0 # Default si falla
+                        
+                    # 2. Límite de sentido común (Max 6 horas, Min 0)
+                    if horas_float > 6.0:
+                        r = "⚠️ El tiempo máximo de exposición que puedo calcular son 6 horas diarias. Por favor, explícale esto amablemente al usuario y pídele un tiempo real."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        continue # Saltamos el guardado en BD
+                        
+                    if horas_float < 0:
+                        horas_float = 0.0
+                        
+                    # 3. Validar Transporte soportado
+                    MEDIOS_VALIDOS = ["auto_ac", "suburbano", "cablebus", "metro", "metrobus", "auto_ventana", "combi", "caminar", "bicicleta", "home_office"]
+                    if medio not in MEDIOS_VALIDOS:
+                        r = f"⚠️ '{medio}' no es un modo válido. Dile que elija entre: Auto, Metro, Metrobús, Combi, Tren, Cablebús, Caminar, Bici o Home Office."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        continue # Saltamos el guardado en BD
+
+                    # 4. Guardar en DynamoDB
+                    horas_db = Decimal(str(horas_float))
                     table.update_item(
                         Key={'user_id': str(user_id)},
                         UpdateExpression="SET profile_transport = :p",
-                        ExpressionAttributeValues={':p': {'medio': medio, 'horas': horas_db}} # Usamos horas_db
+                        ExpressionAttributeValues={':p': {'medio': medio, 'horas': horas_db}}
                     )
-                    r = f"✅ Transporte guardado: Viajas en {medio} aprox {horas_raw} horas al día."
+                    r = f"✅ Perfil actualizado: Viajas en {medio} por {horas_float} horas. Dile al usuario de forma amigable que su transporte ha sido guardado y que ya puede consultar sus cigarros."
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
                 elif fn == "calcular_exposicion_diaria":
@@ -1126,6 +1185,17 @@ def lambda_handler(event, context):
                         else:
                             r = f"⚠️ No encontré '{nombre}' o ya estaba borrada."
                     
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+
+                elif fn == "renombrar_ubicacion":
+                    nombre_viejo = args.get('nombre_actual')
+                    nombre_nuevo = args.get('nombre_nuevo')
+                    
+                    if not nombre_viejo or not nombre_nuevo:
+                        r = "⚠️ Necesito saber qué nombre cambiar y cuál es el nuevo."
+                    else:
+                        success, r = rename_location_in_db(user_id, nombre_viejo, nombre_nuevo)
+                        
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                 
                 elif fn == "configurar_alerta_ias": 
