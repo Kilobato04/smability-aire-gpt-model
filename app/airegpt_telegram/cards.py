@@ -1,7 +1,9 @@
 import urllib.parse
 
-# app/cards.py
-BOT_FOOTER = "🤖 *AireGPT* | [Smability.io](https://smability.io)"
+BOT_VERSION = "v6.0"
+
+# --- NUEVO FOOTER LIMPIO ---
+BOT_FOOTER = "🤖 *AIreGPT* | [Smability.io](https://smability.io)"
 
 IAS_INFO = {
     "Buena": {"msg": "Aire limpio.", "rec": "¡Disfruta el exterior!", "emoji": "🟢"},
