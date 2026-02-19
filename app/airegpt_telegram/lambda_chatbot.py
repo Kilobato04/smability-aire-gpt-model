@@ -792,8 +792,60 @@ def lambda_handler(event, context):
 
             elif data.startswith("SET_TIME_"):
                 horas = int(data.replace("SET_TIME_", ""))
+                # 1. Guardamos las horas
                 table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport.horas = :h", ExpressionAttributeValues={':h': horas})
-                send_telegram(chat_id, "✅ **¡Perfil completado!**\n\n👇 Presiona aquí para ver tu resultado:", markup=cards.get_exposure_button())
+                send_telegram(chat_id, "✅ **¡Perfil completado!**\n\n⏳ *Calculando tu desgaste celular...*")
+                
+                # 2. Simulamos el clic de CHECK_EXPOSURE forzando el dato
+                # Al cambiar el valor de 'data', el bloque de abajo (CHECK_EXPOSURE) 
+                # NO se ejecutará automáticamente porque ya pasamos por los 'elif'.
+                # La forma correcta es volver a llamar a la función internamente o copiar el código.
+                # Para evitar código duplicado o recursión riesgosa en Lambda, usaremos la vía segura:
+                
+                # RECONSTRUCCIÓN RÁPIDA DEL CÁLCULO
+                try:
+                    user = get_user_profile(user_id)
+                    locs = user.get('locations', {})
+                    transp = user.get('profile_transport') # Ya incluye las horas actualizadas
+                    
+                    lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
+                    resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
+                    vector_c = resp_c.get("vector_exposicion_ayer")
+                    
+                    vector_t = None
+                    es_ho = False
+                    if 'trabajo' in locs:
+                        lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
+                        resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}").json()
+                        vector_t = resp_t.get("vector_exposicion_ayer")
+
+                    if vector_c:
+                        calc = CalculadoraRiesgoSmability()
+                        perfil = {"transporte_default": transp.get('medio', 'auto_ventana'), "tiempo_traslado_horas": transp.get('horas', 2)}
+                        res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
+                        
+                        cigs, dias = res['cigarros'], res['dias_perdidos']
+                        
+                        card = cards.CARD_EXPOSICION.format(
+                            user_name=first_name, 
+                            emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
+                            emoji_cigarro="🚬" * int(cigs) if cigs >= 1 else "🚬", 
+                            cigarros=cigs, 
+                            emoji_edad="⏳🧓" if dias >= 1.0 else "🕰️", 
+                            dias=dias,
+                            mun_casa=resp_c['ubicacion']['mun'], 
+                            calidad_hoy=resp_c['aire']['calidad'],
+                            mensaje_hoy=resp_c['aire']['mensaje_corto'], 
+                            promedio_riesgo=res['promedio_riesgo'],
+                            footer=cards.BOT_FOOTER
+                        )
+                        send_telegram(chat_id, card)
+                    else:
+                        send_telegram(chat_id, "⚠️ Aún no tengo los datos atmosféricos de ayer procesados.")
+                except Exception as e:
+                    print(f"Error forzando calculo final: {e}")
+                    send_telegram(chat_id, "Hubo un error al procesar tu exposición.")
+                    
                 return {'statusCode': 200, 'body': 'OK'}
 
         # 2. MESSAGES
@@ -946,6 +998,54 @@ def lambda_handler(event, context):
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                         # Aquí NO hacemos return, dejamos que el flujo baje para que GPT explique el error en texto.
                     
+                # --- INICIO DE NUEVAS TOOLS (TEXTO/LLM) ---
+                elif fn == "configurar_transporte":
+                    medio = args.get('medio', 'auto_ventana')
+                    horas = args.get('horas_al_dia', 2)
+                    
+                    table.update_item(
+                        Key={'user_id': str(user_id)},
+                        UpdateExpression="SET profile_transport = :p",
+                        ExpressionAttributeValues={':p': {'medio': medio, 'horas': horas}}
+                    )
+                    r = f"✅ Transporte guardado: Viajas en {medio} aprox {horas} horas al día."
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+
+                elif fn == "calcular_exposicion_diaria":
+                    # Este es el código que el LLM ejecutará si el usuario pregunta "cuántos cigarros respiré"
+                    user = get_user_profile(user_id)
+                    locs = user.get('locations', {})
+                    transp = user.get('profile_transport', {'medio': 'auto_ventana', 'horas': 2})
+                    
+                    if 'casa' not in locs:
+                        r = "⚠️ Necesito tu ubicación de CASA para calcular esto. Pídesela al usuario."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    else:
+                        lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
+                        resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
+                        vector_c = resp_c.get("vector_exposicion_ayer")
+                        
+                        vector_t = None
+                        es_ho = True
+                        if 'trabajo' in locs:
+                            lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
+                            resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}").json()
+                            vector_t = resp_t.get("vector_exposicion_ayer")
+                            es_ho = False
+
+                        if vector_c:
+                            calc = CalculadoraRiesgoSmability()
+                            perfil = {"transporte_default": transp.get('medio', 'auto_ventana'), "tiempo_traslado_horas": transp.get('horas', 2)}
+                            res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
+                            
+                            # AQUÍ ESTÁ EL FIX: Le devolvemos un string limpio a GPT para que él lo hable.
+                            r = f"El usuario respiró el equivalente a {res['cigarros']} cigarros ayer, perdiendo {res['dias_perdidos']} días de vida celular (Edad Urbana). Promedio de exposición integral: {res['promedio_riesgo']} ug/m3. Transmítele esto de forma empática usando emojis."
+                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        else:
+                            r = "⚠️ Aún no tengo los datos atmosféricos de ayer procesados."
+                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                # --- FIN DE NUEVAS TOOLS ---
+                
                 # --- NUEVA TOOL: ELIMINAR UBICACIÓN (TEXTO) ---
                 elif fn == "eliminar_ubicacion":
                     nombre = args.get('nombre_ubicacion')
