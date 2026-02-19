@@ -218,16 +218,18 @@ CARD_MY_LOCATIONS = """📍 **MIS UBICACIONES GUARDADAS**
 {footer}"""
 
 # --- NUEVA TARJETA: EXPOSICIÓN (GAMIFICACIÓN) ---
-CARD_EXPOSICION = """{emoji_alerta} *Reporte de Desgaste Acelerado*
+CARD_EXPOSICION = """{emoji_alerta} *Reporte de Exposición*
 👤 {user_name}
 
 Ayer te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
+
+{rutina_str}
 
 {emoji_cigarro} Respiraste el equivalente a *{cigarros} cigarros invisibles* en tu rutina.
 
 {emoji_edad} Esto sumó *{dias} días extra* de desgaste a tu Edad Urbana.
 
-_*Promedio de exposición integral {promedio_riesgo} µg/m³ eq.*_
+_*Promedio de exposición {promedio_riesgo} µg/m³ eq.*_
 {footer}"""
 
 # --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
@@ -423,7 +425,7 @@ def get_delete_confirmation_buttons(location_key):
 # --- BOTONES VIRALES (COMPARTIR) ---
 def get_share_exposure_button(cigarros, dias):
     """Botón para compartir el desgaste celular (Gamificación)"""
-    texto = f"😷 Ayer respiré el equivalente a {cigarros} cigarros invisibles en el tráfico de la ciudad y sumé {dias} días extra a mi Edad Urbana.\n\nDescubre tu exposición y protégete con @airegptcdmx_bot 🏙️👇"
+    texto = f"😷 Ayer respiré el equivalente a {cigarros} cigarros invisibles en el tráfico de la ciudad y sumé {dias} días extra a mi Edad Urbana.\n\nDescubre tu exposición y protégete con AireGPT 🏙️👇"
     url_segura = urllib.parse.quote(texto)
     link_share = f"https://t.me/share/url?url=https://t.me/airegptcdmx_bot&text={url_segura}"
     
