@@ -223,31 +223,32 @@ Ayer te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
 
 {emoji_edad} Esto sumó *{dias} días extra* de desgaste a tu Edad Urbana.
 
-💡 *Hoy en tu zona principal ({mun_casa}) la calidad es {calidad_hoy}.* {mensaje_hoy}
-
-_*(Dato científico: Promedio de exposición integral {promedio_riesgo} µg/m³ eq.)*_
+_*(Promedio de exposición integral {promedio_riesgo} µg/m³ eq.)*_
 {footer}"""
 
 # --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
 def get_exposure_button():
-    return {"inline_keyboard": [[{"text": "🚬 ¿Cuántos cigarros respiré ayer?", "callback_data": "CHECK_EXPOSURE"}]]}
+    # Usamos 💨🚬 como combo, o si prefieres solo la cajita 🚬
+    return {"inline_keyboard": [[{"text": "💨🚬 ¿Cuántos cigarros respiré ayer?", "callback_data": "CHECK_EXPOSURE"}]]}
 
 def get_transport_buttons():
+    # UX Ajustada: Consolidamos Auto, agregamos Metrobús
     return {"inline_keyboard": [
         [{"text": "🚇 Metro / Tren", "callback_data": "SET_TRANS_metro"}, 
-         {"text": "🚐 Combi / Bus", "callback_data": "SET_TRANS_combi"}],
-        [{"text": "🚗 Auto (Ventanillas)", "callback_data": "SET_TRANS_auto_ventana"},
-         {"text": "❄️ Auto (Con A/C)", "callback_data": "SET_TRANS_auto_ac"}],
-        [{"text": "🚲 Bici / Caminar", "callback_data": "SET_TRANS_bicicleta"},
-         {"text": "🏠 Hago Home Office", "callback_data": "SET_TRANS_home_office"}]
+         {"text": "🚌 Metrobús", "callback_data": "SET_TRANS_metrobus"}],
+        [{"text": "🚗 Automóvil", "callback_data": "SET_TRANS_auto_ac"}, # Asumimos AC/Cerrado para la matemática
+         {"text": "🚐 Combi / Micro", "callback_data": "SET_TRANS_combi"}],
+        [{"text": "🚲 Caminar / Bici", "callback_data": "SET_TRANS_caminar"},
+         {"text": "🏠 Home Office", "callback_data": "SET_TRANS_home_office"}]
     ]}
 
 def get_time_buttons():
+    # UX Ajustada: Agregamos 30 mins (0.5 hrs)
     return {"inline_keyboard": [
-        [{"text": "⏱️ ~1 Hora", "callback_data": "SET_TIME_1"}, 
-         {"text": "⏱️ ~2 Horas", "callback_data": "SET_TIME_2"}],
-        [{"text": "⏱️ ~3 Horas", "callback_data": "SET_TIME_3"}, 
-         {"text": "⏱️ 4+ Horas", "callback_data": "SET_TIME_4"}]
+        [{"text": "⏱️ ~30 min", "callback_data": "SET_TIME_0.5"}, 
+         {"text": "⏱️ ~1 Hora", "callback_data": "SET_TIME_1"}],
+        [{"text": "⏱️ ~2 Horas", "callback_data": "SET_TIME_2"}, 
+         {"text": "⏱️ 3+ Horas", "callback_data": "SET_TIME_3"}]
     ]}
 
 # --- 1. HELPER VISUAL DE DÍAS ---
