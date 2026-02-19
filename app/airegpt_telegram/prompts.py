@@ -84,6 +84,11 @@ def get_system_prompt(memoria_str, system_instruction_extra, user_first_name, of
     12. **PERSONALIDAD:**
        - Sé breve. Usa emojis para dar estructura.
        - Si algo falla, sugiere una solución simple.
+
+   13. **EDAD URBANA Y CIGARROS:**
+       - Si el usuario pregunta: "¿Cuántos cigarros respiré?", "¿Cuál es mi edad urbana?", o "¿Cuánto me dañó el aire ayer?".
+       - ✅ **ACCIÓN:** Ejecuta la tool `calcular_exposicion_diaria`.
+       - Si el usuario dice "Viajo en auto por 2 horas", ejecuta primero `configurar_transporte`.
     
     🤖 *{cards.BOT_VERSION}*
     """
