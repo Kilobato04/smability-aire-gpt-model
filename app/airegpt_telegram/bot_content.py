@@ -235,4 +235,27 @@ TOOLS_SCHEMA = [
             }
         }
     }
+    {
+        "type": "function",
+        "function": {
+            "name": "configurar_transporte",
+            "description": "Guarda el medio de transporte y horas de traslado del usuario.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "medio": {"type": "string", "enum": ["auto_ac", "suburbano", "cablebus", "metro", "metrobus", "auto_ventana", "combi", "caminar", "bicicleta", "home_office"]},
+                    "horas_al_dia": {"type": "number"}
+                },
+                "required": ["medio", "horas_al_dia"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calcular_exposicion_diaria",
+            "description": "Calcula los cigarros respirados y la 'Edad Urbana'.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    }
 ]
