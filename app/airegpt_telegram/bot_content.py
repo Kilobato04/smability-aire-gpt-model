@@ -1,5 +1,3 @@
-import cards
-BOT_VERSION = cards.BOT_VERSION
 TOOLS_SCHEMA = [
     {
         "type": "function",
