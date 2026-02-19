@@ -174,7 +174,7 @@ class CalculadoraRiesgoSmability:
             hora_salida, hora_llegada_casa, factor_transporte = 25, 25, 1.0
         else:
             hora_salida = 7  
-            duracion_traslado = perfil_usuario.get('tiempo_traslado_horas', 2) 
+            duracion_traslado = float(perfil_usuario.get('tiempo_traslado_horas', 2)) # <--- FIX AQUÍ
             mitad_traslado = math.ceil(duracion_traslado / 2.0)
             hora_llegada_trabajo = hora_salida + mitad_traslado
             hora_salida_trabajo = 18 
