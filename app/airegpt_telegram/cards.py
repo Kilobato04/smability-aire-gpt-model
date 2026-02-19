@@ -1,6 +1,5 @@
 # app/cards.py
-BOT_VERSION = "v0.6.0 (Live API Connect)"
-BOT_FOOTER = f"🤖 AIreGPT {BOT_VERSION}"
+BOT_FOOTER = "🤖 *AireGPT* | [Smability.io](https://smability.io)"
 
 IAS_INFO = {
     "Buena": {"msg": "Aire limpio.", "rec": "¡Disfruta el exterior!", "emoji": "🟢"},
@@ -59,9 +58,8 @@ Ahora, envíame la ubicación de tu **TRABAJO** (o escuela) para activar las ale
 
 # ACTUALIZADA: Se agregó {trend_arrow} para aprovechar el dato de la nueva API
 CARD_REPORT = """🌤️ **{greeting}, {user_name}!**
-Aquí tienes el reporte para **{location_name}**:
-[🔗 Abrir en Google Maps]({maps_url})
-📍 {region} • 🕒 {report_time}
+Aquí tienes el reporte para 📍 **[{location_name}]({maps_url})**:
+🗺️ {region} • 🕒 {report_time}
 
 {risk_circle} **Calidad {risk_category} ({ias_value} pts)**
 ☣️ **Contaminante dominante:** {pollutant}
@@ -87,9 +85,8 @@ Hola {user_name}, la contaminación en **{location_name}** ha superado tu límit
 {footer}"""
 
 CARD_REMINDER = """⏰ **{greeting}, {user_name}!**
-Aquí tienes el reporte para **{location_name}**:
-[🔗 Abrir en Google Maps]({maps_url})
-📍 {region} • 🕒 {report_time}
+Aquí tienes el reporte para 📍 **[{location_name}]({maps_url})**:
+🗺️ {region} • 🕒 {report_time}
 
 {risk_circle} **Calidad {risk_category} ({ias_value} pts)**
 ☣️ **Contaminante dominante:** {pollutant}
@@ -328,10 +325,19 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
             schedule_list.append(f"• {safe_k}: {v.get('time')} hrs ({days_txt})")
     schedule_str = "\n".join(schedule_list) if schedule_list else "• *Sin reportes programados*"
 
+    # ====================================================
+    # AQUÍ ESTÁ EL BLOQUE DEL HOY NO CIRCULA DINÁMICO
+    # ====================================================
     if vehicle and vehicle.get('active'):
-        hnc_str = "• 🚗 Encuentra las restricciones de HNC directamente en tus alertas y reportes de Aire."
+        plate = vehicle.get('plate_last_digit')
+        holo = vehicle.get('hologram')
+        # Calculamos al vuelo si circula HOY (asumimos Fase regular para el resumen rápido)
+        can_drive, r_short, _ = check_driving_status(plate, holo, "hoy", "None")
+        status_text = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
+        hnc_str = f"• Hoy: **{status_text}** ({r_short})"
     else:
         hnc_str = "• 🔕 Registra tu auto para ver restricciones." 
+    # ====================================================
 
     tip = "💡 Tip: Dile al bot 'Cambia mi transporte a...' para ajustar tu rutina."
 
