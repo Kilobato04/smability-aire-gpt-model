@@ -175,6 +175,9 @@ CARD_SUMMARY = """
 📍 **Tus Ubicaciones:**
 {locations_list}
 
+🚇 **Tu Rutina (Cálculo de Desgaste):**
+{transport_info}
+
 🚗 **Tu Auto:**
 {vehicle_info}
 
@@ -261,24 +264,19 @@ def format_days_text(days_list):
 
 
 # --- 2. ACTUALIZAR FUNCIÓN GENERADORA DE RESUMEN ---
-def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
-    # Función auxiliar de limpieza local
+def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, transport_data=None):
     def clean(text):
         return str(text).replace("_", " ").replace("*", "").replace("[", "").replace("]", "")
 
-    # a) Status Contingencia & Plan (LÓGICA CORREGIDA)
     safe_plan = clean(plan_status)
     is_premium = "PREMIUM" in safe_plan.upper() or "TRIAL" in safe_plan.upper()
     
     if is_premium:
-        # Leemos el estado real de la BD. Si no existe la llave, asumimos False (Inactiva)
-        # OJO: Si prefieres que por defecto esté activa para nuevos, cambia False a True
         is_active_db = alerts.get('contingency', False)
         contingency_status = "✅ **ACTIVA**" if is_active_db else "🔕 **DESACTIVADA**"
     else:
         contingency_status = "🔒 **BLOQUEADA** (Solo Premium)"
     
-    # b) Ubicaciones
     locs = []
     if isinstance(locations, dict):
         for k, v in locations.items():
@@ -287,28 +285,42 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
             locs.append(f"• **{safe_k}:** {safe_name}")
     loc_str = "\n".join(locs) if locs else "• *Sin ubicaciones guardadas*"
 
-    # c) Vehículo
+    # --- NUEVO: Procesar Transporte ---
+    if transport_data and transport_data.get('medio'):
+        medio_raw = transport_data.get('medio')
+        horas = transport_data.get('horas', 0)
+        
+        nombres_medios = {
+            "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
+            "metro": "🚇 Metro/Tren", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
+            "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
+        }
+        medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
+        
+        if medio_raw == "home_office":
+            trans_str = f"• Modalidad: **{medio_str}**"
+        else:
+            trans_str = f"• Modo: **{medio_str}**\n• Tiempo: **{horas} hrs/día**"
+    else:
+        trans_str = "• *Sin configurar (Escribe 'Viajo en metro 2 horas')*"
+
     veh_str = "• *Sin auto registrado*"
     if vehicle and vehicle.get('active'):
         digit = vehicle.get('plate_last_digit')
         holo = clean(vehicle.get('hologram'))
         veh_str = f"• Placa **{digit}** (Holo {holo})"
 
-    # d) Alertas de Aire por UMBRAL (FILTRADO)
     threshold_list = []
     thresholds = alerts.get('threshold', {})
     for k, v in thresholds.items():
-        # Validar que la ubicación exista
         if v.get('active') and k in locations: 
             safe_k = clean(k.capitalize())
             threshold_list.append(f"• {safe_k}: > {v.get('umbral')} pts")
     threshold_str = "\n".join(threshold_list) if threshold_list else "• *Sin alertas de umbral*"
 
-    # e) Reportes de Aire PROGRAMADOS (FILTRADO)
     schedule_list = []
     schedules = alerts.get('schedule', {})
     for k, v in schedules.items():
-        # Validar que la ubicación exista
         if v.get('active') and k in locations: 
             safe_k = clean(k.capitalize())
             days = v.get('days', [])
@@ -316,20 +328,19 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status):
             schedule_list.append(f"• {safe_k}: {v.get('time')} hrs ({days_txt})")
     schedule_str = "\n".join(schedule_list) if schedule_list else "• *Sin reportes programados*"
 
-    # f) Recordatorio HOY NO CIRCULA
     if vehicle and vehicle.get('active'):
         hnc_str = "• 🚗 Encuentra las restricciones de HNC directamente en tus alertas y reportes de Aire."
     else:
         hnc_str = "• 🔕 Registra tu auto para ver restricciones." 
 
-    # Footer
-    tip = "💡 Tip: Escribe 'Cambiar hora alertas' para ajustar." if is_premium else "💎 Tip: Hazte Premium para activar Contingencias."
+    tip = "💡 Tip: Dile al bot 'Cambia mi transporte a...' para ajustar tu rutina."
 
     return CARD_SUMMARY.format(
         user_name=clean(user_name),
         plan_status=safe_plan,
         contingency_status=contingency_status,
         locations_list=loc_str,
+        transport_info=trans_str,  # <--- SE INYECTA AQUÍ
         vehicle_info=veh_str,
         alerts_threshold=threshold_str,
         alerts_schedule=schedule_str,
