@@ -1,3 +1,5 @@
+import urllib.parse
+
 # app/cards.py
 BOT_FOOTER = "🤖 *AireGPT* | [Smability.io](https://smability.io)"
 
@@ -414,6 +416,27 @@ def get_delete_confirmation_buttons(location_key):
             {"text": "✅ Sí, borrar todo", "callback_data": f"CONFIRM_DEL_{location_key.upper()}"},
             {"text": "❌ Cancelar", "callback_data": "CANCEL_DELETE"}
         ]
+    ]}
+
+# --- BOTONES VIRALES (COMPARTIR) ---
+def get_share_exposure_button(cigarros, dias):
+    """Botón para compartir el desgaste celular (Gamificación)"""
+    texto = f"😷 Ayer respiré el equivalente a {cigarros} cigarros invisibles en el tráfico de la ciudad y sumé {dias} días extra a mi Edad Urbana.\n\nDescubre tu desgaste y protégete gratis con @airegptcdmx_bot 🏙️👇"
+    url_segura = urllib.parse.quote(texto)
+    link_share = f"https://t.me/share/url?url=https://t.me/airegptcdmx_bot&text={url_segura}"
+    
+    return {"inline_keyboard": [
+        [{"text": "🚀 Compartir mi resultado", "url": link_share}]
+    ]}
+
+def get_share_contingency_button():
+    """Botón para compartir la alerta de contingencia"""
+    texto = "🚨 ¡Contingencia Ambiental Activa! 🚨\n\nCheca si tu auto circula hoy, evita multas y ve las medidas de salud actualizadas aquí: @airegptcdmx_bot 🚗💨"
+    url_segura = urllib.parse.quote(texto)
+    link_share = f"https://t.me/share/url?url=https://t.me/airegptcdmx_bot&text={url_segura}"
+    
+    return {"inline_keyboard": [
+        [{"text": "📢 Avisar a mis contactos", "url": link_share}]
     ]}
 
 # =====================================================================
