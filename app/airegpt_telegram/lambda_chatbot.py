@@ -805,20 +805,47 @@ def lambda_handler(event, context):
                         
                         cigs, dias = res['cigarros'], res['dias_perdidos']
                         
-                        # Nota: En lugar de pintar cigarros reales, pintamos humo tóxico
+                        # Generación de la Rutina Visual
+                        nombres_medios = {
+                            "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
+                            "metro": "🚇 Metro/Tren", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
+                            "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
+                        }
+                        
+                        medio_raw = transp.get('medio', 'auto_ventana')
+                        horas_val = transp.get('horas', 2)
+                        medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
+                        
+                        if es_ho: 
+                            rutina_txt = "🏠 **Tu rutina:** Modalidad Home Office"
+                            cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
+                        else:
+                            # Extraemos el emoji para que quede estético
+                            emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
+                            rutina_txt = f"{emoji_rut} **Tu rutina:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
+                            cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* en tu recorrido y estancia."
+                        
                         grafico_humo = "🌫️" * int(cigs) if cigs >= 1 else "🌫️"
 
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
+                            rutina_str=rutina_txt,
                             emoji_cigarro=grafico_humo, 
+                            texto_cigarros=cigs_txt,
                             cigarros=cigs, 
                             emoji_edad="⏳🧓" if dias >= 1.0 else "🕰️", 
                             dias=dias,
                             promedio_riesgo=res['promedio_riesgo'],
                             footer=cards.BOT_FOOTER
                         )
+                        
+                        # Generamos botón para compartir
                         markup_viral = cards.get_share_exposure_button(cigs, dias)
+                        
+                        if 'trabajo' not in locs and not es_ho: 
+                            card += "\n\n💡 *Tip: Guarda la ubicación de tu 'Trabajo' para un cálculo más exacto.*"
+                        
                         send_telegram(chat_id, card, markup=markup_viral)
                     else:
                         send_telegram(chat_id, "⚠️ Aún no tengo los datos atmosféricos de ayer procesados.")
@@ -871,23 +898,47 @@ def lambda_handler(event, context):
                         
                         cigs, dias = res['cigarros'], res['dias_perdidos']
                         
-                        # Nota: En lugar de pintar cigarros reales, pintamos humo tóxico
+                        # Generación de la Rutina Visual
+                        nombres_medios = {
+                            "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
+                            "metro": "🚇 Metro/Tren", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
+                            "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
+                        }
+                        
+                        medio_raw = transp.get('medio', 'auto_ventana')
+                        horas_val = transp.get('horas', 2)
+                        medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
+                        
+                        if es_ho: 
+                            rutina_txt = "🏠 **Tu rutina:** Modalidad Home Office"
+                            cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
+                        else:
+                            # Extraemos el emoji para que quede estético
+                            emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
+                            rutina_txt = f"{emoji_rut} **Tu rutina:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
+                            cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* en tu recorrido y estancia."
+                        
                         grafico_humo = "🌫️" * int(cigs) if cigs >= 1 else "🌫️"
 
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
+                            rutina_str=rutina_txt,
                             emoji_cigarro=grafico_humo, 
+                            texto_cigarros=cigs_txt,
                             cigarros=cigs, 
                             emoji_edad="⏳🧓" if dias >= 1.0 else "🕰️", 
                             dias=dias,
                             promedio_riesgo=res['promedio_riesgo'],
                             footer=cards.BOT_FOOTER
                         )
+                        
+                        # Generamos botón para compartir
+                        markup_viral = cards.get_share_exposure_button(cigs, dias)
+                        
                         if 'trabajo' not in locs and not es_ho: 
                             card += "\n\n💡 *Tip: Guarda la ubicación de tu 'Trabajo' para un cálculo más exacto.*"
                         
-                        markup_viral = cards.get_share_exposure_button(cigs, dias)
                         send_telegram(chat_id, card, markup=markup_viral)
                     else:
                         send_telegram(chat_id, "⚠️ Aún no tengo los datos atmosféricos de ayer procesados.")
