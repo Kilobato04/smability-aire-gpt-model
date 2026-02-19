@@ -199,6 +199,10 @@ class CalculadoraRiesgoSmability:
         self.K_CIGARRO = 22.0  
         self.K_O3_A_PM = 0.5   
         self.K_ENVEJECIMIENTO = 2.0  
+        
+        # NUEVO FIX: Escudo protector de edificios (Paredes/Ventanas filtran el 60%)
+        self.FACTOR_INTRAMUROS = 0.4 
+        
         self.FACTORES_TRANSPORTE = {
             "auto_ac": 0.4, "suburbano": 0.5, "cablebus": 0.7,
             "metro": 0.8, "metrobus": 0.9, "auto_ventana": 1.0,
@@ -211,7 +215,7 @@ class CalculadoraRiesgoSmability:
             hora_salida, hora_llegada_casa, factor_transporte = 25, 25, 1.0
         else:
             hora_salida = 7  
-            duracion_traslado = float(perfil_usuario.get('tiempo_traslado_horas', 2)) # <--- FIX AQUÍ
+            duracion_traslado = float(perfil_usuario.get('tiempo_traslado_horas', 2)) 
             mitad_traslado = math.ceil(duracion_traslado / 2.0)
             hora_llegada_trabajo = hora_salida + mitad_traslado
             hora_salida_trabajo = 18 
@@ -222,20 +226,28 @@ class CalculadoraRiesgoSmability:
         suma_exposicion_acumulada = 0.0
         
         for hora in range(24):
-            riesgo_casa = vector_casa['pm25_12h'][hora] + (vector_casa['o3_1h'][hora] * self.K_O3_A_PM)
-            riesgo_trabajo = vector_trabajo['pm25_12h'][hora] + (vector_trabajo['o3_1h'][hora] * self.K_O3_A_PM)
+            # 1. Contaminación EXTERIOR bruta (de la calle)
+            ext_casa = vector_casa['pm25_12h'][hora] + (vector_casa['o3_1h'][hora] * self.K_O3_A_PM)
+            ext_trab = vector_trabajo['pm25_12h'][hora] + (vector_trabajo['o3_1h'][hora] * self.K_O3_A_PM)
 
+            # 2. Contaminación INTERIOR (Con escudo del edificio aplicado)
+            int_casa = ext_casa * self.FACTOR_INTRAMUROS
+            int_trab = ext_trab * self.FACTOR_INTRAMUROS
+
+            # 3. Reconstrucción de la película del día
             if es_home_office:
-                nivel_hora = riesgo_casa
+                nivel_hora = int_casa # Todo el día protegido en casa
             else:
                 if hora < hora_salida or hora >= hora_llegada_casa:
-                    nivel_hora = riesgo_casa 
+                    nivel_hora = int_casa # Durmiendo / En casa
                 elif hora_salida <= hora < hora_llegada_trabajo:
-                    nivel_hora = ((riesgo_casa + riesgo_trabajo) / 2) * factor_transporte
+                    # En la calle (Sin escudo de edificio, solo escudo de vehículo)
+                    nivel_hora = ((ext_casa + ext_trab) / 2) * factor_transporte 
                 elif hora_llegada_trabajo <= hora < hora_salida_trabajo:
-                    nivel_hora = riesgo_trabajo 
+                    nivel_hora = int_trab # Protegido dentro de la oficina
                 elif hora_salida_trabajo <= hora < hora_llegada_casa:
-                    nivel_hora = ((riesgo_casa + riesgo_trabajo) / 2) * factor_transporte 
+                    # En la calle regresando
+                    nivel_hora = ((ext_casa + ext_trab) / 2) * factor_transporte 
 
             suma_exposicion_acumulada += nivel_hora
 
