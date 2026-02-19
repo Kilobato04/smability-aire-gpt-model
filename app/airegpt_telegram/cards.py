@@ -213,6 +213,43 @@ CARD_MY_LOCATIONS = """📍 **MIS UBICACIONES GUARDADAS**
 👇 *Usa los botones para consultar o eliminar.*
 {footer}"""
 
+# --- NUEVA TARJETA: EXPOSICIÓN (GAMIFICACIÓN) ---
+CARD_EXPOSICION = """{emoji_alerta} *Reporte de Desgaste Acelerado*
+👤 {user_name}
+
+Ayer te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
+
+{emoji_cigarro} Respiraste el equivalente a *{cigarros} cigarros invisibles* en tu rutina.
+
+{emoji_edad} Esto sumó *{dias} días extra* de desgaste a tu Edad Urbana.
+
+💡 *Hoy en tu zona principal ({mun_casa}) la calidad es {calidad_hoy}.* {mensaje_hoy}
+
+_*(Dato científico: Promedio de exposición integral {promedio_riesgo} µg/m³ eq.)*_
+{footer}"""
+
+# --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
+def get_exposure_button():
+    return {"inline_keyboard": [[{"text": "🚬 ¿Cuántos cigarros respiré ayer?", "callback_data": "CHECK_EXPOSURE"}]]}
+
+def get_transport_buttons():
+    return {"inline_keyboard": [
+        [{"text": "🚇 Metro / Tren", "callback_data": "SET_TRANS_metro"}, 
+         {"text": "🚐 Combi / Bus", "callback_data": "SET_TRANS_combi"}],
+        [{"text": "🚗 Auto (Ventanillas)", "callback_data": "SET_TRANS_auto_ventana"},
+         {"text": "❄️ Auto (Con A/C)", "callback_data": "SET_TRANS_auto_ac"}],
+        [{"text": "🚲 Bici / Caminar", "callback_data": "SET_TRANS_bicicleta"},
+         {"text": "🏠 Hago Home Office", "callback_data": "SET_TRANS_home_office"}]
+    ]}
+
+def get_time_buttons():
+    return {"inline_keyboard": [
+        [{"text": "⏱️ ~1 Hora", "callback_data": "SET_TIME_1"}, 
+         {"text": "⏱️ ~2 Horas", "callback_data": "SET_TIME_2"}],
+        [{"text": "⏱️ ~3 Horas", "callback_data": "SET_TIME_3"}, 
+         {"text": "⏱️ 4+ Horas", "callback_data": "SET_TIME_4"}]
+    ]}
+
 # --- 1. HELPER VISUAL DE DÍAS ---
 def format_days_text(days_list):
     if not days_list or len(days_list) == 7: return "Diario"
