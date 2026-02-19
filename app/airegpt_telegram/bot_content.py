@@ -234,7 +234,7 @@ TOOLS_SCHEMA = [
                 "required": ["activar"]
             }
         }
-    }
+    },
     {
         "type": "function",
         "function": {
