@@ -244,7 +244,10 @@ TOOLS_SCHEMA = [
                 "type": "object",
                 "properties": {
                     "medio": {"type": "string", "enum": ["auto_ac", "suburbano", "cablebus", "metro", "metrobus", "auto_ventana", "combi", "caminar", "bicicleta", "home_office"]},
-                    "horas_al_dia": {"type": "number"}
+                    "horas_al_dia": {
+                        "type": "number",
+                        "description": "Horas en tránsito. SI EL USUARIO DA MINUTOS, CONVIÉRTELOS A HORAS DECIMALES (ej. 30 min = 0.5, 65 min = 1.1). Máximo permitido: 6.0"
+                    }
                 },
                 "required": ["medio", "horas_al_dia"]
             }
