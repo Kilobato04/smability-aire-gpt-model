@@ -77,11 +77,11 @@ Aquí tienes el reporte para 📍 **[{location_name}]({maps_url})**:
 {footer}"""
 
 CARD_ALERT_IAS = """🚨 **¡ALERTA DE CALIDAD DEL AIRE!** 🚨
-Hola {user_name}, la contaminación en **{location_name}** ha superado tu límite de seguridad.
+Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** ha superado tu límite de seguridad.
 
 {risk_circle} **Calidad {risk_category} ({ias_value} pts)**
 ☣️ **Contaminante principal:** {pollutant}
-*(Tu umbral configurado es: {threshold} pts)*
+*Tu umbral configurado es: {threshold} pts*
 
 📈 **Tendencia:** {forecast_msg}
 
@@ -176,7 +176,7 @@ CARD_SUMMARY = """
 📍 **Tus Ubicaciones:**
 {locations_list}
 
-🚇 **Tu Rutina (Cálculo de Desgaste):**
+🚇 **Tu Rutina (Cálculo de Exposición):**
 {transport_info}
 
 🚗 **Tu Auto:**
@@ -188,7 +188,7 @@ CARD_SUMMARY = """
 ⏰ **Reportes Aire (Programados):**
 {alerts_schedule}
 
-🚫 **Aviso Hoy No Circula:**
+🚫 **Tu Auto Circula Hoy?:**
 {hnc_reminder}
 
 💡 *{tip_footer}*
@@ -227,7 +227,7 @@ Ayer te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
 
 {emoji_edad} Esto sumó *{dias} días extra* de desgaste a tu Edad Urbana.
 
-_*(Promedio de exposición integral {promedio_riesgo} µg/m³ eq.)*_
+_*Promedio de exposición integral {promedio_riesgo} µg/m³ eq.*_
 {footer}"""
 
 # --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
@@ -423,7 +423,7 @@ def get_delete_confirmation_buttons(location_key):
 # --- BOTONES VIRALES (COMPARTIR) ---
 def get_share_exposure_button(cigarros, dias):
     """Botón para compartir el desgaste celular (Gamificación)"""
-    texto = f"😷 Ayer respiré el equivalente a {cigarros} cigarros invisibles en el tráfico de la ciudad y sumé {dias} días extra a mi Edad Urbana.\n\nDescubre tu desgaste y protégete gratis con @airegptcdmx_bot 🏙️👇"
+    texto = f"😷 Ayer respiré el equivalente a {cigarros} cigarros invisibles en el tráfico de la ciudad y sumé {dias} días extra a mi Edad Urbana.\n\nDescubre tu exposición y protégete con @airegptcdmx_bot 🏙️👇"
     url_segura = urllib.parse.quote(texto)
     link_share = f"https://t.me/share/url?url=https://t.me/airegptcdmx_bot&text={url_segura}"
     
