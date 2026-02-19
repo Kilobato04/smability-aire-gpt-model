@@ -629,6 +629,8 @@ def lambda_handler(event, context):
                 oficial_link=link_came, # <--- ENLACE INYECTADO
                 footer=cards.BOT_FOOTER
             )
+            # NUEVO: Generar el botón viral
+            markup_contingencia = cards.get_share_contingency_button()
 
         # B. Enviar a Usuarios (Scan Eficiente)
         try:
@@ -645,7 +647,8 @@ def lambda_handler(event, context):
                 if start_key: scan_kwargs['ExclusiveStartKey'] = start_key
                 response = table.scan(**scan_kwargs)
                 for u in response.get('Items', []):
-                    send_telegram(u['user_id'], msg)
+                    # AQUÍ PASAMOS EL MARKUP
+                    send_telegram(u['user_id'], msg, markup=markup_contingencia)
                     count += 1
                 start_key = response.get('LastEvaluatedKey')
                 if not start_key: done = True
@@ -815,7 +818,8 @@ def lambda_handler(event, context):
                             promedio_riesgo=res['promedio_riesgo'],
                             footer=cards.BOT_FOOTER
                         )
-                        send_telegram(chat_id, card)
+                        markup_viral = cards.get_share_exposure_button(cigs, dias)
+                        send_telegram(chat_id, card, markup=markup_viral)
                     else:
                         send_telegram(chat_id, "⚠️ Aún no tengo los datos atmosféricos de ayer procesados.")
                 except Exception as e:
@@ -883,7 +887,8 @@ def lambda_handler(event, context):
                         if 'trabajo' not in locs and not es_ho: 
                             card += "\n\n💡 *Tip: Guarda la ubicación de tu 'Trabajo' para un cálculo más exacto.*"
                         
-                        send_telegram(chat_id, card)
+                        markup_viral = cards.get_share_exposure_button(cigs, dias)
+                        send_telegram(chat_id, card, markup=markup_viral)
                     else:
                         send_telegram(chat_id, "⚠️ Aún no tengo los datos atmosféricos de ayer procesados.")
                 except Exception as e:
