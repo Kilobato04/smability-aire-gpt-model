@@ -1471,7 +1471,7 @@ def lambda_handler(event, context):
                             # 3. URL Segura (Formato API Google Maps Universal)
                             maps_url = f"http://www.google.com/maps/place/{lat},{lon}"
                             
-                            lista_txt += f"🏠 **{key_clean}:** {display}\n🔗 [Ver en Mapa]({maps_url})\n\n"
+                            lista_txt += f"🏠 **[{key_clean}]({maps_url}):** {display}\n\n"
                         
                         card = cards.CARD_MY_LOCATIONS.format(
                             user_name=first_name, # Ya viene limpio del FIX 1
