@@ -7,6 +7,7 @@ from openai import OpenAI
 import bot_content
 import cards
 import prompts
+import math
 
 # --- CONFIG ---
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
@@ -154,6 +155,61 @@ def delete_location_from_db(user_id, location_name):
     except Exception as e:
         print(f"❌ Error deleting location cascade: {e}")
         return False
+
+
+class CalculadoraRiesgoSmability:
+    def __init__(self):
+        self.K_CIGARRO = 22.0  
+        self.K_O3_A_PM = 0.5   
+        self.K_ENVEJECIMIENTO = 2.0  
+        self.FACTORES_TRANSPORTE = {
+            "auto_ac": 0.4, "suburbano": 0.5, "cablebus": 0.7,
+            "metro": 0.8, "metrobus": 0.9, "auto_ventana": 1.0,
+            "combi": 1.2, "caminar": 1.3, "bicicleta": 1.5, "home_office": 1.0
+        }
+
+    def calcular_usuario(self, vector_casa, perfil_usuario, vector_trabajo=None, es_home_office=False):
+        if es_home_office or not vector_trabajo:
+            vector_trabajo = vector_casa
+            hora_salida, hora_llegada_casa, factor_transporte = 25, 25, 1.0
+        else:
+            hora_salida = 7  
+            duracion_traslado = perfil_usuario.get('tiempo_traslado_horas', 2) 
+            mitad_traslado = math.ceil(duracion_traslado / 2.0)
+            hora_llegada_trabajo = hora_salida + mitad_traslado
+            hora_salida_trabajo = 18 
+            hora_llegada_casa = hora_salida_trabajo + mitad_traslado
+            modo_transporte = perfil_usuario.get('transporte_default', 'auto_ventana')
+            factor_transporte = self.FACTORES_TRANSPORTE.get(modo_transporte, 1.0)
+
+        suma_exposicion_acumulada = 0.0
+        
+        for hora in range(24):
+            riesgo_casa = vector_casa['pm25_12h'][hora] + (vector_casa['o3_1h'][hora] * self.K_O3_A_PM)
+            riesgo_trabajo = vector_trabajo['pm25_12h'][hora] + (vector_trabajo['o3_1h'][hora] * self.K_O3_A_PM)
+
+            if es_home_office:
+                nivel_hora = riesgo_casa
+            else:
+                if hora < hora_salida or hora >= hora_llegada_casa:
+                    nivel_hora = riesgo_casa 
+                elif hora_salida <= hora < hora_llegada_trabajo:
+                    nivel_hora = ((riesgo_casa + riesgo_trabajo) / 2) * factor_transporte
+                elif hora_llegada_trabajo <= hora < hora_salida_trabajo:
+                    nivel_hora = riesgo_trabajo 
+                elif hora_salida_trabajo <= hora < hora_llegada_casa:
+                    nivel_hora = ((riesgo_casa + riesgo_trabajo) / 2) * factor_transporte 
+
+            suma_exposicion_acumulada += nivel_hora
+
+        promedio = suma_exposicion_acumulada / 24.0
+        cigarros = promedio / self.K_CIGARRO
+        
+        return {
+            "cigarros": round(cigarros, 1), 
+            "dias_perdidos": round(cigarros * self.K_ENVEJECIMIENTO, 1),
+            "promedio_riesgo": round(promedio, 1)
+        }
 
 # --- TOOLS ---
 def confirm_saved_location(user_id, tipo):
@@ -605,7 +661,7 @@ def lambda_handler(event, context):
                     current_phase = sys_state.get('last_contingency_phase', 'None')
                     
                     report = generate_report_card(first_name, disp_name, lat, lon, vehicle=veh, contingency_phase=current_phase)
-                    send_telegram(chat_id, report)
+                    send_telegram(chat_id, report, markup=cards.get_exposure_button())
                     return {'statusCode': 200, 'body': 'OK'}
                 else:
                     resp = f"⚠️ No encontré la ubicación '{loc_key}'. Intenta actualizar tu menú."
@@ -663,6 +719,82 @@ def lambda_handler(event, context):
             # --- RESPUESTA DEFAULT ---
             send_telegram(chat_id, resp)
             return {'statusCode': 200, 'body': 'OK'}
+
+            # =========================================================
+            # 🚬 FLUJO GAMIFICACIÓN: CIGARROS, EDAD URBANA Y ONBOARDING
+            # =========================================================
+            elif data == "CHECK_EXPOSURE":
+                user = get_user_profile(user_id)
+                locs = user.get('locations', {})
+                transp = user.get('profile_transport') 
+                
+                if 'casa' not in locs:
+                    send_telegram(chat_id, "⚠️ Necesito tu ubicación de CASA para calcular tu exposición. Toca el clip 📎 y envíala.")
+                    return {'statusCode': 200, 'body': 'OK'}
+
+                if not transp:
+                    send_telegram(chat_id, "⚙️ **¡Vamos a personalizar tu cálculo!**\n\nPara decirte exactamente cuántos cigarros respiraste, necesito saber a qué te expones en el tráfico.\n\n👇 **¿Qué transporte usas más en tu rutina diaria?**", markup=cards.get_transport_buttons())
+                    return {'statusCode': 200, 'body': 'OK'}
+
+                try:
+                    lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
+                    resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
+                    vector_c = resp_c.get("vector_exposicion_ayer")
+                    
+                    vector_t = None
+                    es_ho = (transp.get('medio') == 'home_office')
+                    
+                    if 'trabajo' in locs and not es_ho:
+                        lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
+                        resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}").json()
+                        vector_t = resp_t.get("vector_exposicion_ayer")
+
+                    if vector_c:
+                        calc = CalculadoraRiesgoSmability()
+                        perfil = {"transporte_default": transp.get('medio', 'auto_ventana'), "tiempo_traslado_horas": transp.get('horas', 2)}
+                        res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
+                        
+                        cigs, dias = res['cigarros'], res['dias_perdidos']
+                        
+                        card = cards.CARD_EXPOSICION.format(
+                            user_name=first_name, 
+                            emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
+                            emoji_cigarro="🚬" * int(cigs) if cigs >= 1 else "🚬", 
+                            cigarros=cigs, 
+                            emoji_edad="⏳🧓" if dias >= 1.0 else "🕰️", 
+                            dias=dias,
+                            mun_casa=resp_c['ubicacion']['mun'], 
+                            calidad_hoy=resp_c['aire']['calidad'],
+                            mensaje_hoy=resp_c['aire']['mensaje_corto'], 
+                            promedio_riesgo=res['promedio_riesgo'],
+                            footer=cards.BOT_FOOTER
+                        )
+                        if 'trabajo' not in locs and not es_ho: 
+                            card += "\n\n💡 *Tip: Guarda la ubicación de tu 'Trabajo' para un cálculo más exacto.*"
+                        
+                        send_telegram(chat_id, card)
+                    else:
+                        send_telegram(chat_id, "⚠️ Aún no tengo los datos atmosféricos de ayer procesados.")
+                except Exception as e:
+                    print(f"Error EXPOSURE: {e}")
+                return {'statusCode': 200, 'body': 'OK'}
+
+            # --- RESPUESTAS DEL ONBOARDING TRANSPORTE ---
+            elif data.startswith("SET_TRANS_"):
+                medio = data.replace("SET_TRANS_", "")
+                if medio == "home_office":
+                    table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport = :p", ExpressionAttributeValues={':p': {'medio': 'home_office', 'horas': 0}})
+                    send_telegram(chat_id, "✅ Perfil guardado (Home Office).\n\n👇 Presiona de nuevo el botón para ver tu resultado:", markup=cards.get_exposure_button())
+                else:
+                    table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport = :p", ExpressionAttributeValues={':p': {'medio': medio, 'horas': 2}})
+                    send_telegram(chat_id, "📍 **¡Entendido!**\n\nPor último, ¿cuántas horas en total pasas al día en ese transporte? (Ida y vuelta).", markup=cards.get_time_buttons())
+                return {'statusCode': 200, 'body': 'OK'}
+
+            elif data.startswith("SET_TIME_"):
+                horas = int(data.replace("SET_TIME_", ""))
+                table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport.horas = :h", ExpressionAttributeValues={':h': horas})
+                send_telegram(chat_id, "✅ **¡Perfil completado!**\n\n👇 Presiona aquí para ver tu resultado:", markup=cards.get_exposure_button())
+                return {'statusCode': 200, 'body': 'OK'}
 
         # 2. MESSAGES
         if 'message' not in body: return {'statusCode': 200, 'body': 'OK'}
@@ -806,7 +938,7 @@ def lambda_handler(event, context):
                         current_phase = sys_state.get('last_contingency_phase', 'None')
                         
                         r = generate_report_card(first_name, in_name, in_lat, in_lon, vehicle=veh, contingency_phase=current_phase)
-                        send_telegram(chat_id, r)
+                        send_telegram(chat_id, r, markup=cards.get_exposure_button())
                         return {'statusCode': 200, 'body': 'OK'}
                     else:
                         # ❌ FALLO: No hay coordenadas. Avisamos al LLM para que pregunte al usuario.
