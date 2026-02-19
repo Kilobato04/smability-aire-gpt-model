@@ -8,6 +8,7 @@ import bot_content
 import cards
 import prompts
 import math
+from decimal import Decimal
 
 # --- CONFIG ---
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
@@ -717,9 +718,10 @@ def lambda_handler(event, context):
                 return {'statusCode': 200, 'body': 'OK'}
 
             elif data.startswith("SET_TIME_"):
-                horas = int(data.replace("SET_TIME_", ""))
+                horas_str = data.replace("SET_TIME_", "")
+                horas_db = Decimal(horas_str) # Boto3 exige Decimal
                 # 1. Guardamos las horas
-                table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport.horas = :h", ExpressionAttributeValues={':h': horas})
+                table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport.horas = :h", ExpressionAttributeValues={':h': horas_db})
                 send_telegram(chat_id, "✅ **¡Perfil completado!**\n\n⏳ *Calculando tu desgaste celular...*")
                 
                 # 2. Simulamos el clic de CHECK_EXPOSURE forzando el dato
@@ -752,16 +754,16 @@ def lambda_handler(event, context):
                         
                         cigs, dias = res['cigarros'], res['dias_perdidos']
                         
+                        # Nota: En lugar de pintar cigarros reales, pintamos humo tóxico
+                        grafico_humo = "🌫️" * int(cigs) if cigs >= 1 else "🌫️"
+
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
-                            emoji_cigarro="🚬" * int(cigs) if cigs >= 1 else "🚬", 
+                            emoji_cigarro=grafico_humo, 
                             cigarros=cigs, 
                             emoji_edad="⏳🧓" if dias >= 1.0 else "🕰️", 
                             dias=dias,
-                            mun_casa=resp_c['ubicacion']['mun'], 
-                            calidad_hoy=resp_c['aire']['calidad'],
-                            mensaje_hoy=resp_c['aire']['mensaje_corto'], 
                             promedio_riesgo=res['promedio_riesgo'],
                             footer=cards.BOT_FOOTER
                         )
@@ -817,16 +819,16 @@ def lambda_handler(event, context):
                         
                         cigs, dias = res['cigarros'], res['dias_perdidos']
                         
+                        # Nota: En lugar de pintar cigarros reales, pintamos humo tóxico
+                        grafico_humo = "🌫️" * int(cigs) if cigs >= 1 else "🌫️"
+
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
-                            emoji_cigarro="🚬" * int(cigs) if cigs >= 1 else "🚬", 
+                            emoji_cigarro=grafico_humo, 
                             cigarros=cigs, 
                             emoji_edad="⏳🧓" if dias >= 1.0 else "🕰️", 
                             dias=dias,
-                            mun_casa=resp_c['ubicacion']['mun'], 
-                            calidad_hoy=resp_c['aire']['calidad'],
-                            mensaje_hoy=resp_c['aire']['mensaje_corto'], 
                             promedio_riesgo=res['promedio_riesgo'],
                             footer=cards.BOT_FOOTER
                         )
@@ -852,8 +854,10 @@ def lambda_handler(event, context):
                 return {'statusCode': 200, 'body': 'OK'}
 
             elif data.startswith("SET_TIME_"):
-                horas = int(data.replace("SET_TIME_", ""))
-                table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport.horas = :h", ExpressionAttributeValues={':h': horas})
+                horas_str = data.replace("SET_TIME_", "")
+                horas_db = Decimal(horas_str) # Boto3 exige Decimal
+                # 1. Guardamos las horas
+                table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport.horas = :h", ExpressionAttributeValues={':h': horas_db})
                 send_telegram(chat_id, "✅ **¡Perfil completado!**\n\n⏳ *Calculando tu desgaste celular...*")
                 
                 try:
@@ -879,16 +883,16 @@ def lambda_handler(event, context):
                         
                         cigs, dias = res['cigarros'], res['dias_perdidos']
                         
+                        # Nota: En lugar de pintar cigarros reales, pintamos humo tóxico
+                        grafico_humo = "🌫️" * int(cigs) if cigs >= 1 else "🌫️"
+
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
-                            emoji_cigarro="🚬" * int(cigs) if cigs >= 1 else "🚬", 
+                            emoji_cigarro=grafico_humo, 
                             cigarros=cigs, 
                             emoji_edad="⏳🧓" if dias >= 1.0 else "🕰️", 
                             dias=dias,
-                            mun_casa=resp_c['ubicacion']['mun'], 
-                            calidad_hoy=resp_c['aire']['calidad'],
-                            mensaje_hoy=resp_c['aire']['mensaje_corto'], 
                             promedio_riesgo=res['promedio_riesgo'],
                             footer=cards.BOT_FOOTER
                         )
@@ -1063,14 +1067,15 @@ def lambda_handler(event, context):
                 # --- INICIO DE NUEVAS TOOLS (TEXTO/LLM) ---
                 elif fn == "configurar_transporte":
                     medio = args.get('medio', 'auto_ventana')
-                    horas = args.get('horas_al_dia', 2)
+                    horas_raw = args.get('horas_al_dia', 2)
+                    horas_db = Decimal(str(horas_raw)) # Protegemos el dato para DynamoDB
                     
                     table.update_item(
                         Key={'user_id': str(user_id)},
                         UpdateExpression="SET profile_transport = :p",
-                        ExpressionAttributeValues={':p': {'medio': medio, 'horas': horas}}
+                        ExpressionAttributeValues={':p': {'medio': medio, 'horas': horas_db}} # Usamos horas_db
                     )
-                    r = f"✅ Transporte guardado: Viajas en {medio} aprox {horas} horas al día."
+                    r = f"✅ Transporte guardado: Viajas en {medio} aprox {horas_raw} horas al día."
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
                 elif fn == "calcular_exposicion_diaria":
