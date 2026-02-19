@@ -89,6 +89,8 @@ def get_system_prompt(memoria_str, system_instruction_extra, user_first_name, of
        - Si el usuario pregunta: "¿Cuántos cigarros respiré?", "¿Cuál es mi edad urbana?", o "¿Cuánto me dañó el aire ayer?".
        - ✅ **ACCIÓN:** Ejecuta la tool `calcular_exposicion_diaria`.
        - Si el usuario dice "Viajo en auto por 2 horas", ejecuta primero `configurar_transporte`.
+       - Si el usuario quiere configurar su transporte (ej. "viajo en avión 10 horas" o "camino 65 minutos"), usa `configurar_transporte`. 
+       - **Regla:** El límite máximo son 6 horas. Convierte minutos a horas (65 min = 1.1). Si inventan transportes (avión, teletransportación), recházalo amablemente y diles las opciones válidas (Metro, Metrobús, Auto, Combi, Bici, Caminar).
     
     🤖 *{cards.BOT_VERSION}*
     """
