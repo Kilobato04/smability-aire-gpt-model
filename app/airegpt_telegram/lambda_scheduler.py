@@ -377,12 +377,16 @@ def process_user(user, current_hour_str, contingency_data):
                                 combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
 
                                 card = cards.CARD_ALERT_IAS.format(
-                                    user_name=first_name, location_name=loc_data.get('display_name', loc_name),
+                                    user_name=first_name, 
+                                    location_name=loc_data.get('display_name', loc_name),
                                     maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
-                                    report_time=f"{current_hour_str.split(':')[0]}:20", region="ZMVM",
-                                    risk_category=cat, risk_circle=info['emoji'], ias_value=cur_ias,
+                                    risk_category=cat, 
+                                    risk_circle=info['emoji'], 
+                                    ias_value=cur_ias,
                                     forecast_msg=f_short,
-                                    threshold=umbral, pollutant=qa.get('dominante', 'N/A'), health_recommendation=cards.get_health_advice(cat, h_str),
+                                    threshold=umbral, 
+                                    pollutant=qa.get('dominante', 'N/A'), 
+                                    health_recommendation=cards.get_health_advice(cat, h_str),
                                     footer=combined_footer
                                 )
                                 send_telegram_push(user_id, card)
