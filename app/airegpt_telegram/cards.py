@@ -164,7 +164,6 @@ CARD_HNC_DETAILED = """🚗 **Reporte Mensual HNC: {mes_nombre}**
 🏛️ **CDMX:** {multa_cdmx} + Corralón
 🌲 **Edomex:** {multa_edomex} + Retención
 
-📝 *Alertas automáticas activadas a las 20:00 hrs.*
 {footer}"""
 
 CARD_SUMMARY = """
