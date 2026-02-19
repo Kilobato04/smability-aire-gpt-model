@@ -1155,7 +1155,8 @@ def lambda_handler(event, context):
                         user.get('alerts', {}), 
                         user.get('vehicle', None), 
                         user.get('locations', {}), # OJO: Pasamos locations para listar "Casa/Trabajo"
-                        status_str # Nuevo argumento vital para el Tag de Contingencia
+                        status_str, # Nuevo argumento vital para el Tag de Contingencia
+                        user.get('profile_transport', None) # <--- EL FIX FINAL AQUÍ
                     )
                     
                     # 3. Generar Botones Inteligentes (Upselling si es Free)
