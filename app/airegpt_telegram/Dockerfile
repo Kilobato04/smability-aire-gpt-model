@@ -16,6 +16,9 @@ COPY prompts.py ${LAMBDA_TASK_ROOT}
 # --- FIX CRÍTICO: Faltaba este archivo ---
 COPY lambda_api_light.py ${LAMBDA_TASK_ROOT}
 
+# --- FIX BANNERS: Empaquetar la carpeta de imágenes ---
+COPY banners/ ${LAMBDA_TASK_ROOT}/banners/
+
 # 3. Comando por defecto
 # NOTA: En la consola de AWS, para el Scheduler, deberás configurar el
 # CMD Override a: lambda_scheduler.lambda_handler
