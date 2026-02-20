@@ -1123,9 +1123,14 @@ def lambda_handler(event, context):
             # =========================================================
             # ⚡ FAST-PATH: Interceptor de Onboarding, Menús y Reglas
             # =========================================================
-            text = user_content.strip().lower()
+            import re
             
-            if text in ["/start", "start", "hola", "empezar"]:
+            # 1. Limpiamos signos de interrogación, admiración y puntos
+            text_clean = re.sub(r'[¿?¡!.,]', '', user_content.strip().lower())
+            # 2. Quitamos acentos para hacer un match a prueba de balas
+            text_clean = text_clean.replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u')
+            
+            if text_clean in ["/start", "start", "hola", "empezar"]:
                 print(f"🆕 [START] User: {user_id}")
                 markup_onboarding = {
                     "inline_keyboard": [
@@ -1137,23 +1142,24 @@ def lambda_handler(event, context):
                 send_telegram(chat_id, msg_envio, markup=markup_onboarding)
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            elif text in ["ayuda", "menu", "menú", "qué puedes hacer", "que puedes hacer", "opciones", "/menu", "/ayuda"]:
+            elif text_clean in ["ayuda", "menu", "que puedes hacer", "opciones", "/menu", "/ayuda"]:
                 msg_envio = cards.CARD_MENU.format(footer=cards.BOT_FOOTER)
                 send_telegram(chat_id, msg_envio)
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            elif text in ["reglas", "limitaciones", "como funciona", "cómo funciona", "alcance", "restricciones"]:
+            elif text_clean in ["reglas", "limitaciones", "como funciona", "alcance", "restricciones"]:
                 msg_envio = cards.CARD_RULES.format(footer=cards.BOT_FOOTER)
                 send_telegram(chat_id, msg_envio)
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            elif text in ["ejemplos", "ejemplo", "prompts", "prompt", "guia", "guía", "que te pregunto", "qué te pregunto", "como hablarte", "cómo hablarte"]:
+            # --- FIX ROBUSTO: PROMPTS (Detecta la frase aunque haya palabras extra) ---
+            elif any(k in text_clean for k in ["que te pregunto", "que te puedo preguntar", "que me puedes responder", "como te hablo", "como hablarte", "ejemplos", "dame ejemplos", "prompts"]):
                 msg_envio = cards.CARD_PROMPTS.format(footer=cards.BOT_FOOTER)
                 send_telegram(chat_id, msg_envio)
                 return {'statusCode': 200, 'body': 'OK'}
-
-            # --- NUEVO FIX EDUCATIVO: EXPLICACIÓN IAS / IMECA ---
-            elif text in ["ias", "imeca", "que es el ias", "qué es el ias", "que es ias", "qué es ias", "que es el imeca", "qué es el imeca", "como se mide la calidad del aire", "cómo se mide la calidad del aire", "escala ias"]:
+                
+            # --- FIX ROBUSTO: IAS / IMECA (Detecta la frase y variaciones) ---
+            elif any(k in text_clean for k in ["que es el ias", "que es ias", "que significa ias", "que es el imeca", "que es imeca", "como mides el aire", "como se mide", "escala ias"]) or text_clean in ["ias", "imeca"]:
                 msg_envio = cards.CARD_IAS_INFO.format(footer=cards.BOT_FOOTER)
                 send_telegram(chat_id, msg_envio)
                 return {'statusCode': 200, 'body': 'OK'}
