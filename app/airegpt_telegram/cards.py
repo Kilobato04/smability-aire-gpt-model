@@ -43,8 +43,65 @@ def get_health_advice(calidad, user_condition=None):
 
 # --- PLANTILLAS DE TARJETAS ---
 
-CARD_ONBOARDING = """👋 **¡Bienvenido a AIreGPT!**
-Para protegerte, necesito configurar tus dos bases principales. Así podré avisarte antes de que respires aire malo.
+CARD_RULES = """⚙️ **REGLAS DE OPERACIÓN Y ALCANCE**
+Para mantener a AIreGPT rápido, preciso y sin hacer spam, opero bajo estas reglas:
+
+🌃 **Horario de Descanso:** Solo envío alertas entre las 6:00 AM y las 11:00 PM.
+📍 **Ubicaciones (Max 3):** Solo "Casa" y "Trabajo" se utilizan para calcular tu exposición.
+🛑 **Filtro Anti-Spam:** Las alertas de emergencia requieren un mínimo de 100 pts IAS. Me silenciaré tras 3 avisos.
+🗺️ **Cobertura:** Alertas de *Contingencia* y *Hoy No Circula* exclusivas para CDMX y ZMVM.
+🧠 **Motor de IA:** Funciono con *GPT-4o-mini*. Por favor, verifica la información crítica.
+🔬 **Ciencia de Exposición:** El cálculo de "cigarros invisibles" usa algoritmos que miden tu exposición al exterior (según tu transporte y tiempo) y asume que pasas el resto del día en interiores, donde se filtra el 60% de las partículas.
+📡 **Fuente de Verdad:** Mis datos provienen del modelo científico: [Monitoreo de Calidad del Aire y Gemelo Digital en Tiempo Real 🚦🌎](https://airmodelcdmx.netlify.app/)
+🏢 **Desarrollo:** Producto desarrollado por **Smability.io**.
+{footer}"""
+
+CARD_PROMPTS = """💡 **GUÍA DE USO: ¿QUÉ PUEDES PREGUNTARME?**
+Puedes hablarme de forma natural. Aquí tienes los ejemplos más útiles para sacarme provecho:
+
+💨 **Calidad del Aire y Clima:**
+• *"¿Cómo está el aire en Casa?"*
+• *"Dame el pronóstico para el Trabajo."*
+• *"Soy asmático, ¿me recomiendas salir a correr hoy?"*
+
+🚗 **Movilidad y Auto:**
+• *"¿Circula mi auto hoy?"*
+• *"¿Me toca verificar este mes?"*
+
+🚬 **Salud y Exposición:**
+• *"Calcula mi exposición: Viajo 2 horas en metro."*
+• *"Hoy hice Home Office."*
+
+⚙️ **Configuración:**
+• *"Avisa si el aire supera los 100 puntos IAS en Casa."*
+• *"Mándame un reporte todos los días a las 7:30 AM de Casa."*
+• *"Dame mi resumen."*
+
+¡Copia, pega y prueba cualquiera de estos mensajes ahora mismo! 👇
+{footer}"""
+
+CARD_MENU = """🛠️ **MENÚ DE CAPACIDADES**
+Soy AIreGPT, tu asistente inteligente de salud urbana. Aquí tienes todo lo que podemos hacer juntos:
+
+🚨 **Contingencias en Tiempo Real:** *(¡Nuestra especialidad!)* Te enviaré una alerta inmediata en el segundo exacto en que se **active o suspenda** una Contingencia Ambiental.
+📍 **Reportes y Pronósticos:** Guarda hasta 3 ubicaciones (Casa, Trabajo, Escuela) y pídeme la calidad del aire actual, el pronóstico y recomendaciones de salud.
+🚬 **Exposición:** Dime cómo y cuánto tiempo viajas para calcular cuántos *cigarros invisibles* respiras y tu Edad Urbana.
+🚗 **Auto y Movilidad:** Registra tu placa y holograma. Te diré si circulas hoy y los meses que te toca **verificar**.
+⏰ **Alertas Inteligentes:** Programa un reporte diario a la hora que sales o alertas automáticas si la contaminación supera tu límite.
+📊 **Tu Resumen:** Escribe *"Dame mi resumen"* para ver toda tu configuración y estatus.
+
+💡 *Tip: Háblame de forma natural. Ej: "Avísame a las 8 am cómo está el aire en casa".*
+{footer}"""
+
+CARD_ONBOARDING = """👋 **¡Hola, {user_name}! Bienvenido a AIreGPT.**
+
+Conmigo podrás:
+💨 Saber la calidad del aire y el pronóstico en tus 3 lugares más frecuentes.
+😷 Descubrir tu nivel de toxicidad en el tráfico (cigarros invisibles).
+🚨 Recibir alertas inmediatas de Contingencia, Hoy No Circula y Verificación.
+⏰ Programar notificaciones automáticas si el aire se vuelve peligroso.
+
+Para protegerte, necesito configurar tus dos ubicaciones principales. Así podré avisarte antes de que respires aire malo.
 
 🏠 **1. Casa:** Para avisarte al despertar o fines de semana.
 🏢 **2. Trabajo:** Para avisarte antes de salir a tu trayecto.
@@ -220,7 +277,7 @@ CARD_MY_LOCATIONS = """📍 **MIS UBICACIONES GUARDADAS**
 CARD_EXPOSICION = """{emoji_alerta} *Reporte de Exposición*
 👤 {user_name}
 
-Ayer te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
+Ayer **{fecha_ayer}** te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
 
 {rutina_str}
 
@@ -302,7 +359,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         if medio_raw == "home_office":
             trans_str = f"• Modalidad: **{medio_str}**"
         else:
-            trans_str = f"• Modo: **{medio_str}**\n• Tiempo: **{horas} hrs/día**"
+            trans_str = f"• Ruta: **Casa ↔ Trabajo**\n• Modo: **{medio_str}**\n• Tiempo: **{horas} hrs/día**"
     else:
         trans_str = "• *Sin configurar (Escribe 'Viajo en metro 2 horas')*"
 
@@ -424,7 +481,7 @@ def get_delete_confirmation_buttons(location_key):
 # --- BOTONES VIRALES (COMPARTIR) ---
 def get_share_exposure_button(cigarros, dias):
     """Botón para compartir el desgaste celular (Gamificación)"""
-    texto = f"😷 Ayer respiré el equivalente a {cigarros} cigarros invisibles en el tráfico de la ciudad y sumé {dias} días extra a mi Edad Urbana.\n\nDescubre tu exposición y protégete con AireGPT 🏙️👇"
+    texto = f"😷 Ayer respiré el equivalente a {cigarros} cigarros invisibles en el tráfico de la ciudad y sumé {dias} días extra a mi Edad Urbana.\n\nDescubre tu exposición y protégete con AIreGPT 🏙️👇"
     url_segura = urllib.parse.quote(texto)
     link_share = f"https://t.me/share/url?url=https://t.me/airegptcdmx_bot&text={url_segura}"
     
@@ -450,21 +507,38 @@ from datetime import datetime, timedelta
 MATRIZ_SEMANAL = {5:0, 6:0, 7:1, 8:1, 3:2, 4:2, 1:3, 2:3, 9:4, 0:4}
 ENGOMADOS = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
 
-
 def format_forecast_block(timeline):
     if not timeline or not isinstance(timeline, list): return "➡️ Estable"
+    
+    # 1. Obtenemos la hora actual en CDMX
+    current_hour = (datetime.utcnow() - timedelta(hours=6)).hour
+    
+    # 2. Lógica para cruzar la medianoche
+    def sort_key(item):
+        try:
+            # Extraemos el número de la hora (de "22:00" sacamos 22)
+            h = int(str(item.get('hora', '0')).split(':')[0])
+        except ValueError:
+            h = 0
+        # Si la hora del pronóstico es menor a la hora actual, es de mañana (+24)
+        return h if h >= current_hour else h + 24
+
+    # 3. Ordenamos cronológicamente de verdad
+    sorted_timeline = sorted(timeline, key=sort_key)
+    
+    # 4. Armamos el bloque visual
     block = ""
-    cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extrema"}
     emoji_map = {"Bajo": "🟢", "Moderado": "🟡", "Alto": "🟠", "Muy Alto": "🔴", "Extremadamente Alto": "🟣"}
-    count = 0
-    for t in timeline:
-        if count >= 4: break
+    
+    # Tomamos solo las próximas 4 horas ya ordenadas
+    for t in sorted_timeline[:4]:
         riesgo = t.get('riesgo', 'Bajo')
-        cat = cat_map.get(riesgo, "Regular")
-        pol = t.get('dominante', '') # MATCH EXACTO CON TU JSON
-        pol_str = f" • {pol}" if pol else ""
-        block += f"`{t.get('hora')}` | {emoji_map.get(riesgo, '⚪')} {cat} ({t.get('ias')} pts){pol_str}\n"
-        count += 1
+        emoji = emoji_map.get(riesgo, "⚪")
+        # Tu tarjeta mostraba el contaminante (ej. "• PM10"), lo agregamos si existe
+        contam = f" • {t.get('dominante')}" if t.get('dominante') else ""
+        
+        block += f"`{t.get('hora')}` | {emoji} {riesgo} ({t.get('ias')} pts){contam}\n"
+        
     return block.strip()
 
 def get_verification_period(plate_digit, hologram):
