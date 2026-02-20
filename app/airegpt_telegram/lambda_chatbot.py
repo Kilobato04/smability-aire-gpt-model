@@ -804,8 +804,14 @@ def lambda_handler(event, context):
                         res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
                         
                         cigs, dias = res['cigarros'], res['dias_perdidos']
-                        
-                        # Generación de la Rutina Visual
+
+                        # 1. Calcular fecha de ayer en texto
+                        ahora_cdmx = datetime.utcnow() - timedelta(hours=6)
+                        ayer = ahora_cdmx - timedelta(days=1)
+                        meses = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+                        fecha_ayer_str = f"{ayer.day} de {meses[ayer.month]}"
+
+                        # 2. Generación de la Rutina Visual
                         nombres_medios = {
                             "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
                             "metro": "🚇 Metro/Tren", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
@@ -820,17 +826,19 @@ def lambda_handler(event, context):
                             rutina_txt = "🏠 **Tu rutina:** Modalidad Home Office"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
                         else:
-                            # Extraemos el emoji para que quede estético
                             emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
-                            rutina_txt = f"{emoji_rut} **Tu rutina:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
+                            # Inyectamos la aclaración de Casa ↔ Trabajo
+                            rutina_txt = f"{emoji_rut} **Tu rutina:** Casa ↔ Trabajo\n⏱️ **Tiempo:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* en tu recorrido y estancia."
                         
                         grafico_humo = "🌫️" * int(cigs) if cigs >= 1 else "🌫️"
 
+                        # 3. Armar la tarjeta con las nuevas variables
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
+                            fecha_ayer=fecha_ayer_str, # <--- LA FECHA QUE PIDIÓ CARDS.PY
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
-                            rutina_str=rutina_txt,
+                            rutina_str=rutina_txt,     # <--- LA RUTA QUE PIDIÓ CARDS.PY
                             emoji_cigarro=grafico_humo, 
                             texto_cigarros=cigs_txt,
                             cigarros=cigs, 
@@ -897,8 +905,14 @@ def lambda_handler(event, context):
                         res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
                         
                         cigs, dias = res['cigarros'], res['dias_perdidos']
-                        
-                        # Generación de la Rutina Visual
+
+                        # 1. Calcular fecha de ayer en texto
+                        ahora_cdmx = datetime.utcnow() - timedelta(hours=6)
+                        ayer = ahora_cdmx - timedelta(days=1)
+                        meses = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+                        fecha_ayer_str = f"{ayer.day} de {meses[ayer.month]}"
+
+                        # 2. Generación de la Rutina Visual
                         nombres_medios = {
                             "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
                             "metro": "🚇 Metro/Tren", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
@@ -913,15 +927,17 @@ def lambda_handler(event, context):
                             rutina_txt = "🏠 **Tu rutina:** Modalidad Home Office"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
                         else:
-                            # Extraemos el emoji para que quede estético
                             emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
-                            rutina_txt = f"{emoji_rut} **Tu rutina:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
+                            # Inyectamos la aclaración de Casa ↔ Trabajo
+                            rutina_txt = f"{emoji_rut} **Tu rutina:** Casa ↔ Trabajo\n⏱️ **Tiempo:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* en tu recorrido y estancia."
                         
                         grafico_humo = "🌫️" * int(cigs) if cigs >= 1 else "🌫️"
 
+                        # 3. Armar la tarjeta con las nuevas variables
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
+                            fecha_ayer=fecha_ayer_str, # <--- AQUI PASAMOS LA FECHA
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
                             rutina_str=rutina_txt,
                             emoji_cigarro=grafico_humo, 
@@ -955,58 +971,6 @@ def lambda_handler(event, context):
                 else:
                     table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport = :p", ExpressionAttributeValues={':p': {'medio': medio, 'horas': 2}})
                     send_telegram(chat_id, "📍 **¡Entendido!**\n\nPor último, ¿cuántas horas en total pasas al día en ese transporte? (Ida y vuelta).", markup=cards.get_time_buttons())
-                return {'statusCode': 200, 'body': 'OK'}
-
-            elif data.startswith("SET_TIME_"):
-                horas_str = data.replace("SET_TIME_", "")
-                horas_db = Decimal(horas_str) # Boto3 exige Decimal
-                # 1. Guardamos las horas
-                table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport.horas = :h", ExpressionAttributeValues={':h': horas_db})
-                send_telegram(chat_id, "✅ **¡Perfil completado!**\n\n⏳ *Calculando tu desgaste celular...*")
-                
-                try:
-                    user = get_user_profile(user_id)
-                    locs = user.get('locations', {})
-                    transp = user.get('profile_transport') 
-                    
-                    lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
-                    resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
-                    vector_c = resp_c.get("vector_exposicion_ayer")
-                    
-                    vector_t = None
-                    es_ho = False
-                    if 'trabajo' in locs:
-                        lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
-                        resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}").json()
-                        vector_t = resp_t.get("vector_exposicion_ayer")
-
-                    if vector_c:
-                        calc = CalculadoraRiesgoSmability()
-                        perfil = {"transporte_default": transp.get('medio', 'auto_ventana'), "tiempo_traslado_horas": transp.get('horas', 2)}
-                        res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
-                        
-                        cigs, dias = res['cigarros'], res['dias_perdidos']
-                        
-                        # Nota: En lugar de pintar cigarros reales, pintamos humo tóxico
-                        grafico_humo = "🌫️" * int(cigs) if cigs >= 1 else "🌫️"
-
-                        card = cards.CARD_EXPOSICION.format(
-                            user_name=first_name, 
-                            emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
-                            emoji_cigarro=grafico_humo, 
-                            cigarros=cigs, 
-                            emoji_edad="⏳🧓" if dias >= 1.0 else "🕰️", 
-                            dias=dias,
-                            promedio_riesgo=res['promedio_riesgo'],
-                            footer=cards.BOT_FOOTER
-                        )
-                        send_telegram(chat_id, card)
-                    else:
-                        send_telegram(chat_id, "⚠️ Aún no tengo los datos atmosféricos de ayer procesados.")
-                except Exception as e:
-                    print(f"Error forzando calculo final: {e}")
-                    send_telegram(chat_id, "Hubo un error al procesar tu exposición.")
-                    
                 return {'statusCode': 200, 'body': 'OK'}
 
             # =========================================================
@@ -1046,10 +1010,38 @@ def lambda_handler(event, context):
                     else: send_telegram(chat_id, "❌ Error DB.")
                 return {'statusCode': 200, 'body': 'OK'}
 
-            if user_content=="/start": 
+            # =========================================================
+            # ⚡ FAST-PATH: Interceptor de Onboarding, Menús y Reglas
+            # =========================================================
+            text = user_content.strip().lower()
+            
+            if text in ["/start", "start", "hola", "empezar"]:
                 print(f"🆕 [START] User: {user_id}")
-                send_telegram(chat_id, cards.CARD_ONBOARDING.format(user_name=first_name, footer=cards.BOT_FOOTER))
+                markup_onboarding = {
+                    "inline_keyboard": [
+                        [{"text": "📍 Configurar mi Casa", "callback_data": "SET_LOC_casa"}],
+                        [{"text": "🚗 Registrar mi Auto", "callback_data": "SET_VEHICLE_start"}]
+                    ]
+                }
+                msg_envio = cards.CARD_ONBOARDING.format(user_name=first_name, footer=cards.BOT_FOOTER)
+                send_telegram(chat_id, msg_envio, markup=markup_onboarding)
                 return {'statusCode': 200, 'body': 'OK'}
+                
+            elif text in ["ayuda", "menu", "menú", "qué puedes hacer", "que puedes hacer", "opciones", "/menu", "/ayuda"]:
+                msg_envio = cards.CARD_MENU.format(footer=cards.BOT_FOOTER)
+                send_telegram(chat_id, msg_envio)
+                return {'statusCode': 200, 'body': 'OK'}
+                
+            elif text in ["reglas", "limitaciones", "como funciona", "cómo funciona", "alcance", "restricciones"]:
+                msg_envio = cards.CARD_RULES.format(footer=cards.BOT_FOOTER)
+                send_telegram(chat_id, msg_envio)
+                return {'statusCode': 200, 'body': 'OK'}
+                
+            elif text in ["ejemplos", "ejemplo", "prompts", "prompt", "guia", "guía", "que te pregunto", "qué te pregunto", "como hablarte", "cómo hablarte"]:
+                msg_envio = cards.CARD_PROMPTS.format(footer=cards.BOT_FOOTER)
+                send_telegram(chat_id, msg_envio)
+                return {'statusCode': 200, 'body': 'OK'}
+            # =========================================================
 
         print(f"📨 [MSG] User: {user_id} | Content: {user_content}") # LOG CRITICO
 
