@@ -104,16 +104,19 @@ def generate_daily_summary():
                     geo_key = f"{lat},{lon}"
                     
                     if geo_key not in resumen['celdas']:
-                        resumen['celdas'][geo_key] = {"pm25_12h": [0.0]*24, "o3_1h": [0.0]*24, "pm10_12h": [0.0]*24}
+                        # --- FIX IAS: Agregamos el vector de ias ---
+                        resumen['celdas'][geo_key] = {"pm25_12h": [0.0]*24, "o3_1h": [0.0]*24, "pm10_12h": [0.0]*24, "ias": [0.0]*24}
                     
                     # Llamamos a la función que ya existe en memoria
                     pm25 = safe_extract(celda, 'pm25 12h', 'pm25_12h')
                     o3 = safe_extract(celda, 'o3 1h', 'o3_1h')
                     pm10 = safe_extract(celda, 'pm10 12h', 'pm10_12h')
+                    ias_val = safe_extract(celda, 'ias', 'ias') # <--- Extraemos el IAS
                     
                     resumen['celdas'][geo_key]['pm25_12h'][hora_int] = pm25
                     resumen['celdas'][geo_key]['o3_1h'][hora_int] = o3
                     resumen['celdas'][geo_key]['pm10_12h'][hora_int] = pm10
+                    resumen['celdas'][geo_key]['ias'][hora_int] = ias_val # <--- Lo guardamos en su hora
                     
                 archivos_procesados += 1
             except Exception as e:
@@ -121,7 +124,8 @@ def generate_daily_summary():
 
         # Interpolación rápida de huecos (si la Lambda falló alguna hora, repite la hora anterior)
         for geo_key, series in resumen['celdas'].items():
-            for param in ['pm25_12h', 'o3_1h', 'pm10_12h']:
+            # --- FIX IAS: Incluimos 'ias' en la lista de interpolación ---
+            for param in ['pm25_12h', 'o3_1h', 'pm10_12h', 'ias']:
                 for i in range(24):
                     if series[param][i] == 0.0 and i > 0: 
                         series[param][i] = series[param][i-1]
