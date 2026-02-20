@@ -344,7 +344,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         hnc_str = "• 🔕 Registra tu auto para ver restricciones." 
     # ====================================================
 
-    tip = "💡 Tip: Dile al bot 'Cambia mi transporte a...' para ajustar tu rutina."
+    tip = "Tip: Dile al bot 'Cambia mi transporte a...' para ajustar tu rutina."
 
     return CARD_SUMMARY.format(
         user_name=clean(user_name),
