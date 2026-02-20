@@ -525,10 +525,11 @@ def generate_report_card(user_name, location_name, lat, lon, vehicle=None, conti
     try:
         url = f"{API_LIGHT_URL}?lat={lat}&lon={lon}"
         r = requests.get(url, timeout=10)
-        if r.status_code != 200: return f"⚠️ Error de red ({r.status_code})."
+        # FIX: Ahora devuelve una tupla (Mensaje, Categoria Default)
+        if r.status_code != 200: return f"⚠️ Error de red ({r.status_code}).", "Regular"
         
         data = r.json()
-        if data.get('status') == 'out_of_bounds': return f"📍 **Fuera de rango.** ({lat:.2f}, {lon:.2f})"
+        if data.get('status') == 'out_of_bounds': return f"📍 **Fuera de rango.** ({lat:.2f}, {lon:.2f})", "Regular"
 
         qa, meteo, ubic = data.get('aire', {}), data.get('meteo', {}), data.get('ubicacion', {})
         calidad = qa.get('calidad', 'Regular')
@@ -537,18 +538,22 @@ def generate_report_card(user_name, location_name, lat, lon, vehicle=None, conti
         hnc_pill = cards.build_hnc_pill(vehicle, contingency_phase)
         combined_footer = f"{hnc_pill}\n\n{cards.BOT_FOOTER}" if hnc_pill else cards.BOT_FOOTER
 
-        return cards.CARD_REPORT.format(
+        # Guardamos la tarjeta en una variable
+        card_text = cards.CARD_REPORT.format(
             user_name=user_name, greeting=get_time_greeting(), location_name=location_name,
             maps_url=get_maps_url(lat, lon), region=f"{ubic.get('mun', 'ZMVM')}, {ubic.get('edo', 'CDMX')}",
             report_time=get_official_report_time(data.get('ts')), ias_value=qa.get('ias', 0),
             risk_category=calidad, risk_circle=cards.get_emoji_for_quality(calidad),
             pollutant=qa.get('dominante', 'N/A'),
             forecast_block=cards.format_forecast_block(data.get('pronostico_timeline', [])),
-            health_recommendation=cards.get_health_advice(calidad), # Ya no requiere el perfil de salud aquí si no lo pasas, o puedes pasarle 'Ninguno'
+            health_recommendation=cards.get_health_advice(calidad), 
             temp=meteo.get('tmp', 0), humidity=meteo.get('rh', 0), wind_speed=meteo.get('wsp', 0),
             footer=combined_footer
         )
-    except Exception as e: return f"⚠️ Error visual: {str(e)}"
+        
+        # FIX: Devolvemos EL TEXTO y LA CALIDAD
+        return card_text, calidad
+    except Exception as e: return f"⚠️ Error visual: {str(e)}", "Regular"
 
 # --- SENDING ---
 def get_inline_markup(tag):
@@ -571,6 +576,28 @@ def send_telegram(chat_id, text, markup=None):
         r = requests.post(url, json=payload)
         if r.status_code != 200: print(f"❌ [TG FAIL] {r.text}")
     except Exception as e: print(f"❌ [TG NET ERROR]: {e}")
+
+def send_telegram_photo_local(chat_id, photo_path, caption, markup=None):
+    """Sube una foto desde la carpeta local de la Lambda hacia Telegram"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+    data = {"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"}
+    if markup: data["reply_markup"] = json.dumps(markup)
+    
+    try:
+        with open(photo_path, 'rb') as photo_file:
+            files = {"photo": photo_file}
+            r = requests.post(url, data=data, files=files, timeout=15)
+            
+            if r.status_code != 200:
+                print(f"❌ [TG PHOTO FAIL]: {r.text}")
+                # Paracaídas: si falla la foto, enviamos solo el texto
+                send_telegram(chat_id, caption, markup)
+    except FileNotFoundError:
+        print(f"❌ [FILE ERROR] No se encontró la imagen en: {photo_path}")
+        send_telegram(chat_id, caption, markup)
+    except Exception as e:
+        print(f"❌ [TG UPLOAD ERROR]: {e}")
+        send_telegram(chat_id, caption, markup)
 
 # --- HANDLER ---
 def lambda_handler(event, context):
@@ -679,10 +706,33 @@ def lambda_handler(event, context):
             
             resp = ""
             
-            # --- GUARDADO ---
-            if data == "SAVE_HOME": resp = confirm_saved_location(user_id, 'casa')
-            elif data == "SAVE_WORK": resp = confirm_saved_location(user_id, 'trabajo')
-            elif data == "RESET": resp = "🗑️ Cancelado."
+            # --- GUARDADO Y CASCADA DE ONBOARDING ---
+            if data == "SAVE_HOME": 
+                resp = confirm_saved_location(user_id, 'casa')
+                # Magia de Cascada: Revisamos qué le falta
+                user = get_user_profile(user_id)
+                if 'trabajo' not in user.get('locations', {}):
+                    resp += "\n\n🚀 **PASO 2:**\nAhora, envíame la ubicación de tu **TRABAJO** (o escuela) tocando el clip 📎."
+                elif not user.get('vehicle', {}).get('active'):
+                    resp += "\n\n🚗 **PASO FINAL:**\nRegistra tu auto para evitar multas. Escríbeme:\n💬 *'Mi placa termina en 5 y soy holograma 0'.*"
+
+            elif data == "SAVE_WORK": 
+                resp = confirm_saved_location(user_id, 'trabajo')
+                user = get_user_profile(user_id)
+                if not user.get('vehicle', {}).get('active'):
+                    resp += "\n\n🚗 **PASO FINAL:**\nPara protegerte de multas, registra tu auto. Escríbeme:\n💬 *'Mi placa termina en 5 y soy holograma 0'.*"
+                else:
+                    resp += "\n\n🎉 **¡Perfil completo!** Ya estás 100% protegido."
+
+            elif data == "RESET": 
+                resp = "🗑️ Cancelado."
+                
+            # --- BOTONES DEL ONBOARDING INICIAL (/start) ---
+            elif data == "SET_LOC_casa":
+                resp = "🏠 **Paso 1: Configurar Casa**\n\nPor favor, toca el clip 📎 (abajo a la derecha) y envíame la **Ubicación** de tu casa.\n\n*(No te preocupes, tus datos están protegidos por nuestro Aviso de Privacidad).* "
+                
+            elif data == "SET_VEHICLE_start":
+                resp = "🚗 **Registrar Auto**\n\nPara avisarte si circulas o si hay Contingencia, escríbeme de forma natural:\n\n💬 *'Mi auto tiene placas terminación 5 y holograma 0'.*"
             
             # --- ACCESOS RÁPIDOS (Resumen y Ubicaciones) ---
             # Detectamos cualquier botón que empiece con CHECK_AIR_ o los viejos CHECK_HOME/WORK
@@ -699,7 +749,6 @@ def lambda_handler(event, context):
                 locs = user.get('locations', {})
                 
                 # Intentamos buscar directo o normalizado
-                # (Usamos el helper normalize_key si ya lo agregaste, sino búsqueda directa)
                 found_key = None
                 if loc_key in locs: found_key = loc_key
                 
@@ -712,8 +761,20 @@ def lambda_handler(event, context):
                     sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                     current_phase = sys_state.get('last_contingency_phase', 'None')
                     
-                    report = generate_report_card(first_name, disp_name, lat, lon, vehicle=veh, contingency_phase=current_phase)
-                    send_telegram(chat_id, report, markup=cards.get_exposure_button())
+                    # --- FIX BANNERS VISUALES: Recibe 2 valores ---
+                    report_text, calidad = generate_report_card(first_name, disp_name, lat, lon, vehicle=veh, contingency_phase=current_phase)
+                    
+                    # Seleccionamos el banner local
+                    mapa_archivos = {
+                        "Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png",
+                        "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"
+                    }
+                    calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
+                    nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
+                    ruta_imagen = f"/var/task/banners/{nombre_png}"
+                    
+                    # Enviamos Foto + Tarjeta
+                    send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
                     return {'statusCode': 200, 'body': 'OK'}
                 else:
                     resp = f"⚠️ No encontré la ubicación '{loc_key}'. Intenta actualizar tu menú."
@@ -1151,9 +1212,22 @@ def lambda_handler(event, context):
                         sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                         current_phase = sys_state.get('last_contingency_phase', 'None')
                         
-                        r = generate_report_card(first_name, in_name, in_lat, in_lon, vehicle=veh, contingency_phase=current_phase)
-                        send_telegram(chat_id, r, markup=cards.get_exposure_button())
+                        # --- FIX BANNERS VISUALES: Recibe 2 valores ---
+                        report_text, calidad = generate_report_card(first_name, in_name, in_lat, in_lon, vehicle=veh, contingency_phase=current_phase)
+                        
+                        # Seleccionamos banner local
+                        mapa_archivos = {
+                            "Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png",
+                            "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"
+                        }
+                        calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
+                        nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
+                        ruta_imagen = f"/var/task/banners/{nombre_png}"
+                        
+                        # Enviamos Foto + Tarjeta
+                        send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
                         return {'statusCode': 200, 'body': 'OK'}
+                        
                     else:
                         # ❌ FALLO: No hay coordenadas. Avisamos al LLM para que pregunte al usuario.
                         r = f"⚠️ No encontré coordenadas para '{in_name}'. Pide al usuario que guarde la ubicación o envíe su ubicación actual."
