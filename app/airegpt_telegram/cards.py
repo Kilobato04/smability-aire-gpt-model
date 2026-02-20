@@ -43,6 +43,29 @@ def get_health_advice(calidad, user_condition=None):
 
 # --- PLANTILLAS DE TARJETAS ---
 
+CARD_IAS_INFO = """📊 **¿Qué es el IAS (Índice de Aire y Salud)?**
+
+El **IAS** es el indicador oficial actual para medir la contaminación. Sustituyó al antiguo *IMECA* en 2019 y está diseñado para proteger tu salud.
+
+**Escala Oficial (Puntos):**
+
+🟢 **Buena (0 a 50 pts)**
+Riesgo bajo. Excelente para cualquier actividad al aire libre.
+
+🟡 **Regular (51 a 100 pts)**
+Riesgo moderado. *Grupos sensibles* (niños, adultos mayores, personas con asma) deben reducir esfuerzos pesados.
+
+🟠 **Mala (101 a 150 pts)**
+Riesgo alto. *Grupos sensibles* no deben hacer actividades al aire libre. La población general debe reducir esfuerzos.
+
+🔴 **Muy Mala (151 a 200 pts)**
+Riesgo muy alto. *Nadie* debería realizar actividades al aire libre. Mantente en interiores.
+
+🟣 **Extremadamente Mala (>200 pts)**
+Riesgo extremo. Peligro sanitario. Cierra ventanas y no salgas de casa.
+
+{footer}"""
+
 CARD_RULES = """⚙️ **REGLAS DE OPERACIÓN Y ALCANCE**
 Para mantener a AIreGPT rápido, preciso y sin hacer spam, opero bajo estas reglas:
 
@@ -117,7 +140,9 @@ Ahora, envíame la ubicación de tu **TRABAJO** (o escuela) para activar las ale
 *(Toca el clip 📎 y selecciona "Ubicación")*
 {footer}"""
 
+
 # ACTUALIZADA: Se agregó {trend_arrow} para aprovechar el dato de la nueva API
+
 CARD_REPORT = """🌤️ **{greeting}, {user_name}!**
 Aquí tienes el reporte para 📍 **[{location_name}]({maps_url})**:
 🗺️ {region} • 🕒 {report_time}
