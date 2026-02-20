@@ -126,6 +126,7 @@ Aquí tienes el reporte para 📍 **[{location_name}]({maps_url})**:
 ☣️ **Contaminante dominante:** {pollutant}
 
 🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
+📊 **Tendencia:** {trend}
 
 📈 **Pronóstico (Próximas hrs):**
 {forecast_block}
@@ -140,7 +141,7 @@ Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** ha
 ☣️ **Contaminante principal:** {pollutant}
 *Tu umbral configurado es: {threshold} pts*
 
-📈 **Tendencia:** {forecast_msg}
+📊 **Tendencia:** {forecast_msg}
 
 🛡️ **Acción inmediata:** {health_recommendation}
 {footer}"""
@@ -153,6 +154,7 @@ Aquí tienes el reporte para 📍 **[{location_name}]({maps_url})**:
 ☣️ **Contaminante dominante:** {pollutant}
 
 🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
+📊 **Tendencia:** {trend}
 
 📈 **Pronóstico (Próximas hrs):**
 {forecast_block}
