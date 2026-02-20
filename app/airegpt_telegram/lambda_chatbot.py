@@ -1151,6 +1151,12 @@ def lambda_handler(event, context):
                 msg_envio = cards.CARD_PROMPTS.format(footer=cards.BOT_FOOTER)
                 send_telegram(chat_id, msg_envio)
                 return {'statusCode': 200, 'body': 'OK'}
+
+            # --- NUEVO FIX EDUCATIVO: EXPLICACIÓN IAS / IMECA ---
+            elif text in ["ias", "imeca", "que es el ias", "qué es el ias", "que es ias", "qué es ias", "que es el imeca", "qué es el imeca", "como se mide la calidad del aire", "cómo se mide la calidad del aire", "escala ias"]:
+                msg_envio = cards.CARD_IAS_INFO.format(footer=cards.BOT_FOOTER)
+                send_telegram(chat_id, msg_envio)
+                return {'statusCode': 200, 'body': 'OK'}
             # =========================================================
 
         print(f"📨 [MSG] User: {user_id} | Content: {user_content}") # LOG CRITICO
