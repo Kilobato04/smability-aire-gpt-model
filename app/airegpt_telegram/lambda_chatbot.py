@@ -533,6 +533,9 @@ def generate_report_card(user_name, location_name, lat, lon, vehicle=None, conti
 
         qa, meteo, ubic = data.get('aire', {}), data.get('meteo', {}), data.get('ubicacion', {})
         calidad = qa.get('calidad', 'Regular')
+
+        # --- FIX TENDENCIA: Extraemos el dato del JSON ---
+        tendencia_actual = qa.get('tendencia', 'Estable ➡️')
         
         # Inyección HNC centralizada desde cards.py
         hnc_pill = cards.build_hnc_pill(vehicle, contingency_phase)
@@ -545,6 +548,7 @@ def generate_report_card(user_name, location_name, lat, lon, vehicle=None, conti
             report_time=get_official_report_time(data.get('ts')), ias_value=qa.get('ias', 0),
             risk_category=calidad, risk_circle=cards.get_emoji_for_quality(calidad),
             pollutant=qa.get('dominante', 'N/A'),
+            trend=tendencia_actual,
             forecast_block=cards.format_forecast_block(data.get('pronostico_timeline', [])),
             health_recommendation=cards.get_health_advice(calidad), 
             temp=meteo.get('tmp', 0), humidity=meteo.get('rh', 0), wind_speed=meteo.get('wsp', 0),
@@ -661,6 +665,15 @@ def lambda_handler(event, context):
 
         # B. Enviar a Usuarios (Scan Eficiente)
         try:
+            # --- FIX BANNERS: Calculamos la foto ANTES del bucle para no gastar CPU ---
+            import os
+            directorio_actual = os.path.dirname(os.path.abspath(__file__))
+            if phase == "SUSPENDIDA":
+                ruta_imagen = os.path.join(directorio_actual, "banners", "banner_buena.png")
+            else:
+                ruta_imagen = os.path.join(directorio_actual, "banners", "banner_contingencia.png")
+            # -------------------------------------------------------------------------
+
             scan_kwargs = {
                 'FilterExpression': "alerts.contingency = :a",
                 'ExpressionAttributeValues': {":a": True},
@@ -674,8 +687,8 @@ def lambda_handler(event, context):
                 if start_key: scan_kwargs['ExclusiveStartKey'] = start_key
                 response = table.scan(**scan_kwargs)
                 for u in response.get('Items', []):
-                    # AQUÍ PASAMOS EL MARKUP
-                    send_telegram(u['user_id'], msg, markup=markup_contingencia)
+                    # --- FIX BANNERS: Usamos la nueva función con foto ---
+                    send_telegram_photo_local(u['user_id'], ruta_imagen, msg, markup=markup_contingencia)
                     count += 1
                 start_key = response.get('LastEvaluatedKey')
                 if not start_key: done = True
