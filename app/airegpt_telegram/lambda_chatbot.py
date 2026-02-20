@@ -771,7 +771,13 @@ def lambda_handler(event, context):
                     }
                     calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
                     nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
-                    ruta_imagen = f"/var/task/banners/{nombre_png}"
+                    # --- FIX: BUSCADOR INTELIGENTE DE RUTAS AWS ---
+                    import os
+                    ruta_directa = f"/var/task/banners/{nombre_png}"
+                    ruta_repo = f"/var/task/airegpt_telegram/banners/{nombre_png}"
+                    
+                    ruta_imagen = ruta_directa if os.path.exists(ruta_directa) else ruta_repo
+                    # ----------------------------------------------
                     
                     # Enviamos Foto + Tarjeta
                     send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
@@ -1222,7 +1228,13 @@ def lambda_handler(event, context):
                         }
                         calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
                         nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
-                        ruta_imagen = f"/var/task/banners/{nombre_png}"
+                        # --- FIX: BUSCADOR INTELIGENTE DE RUTAS AWS ---
+                        import os
+                        ruta_directa = f"/var/task/banners/{nombre_png}"
+                        ruta_repo = f"/var/task/airegpt_telegram/banners/{nombre_png}"
+                        
+                        ruta_imagen = ruta_directa if os.path.exists(ruta_directa) else ruta_repo
+                        # ----------------------------------------------
                         
                         # Enviamos Foto + Tarjeta
                         send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
