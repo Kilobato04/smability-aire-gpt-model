@@ -282,9 +282,9 @@ CARD_EXPOSICION = """{emoji_alerta} *Reporte de Exposición*
 Ayer **{fecha_ayer}** te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
 
 {rutina_str}
+😷 **Aire que respiraste:** {calidad_ias} ({promedio_ias} pts IAS)
 
 {emoji_cigarro} Respiraste el equivalente a *{cigarros} cigarros invisibles* en tu rutina.
-
 {emoji_edad} Esto sumó *{dias} días extra* de desgaste a tu Edad Urbana.
 
 _*Promedio de exposición {promedio_riesgo} µg/m³ eq.*_
