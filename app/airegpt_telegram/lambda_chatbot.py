@@ -224,40 +224,65 @@ class CalculadoraRiesgoSmability:
             factor_transporte = self.FACTORES_TRANSPORTE.get(modo_transporte, 1.0)
 
         suma_exposicion_acumulada = 0.0
+        suma_ias_acumulada = 0.0 # <--- NUEVO ACUMULADOR PARA IAS
         
+        # FIX: Por si la API manda el vector sin la llave 'ias' (mientras se refresca)
+        vector_casa_ias = vector_casa.get('ias', [0]*24)
+        vector_trabajo_ias = vector_trabajo.get('ias', [0]*24)
+
         for hora in range(24):
             # 1. Contaminación EXTERIOR bruta (de la calle)
             ext_casa = vector_casa['pm25_12h'][hora] + (vector_casa['o3_1h'][hora] * self.K_O3_A_PM)
             ext_trab = vector_trabajo['pm25_12h'][hora] + (vector_trabajo['o3_1h'][hora] * self.K_O3_A_PM)
+            
+            ias_ext_casa = vector_casa_ias[hora]
+            ias_ext_trab = vector_trabajo_ias[hora]
 
             # 2. Contaminación INTERIOR (Con escudo del edificio aplicado)
             int_casa = ext_casa * self.FACTOR_INTRAMUROS
             int_trab = ext_trab * self.FACTOR_INTRAMUROS
+            
+            # El IAS también disminuye si estás protegido en interiores
+            ias_int_casa = ias_ext_casa * self.FACTOR_INTRAMUROS
+            ias_int_trab = ias_ext_trab * self.FACTOR_INTRAMUROS
 
             # 3. Reconstrucción de la película del día
             if es_home_office:
                 nivel_hora = int_casa # Todo el día protegido en casa
+                ias_hora = ias_int_casa
             else:
                 if hora < hora_salida or hora >= hora_llegada_casa:
                     nivel_hora = int_casa # Durmiendo / En casa
+                    ias_hora = ias_int_casa
                 elif hora_salida <= hora < hora_llegada_trabajo:
                     # En la calle (Sin escudo de edificio, solo escudo de vehículo)
                     nivel_hora = ((ext_casa + ext_trab) / 2) * factor_transporte 
+                    ias_hora = ((ias_ext_casa + ias_ext_trab) / 2) * factor_transporte
                 elif hora_llegada_trabajo <= hora < hora_salida_trabajo:
                     nivel_hora = int_trab # Protegido dentro de la oficina
+                    ias_hora = ias_int_trab
                 elif hora_salida_trabajo <= hora < hora_llegada_casa:
                     # En la calle regresando
                     nivel_hora = ((ext_casa + ext_trab) / 2) * factor_transporte 
+                    ias_hora = ((ias_ext_casa + ias_ext_trab) / 2) * factor_transporte
 
             suma_exposicion_acumulada += nivel_hora
+            suma_ias_acumulada += ias_hora # <--- SUMAMOS EL IAS DE ESTA HORA
 
         promedio = suma_exposicion_acumulada / 24.0
         cigarros = promedio / self.K_CIGARRO
+        promedio_ias = suma_ias_acumulada / 24.0 # <--- CALCULAMOS EL PROMEDIO FINAL
+        
+        # Convertimos el promedio IAS a Categoría Visual
+        from cards import get_emoji_for_quality
+        cat_ias = "Buena" if promedio_ias <= 50 else "Regular" if promedio_ias <= 100 else "Mala" if promedio_ias <= 150 else "Muy Mala" if promedio_ias <= 200 else "Extrema"
         
         return {
             "cigarros": round(cigarros, 1), 
             "dias_perdidos": round(cigarros * self.K_ENVEJECIMIENTO, 1),
-            "promedio_riesgo": round(promedio, 1)
+            "promedio_riesgo": round(promedio, 1),
+            "promedio_ias": round(promedio_ias), # <--- SE LO MANDAMOS A LA TARJETA
+            "calidad_ias": f"{get_emoji_for_quality(cat_ias)} Calidad {cat_ias}" # <--- TEXTO LISTO
         }
 
 # --- TOOLS ---
