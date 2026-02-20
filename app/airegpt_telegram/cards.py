@@ -46,7 +46,7 @@ def get_health_advice(calidad, user_condition=None):
 CARD_RULES = """⚙️ **REGLAS DE OPERACIÓN Y ALCANCE**
 Para mantener a AIreGPT rápido, preciso y sin hacer spam, opero bajo estas reglas:
 
-🌃 **Horario de Descanso:** Solo envío alertas entre las 6:00 AM y las 11:00 PM.
+🌃 **Horario de Descanso:** Solo envío alertas entre las 6:00 AM y las 11:00 PM. Las "Alertas" se envía 20 min después de cada hora.
 📍 **Ubicaciones (Max 3):** Solo "Casa" y "Trabajo" se utilizan para calcular tu exposición.
 🛑 **Filtro Anti-Spam:** Las alertas de emergencia requieren un mínimo de 100 pts IAS. Me silenciaré tras 3 avisos.
 🗺️ **Cobertura:** Alertas de *Contingencia* y *Hoy No Circula* exclusivas para CDMX y ZMVM.
