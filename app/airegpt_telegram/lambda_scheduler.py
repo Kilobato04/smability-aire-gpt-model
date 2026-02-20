@@ -48,6 +48,21 @@ def send_telegram_push(chat_id, text):
     except Exception as e:
         print(f"❌ TG Error: {e}")
 
+def send_telegram_photo_local(chat_id, photo_path, caption):
+    """Sube una foto desde la carpeta local hacia Telegram"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+    data = {"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"}
+    
+    try:
+        with open(photo_path, 'rb') as photo_file:
+            r = requests.post(url, data=data, files={"photo": photo_file}, timeout=15)
+            if r.status_code != 200:
+                print(f"❌ [TG PHOTO FAIL]: {r.text}")
+                send_telegram_push(chat_id, caption) # Paracaídas
+    except Exception as e:
+        print(f"❌ [TG UPLOAD ERROR]: {e}")
+        send_telegram_push(chat_id, caption) # Paracaídas
+
 def interpret_timeline_short(current_ias, timeline):
     if not timeline or not isinstance(timeline, list): return "Estable"
     try:
@@ -280,6 +295,9 @@ def process_user(user, current_hour_str, contingency_data):
                             # Armar footer combinado
                             combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
                             
+                            # --- NUEVO: Extraer tendencia de la API ---
+                            tendencia_actual = qa.get('tendencia', 'Estable 📊')
+
                             card = cards.CARD_REMINDER.format(
                                 greeting=get_time_greeting(),
                                 user_name=first_name, location_name=loc_data.get('display_name', loc_name),
@@ -288,12 +306,26 @@ def process_user(user, current_hour_str, contingency_data):
                                 report_time=f"{current_hour_str.split(':')[0]}:20", 
                                 ias_value=qa.get('ias', 0), risk_category=cat, risk_circle=info['emoji'],
                                 pollutant=qa.get('dominante', 'N/A'), 
+                                trend=tendencia_actual, # <--- INYECTAMOS TENDENCIA AQUÍ
                                 forecast_block=f_block,
                                 health_recommendation=cards.get_health_advice(cat, h_str),
                                 temp=meteo.get('tmp', 0), humidity=meteo.get('rh', 0), wind_speed=meteo.get('wsp', 0),
                                 footer=combined_footer
                             )
-                            send_telegram_push(user_id, card)
+                            
+                            # --- FIX BANNERS: Seleccionar y enviar foto ---
+                            import os
+                            directorio_actual = os.path.dirname(os.path.abspath(__file__))
+                            mapa_archivos = {
+                                "Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png",
+                                "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"
+                            }
+                            calidad_clean = cat.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
+                            nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
+                            ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
+                            
+                            send_telegram_photo_local(user_id, ruta_imagen, card)
+                            # ---------------------------------------------
 
         # ---------------------------------------------------------
         # B. ALERTAS POR UMBRAL (Emergencia) - CON LOGS DE DEBUG 🕵️‍♂️
@@ -376,6 +408,11 @@ def process_user(user, current_hour_str, contingency_data):
                                 # Armar footer combinado
                                 combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
 
+                                # --- NUEVO: Extraer tendencia de la API ---
+                                tendencia_actual = qa.get('tendencia', 'Estable 📊')
+                                # A la tarjeta de alerta IAS le pasamos la tendencia corta si f_short existe, o la de la API
+                                tendencia_final = f_short if f_short != "Estable" else tendencia_actual
+
                                 card = cards.CARD_ALERT_IAS.format(
                                     user_name=first_name, 
                                     location_name=loc_data.get('display_name', loc_name),
@@ -383,13 +420,26 @@ def process_user(user, current_hour_str, contingency_data):
                                     risk_category=cat, 
                                     risk_circle=info['emoji'], 
                                     ias_value=cur_ias,
-                                    forecast_msg=f_short,
+                                    forecast_msg=tendencia_final,
                                     threshold=umbral, 
                                     pollutant=qa.get('dominante', 'N/A'), 
                                     health_recommendation=cards.get_health_advice(cat, h_str),
                                     footer=combined_footer
                                 )
-                                send_telegram_push(user_id, card)
+                                
+                                # --- FIX BANNERS: Seleccionar y enviar foto ---
+                                import os
+                                directorio_actual = os.path.dirname(os.path.abspath(__file__))
+                                mapa_archivos = {
+                                    "Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png",
+                                    "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"
+                                }
+                                calidad_clean = cat.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
+                                nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
+                                ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
+                                
+                                send_telegram_photo_local(user_id, ruta_imagen, card)
+                                # ---------------------------------------------
                                 
                                 # Actualizar contador
                                 try:
