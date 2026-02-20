@@ -771,13 +771,25 @@ def lambda_handler(event, context):
                     }
                     calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
                     nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
-                    # --- FIX: BUSCADOR INTELIGENTE DE RUTAS AWS ---
+                    # --- FIX DEFINITIVO: RASTREADOR DE RUTAS DINÁMICO ---
                     import os
-                    ruta_directa = f"/var/task/banners/{nombre_png}"
-                    ruta_repo = f"/var/task/airegpt_telegram/banners/{nombre_png}"
+                    # Obtenemos la ruta exacta de donde vive tu lambda_function.py
+                    base_dir = os.path.dirname(os.path.abspath(__file__))
                     
-                    ruta_imagen = ruta_directa if os.path.exists(ruta_directa) else ruta_repo
-                    # ----------------------------------------------
+                    # Le damos a Python el mapa de los posibles escondites según tu repo
+                    rutas_posibles = [
+                        os.path.join(base_dir, "banners", nombre_png),            # Si están en la misma carpeta
+                        f"/var/task/app/airegpt_telegram/banners/{nombre_png}",   # Basado en tu captura (Carpeta app)
+                        f"/var/task/airegpt_telegram/banners/{nombre_png}",       # Si omitió app
+                        f"/var/task/banners/{nombre_png}"                         # Si extrajo el contenido
+                    ]
+                    
+                    ruta_imagen = rutas_posibles[-1] # Fallback por defecto
+                    for ruta in rutas_posibles:
+                        if os.path.exists(ruta):
+                            ruta_imagen = ruta
+                            break
+                    # ----------------------------------------------------
                     
                     # Enviamos Foto + Tarjeta
                     send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
@@ -1228,13 +1240,25 @@ def lambda_handler(event, context):
                         }
                         calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
                         nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
-                        # --- FIX: BUSCADOR INTELIGENTE DE RUTAS AWS ---
+                        # --- FIX DEFINITIVO: RASTREADOR DE RUTAS DINÁMICO ---
                         import os
-                        ruta_directa = f"/var/task/banners/{nombre_png}"
-                        ruta_repo = f"/var/task/airegpt_telegram/banners/{nombre_png}"
+                        # Obtenemos la ruta exacta de donde vive tu lambda_function.py
+                        base_dir = os.path.dirname(os.path.abspath(__file__))
                         
-                        ruta_imagen = ruta_directa if os.path.exists(ruta_directa) else ruta_repo
-                        # ----------------------------------------------
+                        # Le damos a Python el mapa de los posibles escondites según tu repo
+                        rutas_posibles = [
+                            os.path.join(base_dir, "banners", nombre_png),            # Si están en la misma carpeta
+                            f"/var/task/app/airegpt_telegram/banners/{nombre_png}",   # Basado en tu captura (Carpeta app)
+                            f"/var/task/airegpt_telegram/banners/{nombre_png}",       # Si omitió app
+                            f"/var/task/banners/{nombre_png}"                         # Si extrajo el contenido
+                        ]
+                        
+                        ruta_imagen = rutas_posibles[-1] # Fallback por defecto
+                        for ruta in rutas_posibles:
+                            if os.path.exists(ruta):
+                                ruta_imagen = ruta
+                                break
+                        # ----------------------------------------------------
                         
                         # Enviamos Foto + Tarjeta
                         send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
