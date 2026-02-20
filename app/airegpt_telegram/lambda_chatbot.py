@@ -942,9 +942,11 @@ def lambda_handler(event, context):
                         # 3. Armar la tarjeta con las nuevas variables
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
-                            fecha_ayer=fecha_ayer_str, # <--- LA FECHA QUE PIDIÓ CARDS.PY
+                            fecha_ayer=fecha_ayer_str, 
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
-                            rutina_str=rutina_txt,     # <--- LA RUTA QUE PIDIÓ CARDS.PY
+                            rutina_str=rutina_txt,
+                            calidad_ias=res['calidad_ias'],    # <--- NUEVO
+                            promedio_ias=res['promedio_ias'],  # <--- NUEVO
                             emoji_cigarro=grafico_humo, 
                             texto_cigarros=cigs_txt,
                             cigarros=cigs, 
@@ -1043,9 +1045,11 @@ def lambda_handler(event, context):
                         # 3. Armar la tarjeta con las nuevas variables
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
-                            fecha_ayer=fecha_ayer_str, # <--- AQUI PASAMOS LA FECHA
+                            fecha_ayer=fecha_ayer_str, 
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
                             rutina_str=rutina_txt,
+                            calidad_ias=res['calidad_ias'],    # <--- NUEVO
+                            promedio_ias=res['promedio_ias'],  # <--- NUEVO
                             emoji_cigarro=grafico_humo, 
                             texto_cigarros=cigs_txt,
                             cigarros=cigs, 
