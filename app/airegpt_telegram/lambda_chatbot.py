@@ -857,7 +857,7 @@ def lambda_handler(event, context):
                     current_phase = sys_state.get('last_contingency_phase', 'None')
                     
                     # --- FIX BANNERS VISUALES: Recibe 2 valores ---
-                    report_text, calidad = generate_report_card(first_name, disp_name, lat, lon, vehicle=veh, contingency_phase=current_phase)
+                    report_text, calidad = generate_report_card(first_name, disp_name, lat, lon, vehicle=veh, contingency_phase=current_phase, user_profile=user_profile)
                     
                     # Seleccionamos el banner local
                     mapa_archivos = {
@@ -1437,7 +1437,7 @@ def lambda_handler(event, context):
                         current_phase = sys_state.get('last_contingency_phase', 'None')
                         
                         # --- FIX BANNERS VISUALES: Recibe 2 valores ---
-                        report_text, calidad = generate_report_card(first_name, in_name, in_lat, in_lon, vehicle=veh, contingency_phase=current_phase)
+                        report_text, calidad = generate_report_card(first_name, disp_name, lat, lon, vehicle=veh, contingency_phase=current_phase, user_profile=user_profile)
                         
                         # Seleccionamos banner local
                         mapa_archivos = {
@@ -1675,7 +1675,7 @@ def lambda_handler(event, context):
                 elif fn == "registrar_condicion_salud":
                     condicion_raw = args.get('condicion', '').lower()
                     
-                    # 1. Filtro estricto (Lista blanca de palabras clave relacionadas con contaminación)
+                    # 1. Filtro estricto
                     palabras_clave_validas = [
                         "asma", "epoc", "alergia", "rinitis", "bronquitis", "neumonia", 
                         "hipertension", "presion alta", "cardiac", "corazon", "arritmia",
@@ -1685,26 +1685,25 @@ def lambda_handler(event, context):
                     es_valida = any(palabra in condicion_raw for palabra in palabras_clave_validas)
                     
                     if not es_valida:
-                        # Si es "dolor de muelas", le decimos al LLM que lo rechace amablemente
-                        r = f"⚠️ Smability solo monitorea condiciones afectadas por la calidad del aire (ej. Asma, EPOC, Alergias, Problemas Cardíacos). Dile al usuario de forma muy empática que no es necesario registrar '{condicion_raw}' para proteger su respiración."
+                        r = f"⚠️ Smability solo monitorea condiciones afectadas por la calidad del aire. Dile al usuario amablemente que no es necesario registrar '{condicion_raw}'."
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
-                    else:
-                        # 2. Guardar en BD
-                        try:
-                            # Asignamos un ID único simple (ej. timestamp o el nombre de la condición limpio)
-                            cond_id = condicion_raw.strip().replace(" ", "_")
-                            table.update_item(
-                                Key={'user_id': str(user_id)},
-                                UpdateExpression="SET health_profile.#c = :val",
-                                ExpressionAttributeNames={'#c': cond_id},
-                                ExpressionAttributeValues={':val': {'condition': condicion_raw.capitalize(), 'active': True}}
-                            )
-                            r = f"✅ Condición '{condicion_raw.capitalize()}' guardada. Dile al usuario que a partir de ahora sus alertas de salud estarán hiper-personalizadas."
-                        except Exception as e:
-                            print(f"❌ Error guardando salud: {e}")
-                            r = "Hubo un error al guardar la condición en la base de datos."
-                        
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        continue # <--- ¡FALTABA ESTO! Evita que guarde basura en BD
+                    
+                    # 2. Guardar en BD
+                    try:
+                        cond_id = condicion_raw.strip().replace(" ", "_")
+                        table.update_item(
+                            Key={'user_id': str(user_id)},
+                            UpdateExpression="SET health_profile.#c = :val",
+                            ExpressionAttributeNames={'#c': cond_id},
+                            ExpressionAttributeValues={':val': {'condition': condicion_raw.capitalize(), 'active': True}}
+                        )
+                        r = f"✅ Condición '{condicion_raw.capitalize()}' guardada."
+                    except Exception as e:
+                        print(f"❌ Error guardando salud: {e}")
+                        r = "Hubo un error al guardar la condición."
+                    
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                         
                 elif fn == "consultar_hoy_no_circula":
                     user = get_user_profile(user_id)
