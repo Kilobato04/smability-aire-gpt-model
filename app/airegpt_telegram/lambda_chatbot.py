@@ -8,7 +8,9 @@ import bot_content
 import cards
 import prompts
 import math
+import pytz
 from decimal import Decimal
+
 
 # --- CONFIG ---
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
@@ -271,18 +273,29 @@ class CalculadoraRiesgoSmability:
 
         promedio = suma_exposicion_acumulada / 24.0
         cigarros = promedio / self.K_CIGARRO
-        promedio_ias = suma_ias_acumulada / 24.0 # <--- CALCULAMOS EL PROMEDIO FINAL
         
-        # Convertimos el promedio IAS a Categoría Visual
+        # FIX REDONDEO: math.ceil para igualar a la API Ligera
+        promedio_ias = math.ceil(suma_ias_acumulada / 24.0) 
+        
+        # FIX CATEGORÍAS: Diccionario unificado (26 es Buena)
         from cards import get_emoji_for_quality
-        cat_ias = "Buena" if promedio_ias <= 50 else "Regular" if promedio_ias <= 100 else "Mala" if promedio_ias <= 150 else "Muy Mala" if promedio_ias <= 200 else "Extrema"
+        if promedio_ias <= 50:
+            cat_ias = "Buena"
+        elif promedio_ias <= 100:
+            cat_ias = "Regular"
+        elif promedio_ias <= 150:
+            cat_ias = "Mala"
+        elif promedio_ias <= 200:
+            cat_ias = "Muy Mala"
+        else:
+            cat_ias = "Extremadamente Mala"
         
         return {
             "cigarros": round(cigarros, 1), 
             "dias_perdidos": round(cigarros * self.K_ENVEJECIMIENTO, 1),
             "promedio_riesgo": round(promedio, 1),
-            "promedio_ias": round(promedio_ias), # <--- SE LO MANDAMOS A LA TARJETA
-            "calidad_ias": f"{get_emoji_for_quality(cat_ias)} Calidad {cat_ias}" # <--- TEXTO LISTO
+            "promedio_ias": promedio_ias, # <--- SE LO MANDAMOS A LA TARJETA YA REDONDEADO
+            "calidad_ias": f"{get_emoji_for_quality(cat_ias)} Calidad {cat_ias}" # <--- TEXTO LISTO Y CORREGIDO
         }
 
 # --- TOOLS ---
@@ -535,9 +548,16 @@ def save_vehicle_profile(user_id, digit, hologram):
         return "Error al guardar el vehículo."
 
 def get_official_report_time(ts_str):
-    if ts_str: return ts_str[11:16]
-    now = datetime.utcnow() - timedelta(hours=6)
-    return now.strftime("%H:%M")
+    # Aseguramos hora exacta de CDMX para las inyecciones de tiempo
+    cdmx_tz = pytz.timezone('America/Mexico_City')
+    hora_actual = datetime.now(cdmx_tz).strftime('%H:%M')
+    
+    if ts_str and len(ts_str) >= 16:
+        # Si la API mandó un timestamp válido, sacamos la hora de ahí
+        hora_api = ts_str[11:16]
+        return f"{hora_api} (Alerta a las {hora_actual})"
+    
+    return f"{hora_actual} (Generado en tiempo real)"
 
 def get_time_greeting():
     h = (datetime.utcnow() - timedelta(hours=6)).hour
@@ -685,8 +705,15 @@ def lambda_handler(event, context):
                 oficial_link=link_came, # <--- ENLACE INYECTADO
                 footer=cards.BOT_FOOTER
             )
-            # NUEVO: Generar el botón viral
-            markup_contingencia = cards.get_share_contingency_button()
+            # NUEVO: Teclado Inline combinado (Compartir + Mi Resumen)
+            # Asumiendo que tu archivo cards.py tiene una función get_contingency_buttons
+            # Si no la tienes, inyectamos el JSON directamente aquí:
+            markup_contingencia = {
+                "inline_keyboard": [
+                    [{"text": "📊 Mi Resumen", "callback_data": "ver_resumen"}],
+                    [{"text": "📲 Compartir Alerta", "switch_inline_query": "contingencia"}] 
+                ]
+            }
 
         # B. Enviar a Usuarios (Scan Eficiente)
         try:
@@ -971,6 +998,33 @@ def lambda_handler(event, context):
                     
                 return {'statusCode': 200, 'body': 'OK'}
 
+            # --- NUEVO: BOTÓN "MI RESUMEN" DESDE ALERTAS ---
+            elif data == "ver_resumen":
+                # 1. Obtener datos del usuario
+                user = get_user_profile(user_id)
+                sub_data = user.get('subscription', {})
+                status_str = sub_data.get('status', 'FREE')
+                
+                # Detectar si es Premium o Trial para la lógica visual
+                is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
+                
+                # 2. Generar Tarjeta Visual
+                card_resumen = cards.generate_summary_card(
+                    first_name, 
+                    user.get('alerts', {}), 
+                    user.get('vehicle', None), 
+                    user.get('locations', {}), 
+                    status_str, 
+                    user.get('profile_transport', None)
+                )
+                
+                # 3. Generar Botones Inteligentes
+                markup_resumen = cards.get_summary_buttons(user.get('locations', {}), is_prem)
+                
+                # 4. Enviar y Cortar
+                send_telegram(chat_id, card_resumen, markup_resumen)
+                return {'statusCode': 200, 'body': 'OK'}
+            
             # --- MENÚ AVANZADO (Placeholder) ---
             elif data == "CONFIG_ADVANCED":
                 resp = "⚙️ **Configuración Avanzada**\n\nAquí podrás gestionar tu suscripción y métodos de pago.\n*(Próximamente)*"
