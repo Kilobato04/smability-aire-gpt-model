@@ -845,14 +845,12 @@ def lambda_handler(event, context):
                 locs = user.get('locations', {})
                 
                 # 3. Validación y Extracción
-                # Verificamos que loc_key exista y que lo que haya ahí sea un diccionario
                 if loc_key in locs and isinstance(locs[loc_key], dict):
                     target_loc = locs[loc_key]
                     lat = float(target_loc.get('lat', 0))
                     lon = float(target_loc.get('lon', 0))
                     disp_name = target_loc.get('display_name', loc_key.capitalize())
                     
-                    # Datos extra para la tarjeta
                     veh = user.get('vehicle')
                     sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                     current_phase = sys_state.get('last_contingency_phase', 'None')
@@ -880,12 +878,10 @@ def lambda_handler(event, context):
                     return {'statusCode': 200, 'body': 'OK'}
                 
                 else:
-                    # Si no se encontró la llave o no es un diccionario
-                    resp = f"⚠️ No pude encontrar los datos de '{loc_key}'. Intenta configurarla de nuevo."
+                    # Este era el primer else. El código entra aquí si no hay llave.
+                    resp = f"⚠️ No encontré la ubicación '{loc_key}'. Intenta actualizar tu menú o configurarla de nuevo."
                     send_telegram(chat_id, resp)
                     return {'statusCode': 200, 'body': 'OK'}
-                else:
-                    resp = f"⚠️ No encontré la ubicación '{loc_key}'. Intenta actualizar tu menú."
 
             # --- BORRADO DE UBICACIONES (BOTONES) ---
             elif data.startswith("DELETE_LOC_"):
