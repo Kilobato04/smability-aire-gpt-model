@@ -155,7 +155,7 @@ Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
 
 📈 **Pronóstico (Próximas hrs):**
 {forecast_block}
-
+━━━━━━━━━━━━━━━━━━━━
 🛡️ **Salud:** {health_recommendation}
 {footer}"""
 
@@ -180,7 +180,7 @@ Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
 
 🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
 📊 **Tendencia:** {trend}
-
+━━━━━━━━━━━━━━━━━━━━
 📈 **Pronóstico (Próximas hrs):**
 {forecast_block}
 
