@@ -830,53 +830,59 @@ def lambda_handler(event, context):
                 resp = "🚗 **Registrar Auto**\n\nPara avisarte si circulas o si hay Contingencia, escríbeme de forma natural:\n\n💬 *'Mi auto tiene placas terminación 5 y holograma 0'.*"
             
             # --- ACCESOS RÁPIDOS (Resumen y Ubicaciones) ---
-            # Detectamos cualquier botón que empiece con CHECK_AIR_ o los viejos CHECK_HOME/WORK
             elif data.startswith("CHECK_AIR_") or data.startswith("CHECK_HOME") or data.startswith("CHECK_WORK"):
-                # 1. Normalizar la llave (Key)
+                # 1. Inicialización de seguridad (Scope Fix)
+                loc_key = ""
+                disp_name = "Ubicación" 
+                
+                # Determinamos la llave
                 if "HOME" in data: loc_key = "casa"
                 elif "WORK" in data: loc_key = "trabajo"
-                else: 
-                    # Extraer "unam" de "CHECK_AIR_unam"
-                    loc_key = data.replace("CHECK_AIR_", "").lower()
+                else: loc_key = data.replace("CHECK_AIR_", "").lower()
                 
-                # 2. Buscar en BD
+                # 2. Obtener datos
                 user = get_user_profile(user_id)
                 locs = user.get('locations', {})
                 
-                # Intentamos buscar directo o normalizado
-                found_key = None
-                if loc_key in locs: found_key = loc_key
-                
-                if found_key:
-                    lat, lon = float(locs[found_key]['lat']), float(locs[found_key]['lon'])
-                    disp_name = locs[found_key].get('display_name', found_key.capitalize())
+                # 3. Validación y Extracción
+                # Verificamos que loc_key exista y que lo que haya ahí sea un diccionario
+                if loc_key in locs and isinstance(locs[loc_key], dict):
+                    target_loc = locs[loc_key]
+                    lat = float(target_loc.get('lat', 0))
+                    lon = float(target_loc.get('lon', 0))
+                    disp_name = target_loc.get('display_name', loc_key.capitalize())
                     
-                    # --- FIX: Inyectar datos para la Píldora HNC desde el botón ---
+                    # Datos extra para la tarjeta
                     veh = user.get('vehicle')
                     sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                     current_phase = sys_state.get('last_contingency_phase', 'None')
                     
-                    # --- FIX BANNERS VISUALES: Recibe 2 valores ---
-                    report_text, calidad = generate_report_card(first_name, disp_name, lat, lon, vehicle=veh, contingency_phase=current_phase, user_profile=user_profile)
+                    # Generamos reporte
+                    report_text, calidad = generate_report_card(
+                        first_name, disp_name, lat, lon, 
+                        vehicle=veh, contingency_phase=current_phase, user_profile=user
+                    )
                     
-                    # Seleccionamos el banner local
+                    # Selección de Banner
                     mapa_archivos = {
                         "Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png",
                         "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"
                     }
                     calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
                     nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
-                    # --- FIX EXACTO: RUTA RELATIVA AL SCRIPT ---
+                    
                     import os
-                    # 1. ¿Dónde estoy parado ahora mismo? (Directorio de este script)
                     directorio_actual = os.path.dirname(os.path.abspath(__file__))
-                    
-                    # 2. Entra a la carpeta hermana 'banners' y agarra la imagen
                     ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
-                    # ------------------------------------------
                     
-                    # Enviamos Foto + Tarjeta
+                    # Envío
                     send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
+                    return {'statusCode': 200, 'body': 'OK'}
+                
+                else:
+                    # Si no se encontró la llave o no es un diccionario
+                    resp = f"⚠️ No pude encontrar los datos de '{loc_key}'. Intenta configurarla de nuevo."
+                    send_telegram(chat_id, resp)
                     return {'statusCode': 200, 'body': 'OK'}
                 else:
                     resp = f"⚠️ No encontré la ubicación '{loc_key}'. Intenta actualizar tu menú."
@@ -1304,6 +1310,13 @@ def lambda_handler(event, context):
 
         save_interaction_and_draft(user_id, first_name, lat, lon)
         user_profile = get_user_profile(user_id)
+        
+        # --- SANITIZADOR DE DATOS (Anti-Crash) ---
+        # Si DynamoDB nos da un string donde esperamos un diccionario, lo corregimos en vivo
+        for campo in ['locations', 'alerts', 'vehicle', 'health_profile', 'subscription']:
+            if not isinstance(user_profile.get(campo), dict):
+                user_profile[campo] = {}
+        # -----------------------------------------
         # Parche de seguridad
         if isinstance(user_profile.get('alerts'), str): user_profile['alerts'] = {}
         
