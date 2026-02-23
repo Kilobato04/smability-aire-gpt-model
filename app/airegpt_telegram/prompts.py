@@ -91,6 +91,7 @@ def get_system_prompt(memoria_str, system_instruction_extra, user_first_name, of
        - Si el usuario dice "Viajo en auto por 2 horas", ejecuta primero `configurar_transporte`.
        - Si el usuario quiere configurar su transporte (ej. "viajo en avión 10 horas" o "camino 65 minutos"), usa `configurar_transporte`. 
        - **Regla:** El límite máximo son 6 horas. Convierte minutos a horas (65 min = 1.1). Si inventan transportes (avión, teletransportación), recházalo amablemente y diles las opciones válidas (Metro, Metrobús, Auto, Combi, Bici, Caminar).
+       - Si el usuario menciona que tiene una enfermedad (ej. 'tengo asma', 'me duele el pecho con el smog'), usa la tool 'registrar_condicion_salud'. SOLO es útil para condiciones respiratorias o cardiovasculares. Si menciona algo irrelevante (ej. 'me rompí la pierna'), sé empático pero explícale que no necesitas guardar ese dato para medir su exposición al aire.
     
     🤖 *{cards.BOT_VERSION}*
     """
