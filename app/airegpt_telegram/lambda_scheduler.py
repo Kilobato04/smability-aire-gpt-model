@@ -41,27 +41,32 @@ def get_time_greeting():
     h = get_cdmx_time().hour
     return "Buenos días" if 5<=h<12 else "Buenas tardes" if 12<=h<20 else "Buenas noches"
 
-def send_telegram_push(chat_id, text):
+def send_telegram_push(chat_id, text, markup=None):
     try:
-        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
+        payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+        if markup: 
+            payload["reply_markup"] = markup
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", json=payload)
         time.sleep(0.05) # Rate limiting suave
     except Exception as e:
         print(f"❌ TG Error: {e}")
 
-def send_telegram_photo_local(chat_id, photo_path, caption):
-    """Sube una foto desde la carpeta local hacia Telegram"""
+def send_telegram_photo_local(chat_id, photo_path, caption, markup=None):
+    """Sube una foto desde la carpeta local hacia Telegram y acepta botones"""
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
     data = {"chat_id": chat_id, "caption": caption, "parse_mode": "Markdown"}
+    if markup: 
+        data["reply_markup"] = json.dumps(markup)
     
     try:
         with open(photo_path, 'rb') as photo_file:
             r = requests.post(url, data=data, files={"photo": photo_file}, timeout=15)
             if r.status_code != 200:
                 print(f"❌ [TG PHOTO FAIL]: {r.text}")
-                send_telegram_push(chat_id, caption) # Paracaídas
+                send_telegram_push(chat_id, caption, markup) # Paracaídas
     except Exception as e:
         print(f"❌ [TG UPLOAD ERROR]: {e}")
-        send_telegram_push(chat_id, caption) # Paracaídas
+        send_telegram_push(chat_id, caption, markup) # Paracaídas
 
 def interpret_timeline_short(current_ias, timeline):
     if not timeline or not isinstance(timeline, list): return "Estable"
@@ -324,7 +329,11 @@ def process_user(user, current_hour_str, contingency_data):
                             nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
                             ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
                             
-                            send_telegram_photo_local(user_id, ruta_imagen, card)
+                            # Botón exclusivo para reportes automáticos
+                            markup_reporte = {
+                                "inline_keyboard": [[{"text": "📊 Mi Resumen", "callback_data": "ver_resumen"}]]
+                            }
+                            send_telegram_photo_local(user_id, ruta_imagen, card, markup=markup_reporte)
                             # ---------------------------------------------
 
         # ---------------------------------------------------------
@@ -438,7 +447,11 @@ def process_user(user, current_hour_str, contingency_data):
                                 nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
                                 ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
                                 
-                                send_telegram_photo_local(user_id, ruta_imagen, card)
+                                # Botón exclusivo para alerta de emergencia
+                                markup_umbral = {
+                                    "inline_keyboard": [[{"text": "📊 Mi Resumen", "callback_data": "ver_resumen"}]]
+                                }
+                                send_telegram_photo_local(user_id, ruta_imagen, card, markup=markup_umbral)
                                 # ---------------------------------------------
                                 
                                 # Actualizar contador
