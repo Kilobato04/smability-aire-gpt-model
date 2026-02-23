@@ -144,7 +144,7 @@ Ahora, envíame la ubicación de tu **TRABAJO** (o escuela) para activar las ale
 # ACTUALIZADA: Se agregó {trend_arrow} para aprovechar el dato de la nueva API
 
 CARD_REPORT = """🌤️ **{greeting}, {user_name}!**
-Aquí tienes el reporte para 📍 **[{location_name}]({maps_url})**:
+Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
 🗺️ {region} • 🕒 {report_time}
 
 {risk_circle} **Calidad {risk_category} ({ias_value} pts)**
@@ -172,7 +172,7 @@ Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** a 
 {footer}"""
 
 CARD_REMINDER = """⏰ **{greeting}, {user_name}!**
-Aquí tienes el reporte para 📍 **[{location_name}]({maps_url})**:
+Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
 🗺️ {region} • 🕒 {report_time}
 
 {risk_circle} **Calidad {risk_category} ({ias_value} pts)**
@@ -246,7 +246,7 @@ CARD_HNC_DETAILED = """🚗 **Reporte Mensual HNC: {mes_nombre}**
 
 👮 **RIESGO DE MULTA (Si omites):**
 🏛️ **CDMX:** {multa_cdmx} + Corralón
-🌲 **Edomex:** {multa_edomex} + Retención
+🏛️ **Edomex:** {multa_edomex} + Retención
 
 {footer}"""
 
