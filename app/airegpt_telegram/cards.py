@@ -160,7 +160,7 @@ Aquí tienes el reporte para 📍 **[{location_name}]({maps_url})**:
 {footer}"""
 
 CARD_ALERT_IAS = """🚨 **¡ALERTA DE CALIDAD DEL AIRE!** 🚨
-Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** ha superado tu límite de seguridad.
+Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** a las 🕒 {report_time} ha superado tu límite de seguridad.
 
 {risk_circle} **Calidad {risk_category} ({ias_value} pts)**
 ☣️ **Contaminante principal:** {pollutant}
