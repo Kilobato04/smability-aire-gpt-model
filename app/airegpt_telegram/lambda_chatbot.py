@@ -569,11 +569,10 @@ def get_time_greeting():
 def get_maps_url(lat, lon): return f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
 
 # --- REPORTE DIARIO CON PÍLDORA HNC Y VERIFICACIÓN INTEGRADAS ---
-def generate_report_card(user_name, location_name, lat, lon, vehicle=None, contingency_phase="None"):
+def generate_report_card(user_name, location_name, lat, lon, vehicle=None, contingency_phase="None", user_profile=None):
     try:
         url = f"{API_LIGHT_URL}?lat={lat}&lon={lon}"
         r = requests.get(url, timeout=10)
-        # FIX: Ahora devuelve una tupla (Mensaje, Categoria Default)
         if r.status_code != 200: return f"⚠️ Error de red ({r.status_code}).", "Regular"
         
         data = r.json()
@@ -581,15 +580,22 @@ def generate_report_card(user_name, location_name, lat, lon, vehicle=None, conti
 
         qa, meteo, ubic = data.get('aire', {}), data.get('meteo', {}), data.get('ubicacion', {})
         calidad = qa.get('calidad', 'Regular')
-
-        # --- FIX TENDENCIA: Extraemos el dato del JSON ---
         tendencia_actual = qa.get('tendencia', 'Estable ➡️')
         
-        # Inyección HNC centralizada desde cards.py
+        # --- FIX: EXTRAER SALUD DEL USUARIO ---
+        user_condition = "Ninguno"
+        if user_profile and 'health_profile' in user_profile:
+            health_data = user_profile['health_profile']
+            # Filtramos solo las condiciones activas
+            condiciones = [info['condition'] for key, info in health_data.items() if info.get('active')]
+            if condiciones:
+                user_condition = ", ".join(condiciones) # Ej: "Asma, Alergias"
+
+        # Inyección HNC
         hnc_pill = cards.build_hnc_pill(vehicle, contingency_phase)
         combined_footer = f"{hnc_pill}\n\n{cards.BOT_FOOTER}" if hnc_pill else cards.BOT_FOOTER
 
-        # Guardamos la tarjeta en una variable
+        # Guardamos la tarjeta
         card_text = cards.CARD_REPORT.format(
             user_name=user_name, greeting=get_time_greeting(), location_name=location_name,
             maps_url=get_maps_url(lat, lon), region=f"{ubic.get('mun', 'ZMVM')}, {ubic.get('edo', 'CDMX')}",
@@ -598,12 +604,12 @@ def generate_report_card(user_name, location_name, lat, lon, vehicle=None, conti
             pollutant=qa.get('dominante', 'N/A'),
             trend=tendencia_actual,
             forecast_block=cards.format_forecast_block(data.get('pronostico_timeline', [])),
-            health_recommendation=cards.get_health_advice(calidad), 
+            # --- AQUÍ INYECTAMOS LA CONDICIÓN MÉDICA ---
+            health_recommendation=cards.get_health_advice(calidad, user_condition), 
             temp=meteo.get('tmp', 0), humidity=meteo.get('rh', 0), wind_speed=meteo.get('wsp', 0),
             footer=combined_footer
         )
         
-        # FIX: Devolvemos EL TEXTO y LA CALIDAD
         return card_text, calidad
     except Exception as e: return f"⚠️ Error visual: {str(e)}", "Regular"
 
@@ -1245,6 +1251,53 @@ def lambda_handler(event, context):
                 msg_envio = cards.CARD_IAS_INFO.format(footer=cards.BOT_FOOTER)
                 send_telegram(chat_id, msg_envio)
                 return {'statusCode': 200, 'body': 'OK'}
+                
+            # =========================================================
+            # 📊 NUEVO BLOQUE: MI RESUMEN / PERFIL (FIX ÍTEM 9)
+            # =========================================================
+            elif text_clean in ["mi resumen", "resumen", "perfil", "/perfil", "mi perfil"]:
+                print(f"👤 [PERFIL] Solicitado por: {user_id}")
+                
+                # 1. Preparamos Ubicaciones
+                locs = user_profile.get('locations', {})
+                if not locs:
+                    locs_str = "No tienes ubicaciones guardadas."
+                else:
+                    locs_str = ""
+                    for k, v in locs.items():
+                        if v.get('active'):
+                            locs_str += f"• **{v.get('display_name', k).capitalize()}**\n"
+                
+                # 2. Preparamos Vehículo
+                veh = user_profile.get('vehicle', {})
+                if veh and veh.get('active'):
+                    veh_str = f"Placa: {veh.get('plate_last_digit')} • Holograma: {veh.get('hologram')}"
+                else:
+                    veh_str = "No registrado."
+
+                # 3. Preparamos Alertas (Básico)
+                alerts_str = "Tus alertas inteligentes están activas."
+
+                # 4. FIX ÍTEM 9: EXTRAER SALUD
+                health_data = user_profile.get('health_profile', {})
+                condiciones = [info['condition'] for key, info in health_data.items() if info.get('active')]
+                
+                if condiciones:
+                    health_display = f"🏥 **Salud:** {', '.join(condiciones)}"
+                else:
+                    health_display = "🏥 **Salud:** Ninguna *(Escribe 'Tengo asma' para añadir)*"
+
+                # 5. Formateamos y Enviamos la Tarjeta
+                msg_envio = cards.CARD_PROFILE.format(
+                    locations_list=locs_str,
+                    health_display=health_display,
+                    vehicle_display=veh_str,
+                    alerts_display=alerts_str,
+                    footer=cards.BOT_FOOTER
+                )
+                
+                send_telegram(chat_id, msg_envio)
+                return {'statusCode': 200, 'body': 'OK'}
             # =========================================================
 
         print(f"📨 [MSG] User: {user_id} | Content: {user_content}") # LOG CRITICO
@@ -1285,7 +1338,7 @@ def lambda_handler(event, context):
             current_phase = sys_state.get('last_contingency_phase', 'None')
             
             # 1. Generamos la tarjeta visual del lugar exacto
-            report_text, calidad = generate_report_card(first_name, "Ubicación Actual", lat, lon, vehicle=veh, contingency_phase=current_phase)
+            report_text, calidad = generate_report_card(first_name, "Ubicación Actual", lat, lon, vehicle=veh, contingency_phase=current_phase, user_profile=user_profile)
             
             # 2. Le agregamos la pregunta de retención al final
             report_text += "\n\n💾 **¿Quieres guardar este lugar para recibir alertas?**"
