@@ -26,6 +26,8 @@ def get_health_advice(calidad, user_condition=None):
         "Muy Mala": "Permanece en interiores con ventanas cerradas. No realices esfuerzo físico afuera.",
         "Extremadamente Mala": "¡Emergencia! Quédate en casa. Usa mascarilla N95/KN95 si necesitas salir."
     }
+    
+    # Tu normalización (¡No la tocamos porque es a prueba de balas!)
     cat = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
     base_rec = advice.get(cat, "Toma precauciones al aire libre.")
     
@@ -33,13 +35,31 @@ def get_health_advice(calidad, user_condition=None):
     if not user_condition or user_condition.lower() == "ninguno": 
         return base_rec
         
-    # Si el usuario TIENE perfil de salud (ej. Asma), personalizamos:
+    # --- NUEVA LÓGICA DE HIPER-PERSONALIZACIÓN ---
+    hc_lower = user_condition.lower()
+    
+    # Escenarios de Peligro (Mala, Muy Mala, Extrema)
     if cat in ["Mala", "Muy Mala", "Extremadamente Mala"]:
-        return f"⚠️ **Por tu {user_condition}:** {base_rec}"
+        if any(x in hc_lower for x in ["asma", "epoc", "bronquitis"]):
+            return f"⚠️ **¡Alerta por tu {user_condition}!** El aire actual puede detonar una crisis. Ten a la mano tu medicación de rescate. {base_rec}"
+        elif any(x in hc_lower for x in ["cardiac", "infarto", "hipertension", "presion"]):
+            return f"⚠️ **¡Alerta Cardiovascular!** La contaminación eleva tu riesgo cardíaco. {base_rec}"
+        elif any(x in hc_lower for x in ["alergia", "rinitis"]):
+            return f"⚠️ **Precaución por tus alergias:** Las partículas pueden congestionarte más de lo normal. {base_rec}"
+        else:
+            # Paracaídas para otras condiciones
+            return f"⚠️ **Por tu {user_condition}:** {base_rec}"
+            
+    # Escenario de Precaución (Regular)
     elif cat == "Regular":
-        return f"ℹ️ **Por tu {user_condition}:** Considera reducir el esfuerzo físico."
+        if any(x in hc_lower for x in ["asma", "epoc", "alergia", "rinitis"]):
+            return f"ℹ️ **Atención a tu {user_condition}:** Reduce el esfuerzo físico al aire libre para no irritar tus vías respiratorias."
+        else:
+            return f"ℹ️ **Por tu {user_condition}:** Considera reducir el esfuerzo físico."
+            
+    # Escenario Seguro (Buena)
     else:
-        return f"✅ **Buena noticia:** El aire es seguro para tu {user_condition}."
+        return f"✅ **Buena noticia:** El aire es completamente seguro para tu {user_condition} hoy."
 
 # --- PLANTILLAS DE TARJETAS ---
 
@@ -116,28 +136,38 @@ Soy AIreGPT, tu asistente inteligente de salud urbana. Aquí tienes todo lo que 
 💡 *Tip: Háblame de forma natural. Ej: "Avísame a las 8 am cómo está el aire en casa".*
 {footer}"""
 
-CARD_ONBOARDING = """👋 **¡Hola, {user_name}! Bienvenido a AIreGPT.**
+CARD_ONBOARDING = """👋 **¡Hola, {user_name}! Bienvenido a AIreGPT tu Agente Ambiental.**
 
 Conmigo podrás:
-💨 Saber la calidad del aire y el pronóstico en tus 3 lugares más frecuentes.
-😷 Descubrir tu nivel de toxicidad en el tráfico (cigarros invisibles).
-🚨 Recibir alertas inmediatas de Contingencia, Hoy No Circula y Verificación.
-⏰ Programar notificaciones automáticas si el aire se vuelve peligroso.
+💨 Ver la calidad del aire y el pronóstico exacto de tus zonas.
+🚬 Calcular cuántos "cigarros invisibles" respiras en el tráfico.
+🚨 Recibir alertas de calidad del aire, Contingencia, Hoy No Circula y Multas.
+⏰ Programar notificaciones si el aire se vuelve tóxico.
 
-Para protegerte, necesito configurar tus dos ubicaciones principales. Así podré avisarte antes de que respires aire malo.
+Para protegerte, necesito saber dónde te mueves. 
 
-🏠 **1. Casa:** Para avisarte al despertar o fines de semana.
-🏢 **2. Trabajo:** Para avisarte antes de salir a tu trayecto.
-
-👇 **PASO 1:**
-Por favor, **envíame la ubicación de tu CASA** (toca el clip 📎 y selecciona "Ubicación").
+👇 **Toca el botón de abajo para empezar a configurar tu CASA:**
 {footer}"""
 
-CARD_ONBOARDING_WORK = """✅ **¡Casa guardada!**
+# Esta tarjeta se lanza cuando el usuario guarda su Casa (Callbacks)
+CARD_ONBOARDING_WORK = """✅ **¡Tu Casa está protegida!**
 
-🚀 **PASO 2:**
-Ahora, envíame la ubicación de tu **TRABAJO** (o escuela) para activar las alertas de movilidad.
-*(Toca el clip 📎 y selecciona "Ubicación")*
+🚀 **PASO 2: Tu destino principal.**
+Para calcular cuánto humo te *"fumas"* en el tráfico, necesito saber a dónde vas todos los días.
+
+👇 **Por favor, toca el clip 📎 (abajo a la izquierda), selecciona "Ubicación" y envíame la ubicación de tu TRABAJO o escuela.**
+{footer}"""
+
+# Esta tarjeta se lanza cuando el usuario guarda su Trabajo (Callbacks)
+CARD_ONBOARDING_VEHICLE = """✅ **¡Ruta Casa ↔ Trabajo configurada!**
+
+🚗 **PASO 3: Blindaje Anti-Multas (Opcional pero recomendado).**
+Para avisarte exactamente qué días no circulas y cuándo te toca verificar, registra tu auto.
+
+💬 **Escríbeme un mensaje normal como este:**
+*"Mi placa termina en 5 y soy holograma 0"*
+
+*(Si no tienes auto, simplemente ignora este paso y pídeme la "Calidad del aire" para empezar).*
 {footer}"""
 
 
@@ -155,7 +185,7 @@ Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
 
 📈 **Pronóstico (Próximas hrs):**
 {forecast_block}
-━━━━━━━━━━━━━━━━━━━━
+
 🛡️ **Salud:** {health_recommendation}
 {footer}"""
 
@@ -180,7 +210,7 @@ Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
 
 🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
 📊 **Tendencia:** {trend}
-━━━━━━━━━━━━━━━━━━━━
+
 📈 **Pronóstico (Próximas hrs):**
 {forecast_block}
 
