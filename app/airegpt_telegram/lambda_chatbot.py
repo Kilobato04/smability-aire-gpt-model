@@ -548,16 +548,13 @@ def save_vehicle_profile(user_id, digit, hologram):
         return "Error al guardar el vehículo."
 
 def get_official_report_time(ts_str):
-    # Aseguramos hora exacta de CDMX para las inyecciones de tiempo
-    cdmx_tz = pytz.timezone('America/Mexico_City')
-    hora_actual = datetime.now(cdmx_tz).strftime('%H:%M')
-    
+    # ts_str viene de la API, ej: "2026-02-23T07:20:00"
     if ts_str and len(ts_str) >= 16:
-        # Si la API mandó un timestamp válido, sacamos la hora de ahí
-        hora_api = ts_str[11:16]
-        return f"{hora_api} (Alerta a las {hora_actual})"
+        hora_dato = ts_str[11:16] # Extrae "07:20"
+        return hora_dato
     
-    return f"{hora_actual} (Generado en tiempo real)"
+    # Solo como paracaídas si la API no manda el dato por alguna falla
+    return "Reciente"
 
 def get_time_greeting():
     h = (datetime.utcnow() - timedelta(hours=6)).hour
