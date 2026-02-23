@@ -308,7 +308,6 @@ def confirm_saved_location(user_id, tipo):
         if not draft: return "⚠️ No encontré coordenadas recientes. Por favor toca el clip 📎 y envía la ubicación de nuevo."
         
         # 1. Normalización Robusta (Zócalo -> zocalo)
-        # IMPORTANTE: Asegúrate de haber agregado la función 'normalize_key' arriba (FIX 1)
         key = normalize_key(tipo)
         display_name = tipo.strip().capitalize() # Mantiene tilde visualmente (Zócalo)
 
@@ -320,26 +319,33 @@ def confirm_saved_location(user_id, tipo):
             can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_location')
             if not can_proceed: return msg_bloqueo
         
+        # --- FIX ÍTEM 6: INYECTAR ALERTA DEFAULT DE 100 PTS ---
+        alerta_default = {'umbral': 100, 'active': True, 'consecutive_sent': 0}
+
         # 3. Query: Guardamos y BORRAMOS el draft para no reusarlo por error
-        # "alerts..." borra basura vieja. "draft_location" borra el mapa usado.
+        # Inyectamos alerts.threshold.#loc = :alert_val en la misma operación
         if is_new: 
-            update_expr = "SET locations.#loc = :val REMOVE alerts.threshold.#loc, alerts.schedule.#loc, draft_location"
+            update_expr = "SET locations.#loc = :val, alerts.threshold.#loc = :alert_val REMOVE alerts.schedule.#loc, draft_location"
         else: 
-            update_expr = "SET locations.#loc = :val REMOVE draft_location"
+            update_expr = "SET locations.#loc = :val, alerts.threshold.#loc = :alert_val REMOVE draft_location"
 
         table.update_item(
             Key={'user_id': str(user_id)}, 
             UpdateExpression=update_expr, 
             ExpressionAttributeNames={'#loc': key}, 
-            ExpressionAttributeValues={':val': {
-                'lat': draft['lat'], 'lon': draft['lon'], 'display_name': display_name, 'active': True
-            }}
+            ExpressionAttributeValues={
+                ':val': {'lat': draft['lat'], 'lon': draft['lon'], 'display_name': display_name, 'active': True},
+                ':alert_val': alerta_default # <--- ALERTA CREADA AUTOMÁTICAMENTE
+            }
         )
         
         # 4. Confirmación
         user = get_user_profile(user_id)
         count = len(user.get('locations', {}))
-        msg = f"✅ **{display_name} guardada.**"
+        
+        # Le avisamos al usuario que su alerta ya está activa
+        msg = f"✅ **{display_name} guardada.**\n🚨 *Alerta de emergencia activada (>100 pts).*"
+        
         if count >= 2: msg += f"\n\n🎉 **Tienes {count} lugares guardados.**"
         
         return msg
@@ -622,6 +628,27 @@ def send_telegram(chat_id, text, markup=None):
         r = requests.post(url, json=payload)
         if r.status_code != 200: print(f"❌ [TG FAIL] {r.text}")
     except Exception as e: print(f"❌ [TG NET ERROR]: {e}")
+
+def send_persistent_gps_button(chat_id):
+    """Envía el botón nativo de Telegram que solicita el GPS en tiempo real"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    markup = {
+        "keyboard": [
+            [{"text": "📍 Calidad Aquí (GPS)", "request_location": True}]
+        ],
+        "resize_keyboard": True,
+        "is_persistent": True
+    }
+    payload = {
+        "chat_id": chat_id, 
+        "text": "👇 *Pst... Usa este botón en cualquier momento para escanear el aire de donde estás parado:*", 
+        "parse_mode": "Markdown",
+        "reply_markup": markup
+    }
+    try:
+        requests.post(url, json=payload)
+    except Exception as e:
+        print(f"❌ Error mandando botón GPS: {e}")
 
 def send_telegram_photo_local(chat_id, photo_path, caption, markup=None):
     """Sube una foto desde la carpeta local de la Lambda hacia Telegram"""
@@ -1180,9 +1207,13 @@ def lambda_handler(event, context):
             text_clean = re.sub(r'[¿?¡!.,]', '', user_content.strip().lower())
             # 2. Quitamos acentos para hacer un match a prueba de balas
             text_clean = text_clean.replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u')
-            
+
             if text_clean in ["/start", "start", "hola", "empezar"]:
                 print(f"🆕 [START] User: {user_id}")
+                
+                # --- FIX ÍTEM 7: MANDAMOS EL BOTÓN DE GPS A SU TECLADO ---
+                send_persistent_gps_button(chat_id)
+                
                 markup_onboarding = {
                     "inline_keyboard": [
                         [{"text": "📍 Configurar mi Casa", "callback_data": "SET_LOC_casa"}],
@@ -1249,9 +1280,37 @@ def lambda_handler(event, context):
         
         # 1. Prioridad: Si hay mapa en este mensaje (Override total)
         if lat:
+            # --- FIX ÍTEM 7: REPORTE EFÍMERO INMEDIATO ---
+            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+            current_phase = sys_state.get('last_contingency_phase', 'None')
+            
+            # 1. Generamos la tarjeta visual del lugar exacto
+            report_text, calidad = generate_report_card(first_name, "Ubicación Actual", lat, lon, vehicle=veh, contingency_phase=current_phase)
+            
+            # 2. Le agregamos la pregunta de retención al final
+            report_text += "\n\n💾 **¿Quieres guardar este lugar para recibir alertas?**"
+            
+            # 3. Calculamos qué botones mostrar
             if not has_casa: forced_tag = "CONFIRM_HOME"
             elif not has_trabajo: forced_tag = "CONFIRM_WORK"
             else: forced_tag = "SELECT_TYPE"
+            markup_guardado = get_inline_markup(forced_tag)
+            
+            # 4. Seleccionamos el banner local basado en la calidad efímera
+            mapa_archivos = {
+                "Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png",
+                "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"
+            }
+            calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
+            nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
+            
+            import os
+            directorio_actual = os.path.dirname(os.path.abspath(__file__))
+            ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
+            
+            # 5. Enviamos Foto + Reporte + Botones de Guardado y CORTAMOS (no va a GPT)
+            send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=markup_guardado)
+            return {'statusCode': 200, 'body': 'OK'}
         
         # 2. Prioridad: Si NO hay mapa, revisamos si hay uno pendiente en la DB
         else:
