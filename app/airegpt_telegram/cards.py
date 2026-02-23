@@ -177,8 +177,7 @@ CARD_REPORT = """🌤️ **{greeting}, {user_name}!**
 Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
 🗺️ {region} • 🕒 {report_time}
 
-{risk_circle} **Calidad {risk_category} ({ias_value} pts)**
-☣️ **Contaminante dominante:** {pollutant}
+{risk_circle} **Calidad {risk_category} ({ias_value} pts)** ☣️ **Dominante:** {pollutant}
 
 🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
 📊 **Tendencia:** {trend}
@@ -192,8 +191,7 @@ Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
 CARD_ALERT_IAS = """🚨 **¡ALERTA DE CALIDAD DEL AIRE!** 🚨
 Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** a las 🕒 {report_time} ha superado tu límite de seguridad.
 
-{risk_circle} **Calidad {risk_category} ({ias_value} pts)**
-☣️ **Contaminante principal:** {pollutant}
+{risk_circle} **Calidad {risk_category} ({ias_value} pts)** ☣️ **Dominante:** {pollutant}
 *Tu umbral configurado es: {threshold} pts*
 
 📊 **Tendencia:** {forecast_msg}
@@ -288,6 +286,9 @@ CARD_SUMMARY = """
 
 📍 **Tus Ubicaciones:**
 {locations_list}
+
+🏥 **Tu Salud:**
+{health_display}
 
 🚇 **Tu Rutina (Cálculo de Exposición):**
 {transport_info}
