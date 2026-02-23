@@ -1559,6 +1559,41 @@ def lambda_handler(event, context):
                         send_telegram(chat_id, card) # Tarjeta detallada
                         return {'statusCode': 200, 'body': 'OK'}
 
+                # --- TOOL DE SALUD (CON GATEKEEPER) ---
+                elif fn == "registrar_condicion_salud":
+                    condicion_raw = args.get('condicion', '').lower()
+                    
+                    # 1. Filtro estricto (Lista blanca de palabras clave relacionadas con contaminación)
+                    palabras_clave_validas = [
+                        "asma", "epoc", "alergia", "rinitis", "bronquitis", "neumonia", 
+                        "hipertension", "presion alta", "cardiac", "corazon", "arritmia",
+                        "infarto", "angina", "diabetes", "embarazo", "tercera edad", "niño", "bebe"
+                    ]
+                    
+                    es_valida = any(palabra in condicion_raw for palabra in palabras_clave_validas)
+                    
+                    if not es_valida:
+                        # Si es "dolor de muelas", le decimos al LLM que lo rechace amablemente
+                        r = f"⚠️ Smability solo monitorea condiciones afectadas por la calidad del aire (ej. Asma, EPOC, Alergias, Problemas Cardíacos). Dile al usuario de forma muy empática que no es necesario registrar '{condicion_raw}' para proteger su respiración."
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    else:
+                        # 2. Guardar en BD
+                        try:
+                            # Asignamos un ID único simple (ej. timestamp o el nombre de la condición limpio)
+                            cond_id = condicion_raw.strip().replace(" ", "_")
+                            table.update_item(
+                                Key={'user_id': str(user_id)},
+                                UpdateExpression="SET health_profile.#c = :val",
+                                ExpressionAttributeNames={'#c': cond_id},
+                                ExpressionAttributeValues={':val': {'condition': condicion_raw.capitalize(), 'active': True}}
+                            )
+                            r = f"✅ Condición '{condicion_raw.capitalize()}' guardada. Dile al usuario que a partir de ahora sus alertas de salud estarán hiper-personalizadas."
+                        except Exception as e:
+                            print(f"❌ Error guardando salud: {e}")
+                            r = "Hubo un error al guardar la condición en la base de datos."
+                        
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        
                 elif fn == "consultar_hoy_no_circula":
                     user = get_user_profile(user_id)
                     veh = user.get('vehicle')
