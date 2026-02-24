@@ -2008,7 +2008,9 @@ def lambda_handler(event, context):
                             reason=r_detail, # <--- Usamos el Detalle Visual
                             footer=cards.BOT_FOOTER
                         )
-                        send_telegram(chat_id, card)
+                        # --- FIX: Inyectar botón interactivo ---
+                        markup = cards.get_hnc_buttons()
+                        send_telegram(chat_id, card, markup)
                         return {'statusCode': 200, 'body': 'OK'}
                 
                 # --- NUEVA TOOL: CALENDARIO MENSUAL (READ ONLY) ---
@@ -2050,9 +2052,11 @@ def lambda_handler(event, context):
                             footer=cards.BOT_FOOTER
                         )
                         
-                        # Enviar y Cortar
-                        send_telegram(chat_id, card)
+                        # Enviar y Cortar con botón interactivo
+                        markup = cards.get_hnc_buttons()
+                        send_telegram(chat_id, card, markup)
                         return {'statusCode': 200, 'body': 'OK'}
+                        
                 # --- NUEVA TOOL: TARJETA DE VERIFICACIÓN ---
                 elif fn == "consultar_verificacion":
                     user = get_user_profile(user_id)
