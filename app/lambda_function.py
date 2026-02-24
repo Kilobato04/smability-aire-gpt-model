@@ -147,7 +147,96 @@ def generate_daily_summary():
     except Exception as e:
         print(f"❌ [DAILY SUMMARY] Error crítico: {e}")
         return False
+
+def generate_forecast_summary():
+    """
+    Busca los 24 archivos de pronóstico futuros en 'forecast/',
+    extrae el IAS y arma un vector del futuro ligero.
+    """
+    print("🔮 [FORECAST SUMMARY] Iniciando consolidación del futuro...")
+    try:
+        forecast_prefix = "forecast/" # <--- Ajustado a tu bucket real
+        tz = ZoneInfo("America/Mexico_City")
+        now_mx = datetime.now(tz)
         
+        response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=forecast_prefix)
+        archivos = response.get('Contents', [])
+        
+        if not archivos:
+            print(f"❌ [FORECAST SUMMARY] No se encontraron archivos en {forecast_prefix}")
+            return False
+            
+        # 1. Filtrar cronológicamente (Ignorar pronósticos viejos)
+        futuros = []
+        for obj in archivos:
+            key = obj['Key']
+            # Extraer "2026-02-25_16-00" de "forecast/2026-02-25_16-00.json"
+            filename = key.split('/')[-1].replace('.json', '')
+            try:
+                # Convertimos el nombre del archivo a un objeto DateTime real
+                file_dt = datetime.strptime(filename, "%Y-%m-%d_%H-%M").replace(tzinfo=tz)
+                # Solo tomamos archivos que sean de la hora actual en adelante (con 1 hora de margen)
+                if file_dt >= now_mx - timedelta(hours=1):
+                    futuros.append((file_dt, key))
+            except Exception as e:
+                continue # Si hay un archivo mal nombrado, lo ignoramos
+                
+        # 2. Ordenar de más cercano a más lejano y tomar los primeros 24
+        futuros.sort(key=lambda x: x[0])
+        archivos_target = futuros[:24]
+        
+        if len(archivos_target) < 12:
+            print(f"⚠️ [FORECAST SUMMARY] Alerta: Solo se encontraron {len(archivos_target)} horas futuras disponibles.")
+            
+        resumen = {"origen": "forecast", "celdas": {}}
+        archivos_procesados = 0
+        
+        def safe_extract(c_dict, key1, key2):
+            val = c_dict.get(key1)
+            if val is None: val = c_dict.get(key2)
+            if val is None: return 0.0
+            try: return float(val)
+            except: return 0.0
+            
+        # 3. Procesar los 24 archivos
+        for idx, (file_dt, key) in enumerate(archivos_target):
+            try:
+                resp = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
+                datos_hora = json.loads(resp['Body'].read().decode('utf-8'))
+                
+                for celda in datos_hora:
+                    lat = round(celda['lat'], 3)
+                    lon = round(celda['lon'], 3)
+                    geo_key = f"{lat},{lon}"
+                    
+                    if geo_key not in resumen['celdas']:
+                        resumen['celdas'][geo_key] = {"ias": [0.0]*24}
+                    
+                    ias_val = safe_extract(celda, 'ias', 'ias')
+                    resumen['celdas'][geo_key]['ias'][idx] = ias_val
+                    
+                archivos_procesados += 1
+            except Exception as e:
+                print(f"⚠️ Error procesando {key}: {e}")
+
+        # 4. Comprimir y Subir a S3
+        json_str = json.dumps(resumen, separators=(',', ':'))
+        comprimido = gzip.compress(json_str.encode('utf-8'))
+        output_key = "forecast_summary/latest_forecast.json.gz"
+        
+        s3_client.put_object(
+            Bucket=S3_BUCKET, 
+            Key=output_key, 
+            Body=comprimido, 
+            ContentType='application/json', 
+            ContentEncoding='gzip'
+        )
+        print(f"✅ [FORECAST SUMMARY] Guardado en S3: {output_key} ({archivos_procesados} horas procesadas)")
+        return True
+    except Exception as e:
+        print(f"❌ [FORECAST SUMMARY] Error crítico: {e}")
+        return False
+
 # --- 3. FUNCIONES DE CARGA Y PROCESAMIENTO ---
 def load_models():
     """Descarga modelos desde S3 y los carga en XGBoost"""
@@ -319,21 +408,29 @@ def lambda_handler(event, context):
     VERSION = "V58.4" 
     print(f"🚀 INICIANDO PREDICTOR MAESTRO {VERSION} - ESTABILIZACIÓN FINAL")
     
-    # --- [NUEVO] RELOJ DEL DAILY SUMMARY ---
+    # --- [NUEVO] RELOJ DEL DAILY SUMMARY Y FORECAST ---
     tz = ZoneInfo("America/Mexico_City")
     now_mx = datetime.now(tz)
     
-    # Condición 1: Ejecución automática de madrugada (1:00 AM a 1:25 AM)
+    # Condición 1: Resumen Diario (Se ejecuta en la madrugada)
     is_summary_time = now_mx.hour == 1 and 0 <= now_mx.minute <= 25
-    # Condición 2: Ejecución forzada manual (para tus pruebas)
-    is_forced = event.get('force_daily_summary') == True
     
-    if is_summary_time or is_forced:
+    # Condición 2: Resumen de Pronóstico (Cada 4 horas, dándole tiempo al motor para terminar)
+    is_forecast_time = (now_mx.hour % 4 == 0) and 5 <= now_mx.minute <= 25
+    
+    # Condición 3: Pruebas manuales desde la consola
+    is_forced_daily = event.get('force_daily_summary') == True
+    is_forced_forecast = event.get('force_forecast_summary') == True
+    
+    if is_summary_time or is_forced_daily:
         generate_daily_summary()
         
-        # Si fue un test manual forzado, detenemos la Lambda aquí para no hacer una predicción completa
-        if is_forced:
-            return {'statusCode': 200, 'body': 'Daily Summary Forzado Ejecutado.'}
+    if is_forecast_time or is_forced_forecast:
+        generate_forecast_summary()
+        
+    # Si fue un test manual, detenemos la Lambda aquí
+    if is_forced_daily or is_forced_forecast:
+        return {'statusCode': 200, 'body': 'Resúmenes Forzados Ejecutados Exitosamente.'}
     # ----------------------------------------
     
     try:
