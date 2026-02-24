@@ -4,9 +4,10 @@ import pandas as pd
 import numpy as np
 import xgboost as xgb
 import requests
+import gzip
+import os
 from datetime import datetime, timedelta
 from scipy.interpolate import griddata
-import os
 from zoneinfo import ZoneInfo
 
 # --- 1. CONFIGURACIÓN Y CONSTANTES ---
@@ -182,6 +183,83 @@ def interpolate_on_grid(grid_df, x_src, y_src, z_src, method='linear'):
         grid_z = np.where(np.isnan(grid_z), grid_z_nearest, grid_z)
     
     return grid_z
+
+def generate_forecast_summary():
+    """
+    Busca los 24 archivos de pronóstico futuros generados,
+    extrae el IAS y arma un vector ligero comprimido en S3.
+    """
+    print("\n🔮 [FORECAST SUMMARY] Consolidando el vector del futuro...")
+    try:
+        tz = ZoneInfo("America/Mexico_City")
+        now_mx = datetime.now(tz)
+        
+        response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=S3_FORECAST_PREFIX)
+        archivos = response.get('Contents', [])
+        
+        if not archivos:
+            print("❌ No se encontraron archivos de pronóstico para resumir.")
+            return False
+            
+        # 1. Filtrar cronológicamente (Ignorar pronósticos viejos de días anteriores)
+        futuros = []
+        for obj in archivos:
+            key = obj['Key']
+            filename = key.split('/')[-1].replace('.json', '')
+            try:
+                file_dt = datetime.strptime(filename, "%Y-%m-%d_%H-%M").replace(tzinfo=tz)
+                # Solo tomamos archivos que sean de la hora actual en adelante (con 1 hora de margen)
+                if file_dt >= now_mx - timedelta(hours=1):
+                    futuros.append((file_dt, key))
+            except Exception:
+                continue
+                
+        # 2. Ordenar y tomar las primeras 24 horas
+        futuros.sort(key=lambda x: x[0])
+        archivos_target = futuros[:24]
+        
+        resumen = {"origen": "forecast", "celdas": {}}
+        archivos_procesados = 0
+        
+        # 3. Procesar archivos
+        for idx, (file_dt, key) in enumerate(archivos_target):
+            try:
+                resp = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
+                datos_hora = json.loads(resp['Body'].read().decode('utf-8'))
+                
+                for celda in datos_hora:
+                    lat = round(celda['lat'], 3)
+                    lon = round(celda['lon'], 3)
+                    geo_key = f"{lat},{lon}"
+                    
+                    if geo_key not in resumen['celdas']:
+                        resumen['celdas'][geo_key] = {"ias": [0.0]*24}
+                    
+                    # Extraer el IAS
+                    ias_val = celda.get('ias', 0)
+                    resumen['celdas'][geo_key]['ias'][idx] = int(ias_val)
+                    
+                archivos_procesados += 1
+            except Exception as e:
+                print(f"⚠️ Error procesando {key} para el resumen: {e}")
+
+        # 4. Comprimir y Subir a S3
+        json_str = json.dumps(resumen, separators=(',', ':'))
+        comprimido = gzip.compress(json_str.encode('utf-8'))
+        output_key = "forecast_summary/latest_forecast.json.gz"
+        
+        s3_client.put_object(
+            Bucket=S3_BUCKET, 
+            Key=output_key, 
+            Body=comprimido, 
+            ContentType='application/json', 
+            ContentEncoding='gzip'
+        )
+        print(f"✅ [FORECAST SUMMARY] Guardado en S3: {output_key} ({archivos_procesados} horas integradas)")
+        return True
+    except Exception as e:
+        print(f"❌ [FORECAST SUMMARY] Error crítico: {e}")
+        return False
 
 # --- 5. HANDLER PRINCIPAL ---
 def lambda_handler(event, context):
@@ -365,7 +443,12 @@ def lambda_handler(event, context):
             # --- FIN CAMBIO 3 -----------------------------
 
         print(f"✅ FORECAST COMPLETADO: {len(generated_files)} archivos generados.")
-        return {'statusCode': 200, 'body': json.dumps({'files': len(generated_files)})}
+        
+        # --- NUEVO: Generar el resumen ligero inmediatamente después de crear los archivos ---
+        if len(generated_files) > 0:
+            generate_forecast_summary()
+            
+        return {'statusCode': 200, 'body': json.dumps({'files': len(generated_files), 'summary_generated': True})}
 
     except Exception as e:
         print(f"❌ ERROR: {str(e)}")
