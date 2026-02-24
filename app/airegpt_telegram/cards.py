@@ -671,3 +671,12 @@ def build_hnc_pill(vehicle, contingency_phase="None"):
         pill += f"\n⚠️ **RECORDATORIO:** Estás en periodo de Verificación ({periodo_verif})."
         
     return pill
+
+# --- BOTONES PARA HOY NO CIRCULA ---
+def get_hnc_buttons():
+    """Agrega el botón interactivo a las consultas de movilidad"""
+    return {
+        "inline_keyboard": [
+            [{"text": "📊 Mi Resumen", "callback_data": "ver_resumen"}]
+        ]
+    }
