@@ -1853,18 +1853,27 @@ def lambda_handler(event, context):
                     if not es_valida:
                         r = f"⚠️ Smability solo monitorea condiciones afectadas por la calidad del aire. Dile al usuario amablemente que no es necesario registrar '{condicion_raw}'."
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
-                        continue # <--- ¡FALTABA ESTO! Evita que guarde basura en BD
+                        continue 
                     
-                    # 2. Guardar en BD
+                    # 2. Guardar en BD (Con el FIX Anti-Crash de DynamoDB)
                     try:
                         cond_id = condicion_raw.strip().replace(" ", "_")
+                        
+                        # PASO A: Crear la 'carpeta' health_profile si el usuario es nuevo y no la tiene
+                        table.update_item(
+                            Key={'user_id': str(user_id)},
+                            UpdateExpression="SET health_profile = if_not_exists(health_profile, :empty)",
+                            ExpressionAttributeValues={':empty': {}}
+                        )
+                        
+                        # PASO B: Guardar el padecimiento como un diccionario válido y estructurado
                         table.update_item(
                             Key={'user_id': str(user_id)},
                             UpdateExpression="SET health_profile.#c = :val",
                             ExpressionAttributeNames={'#c': cond_id},
                             ExpressionAttributeValues={':val': {'condition': condicion_raw.capitalize(), 'active': True}}
                         )
-                        r = f"✅ Condición '{condicion_raw.capitalize()}' guardada."
+                        r = f"✅ Condición '{condicion_raw.capitalize()}' guardada exitosamente."
                     except Exception as e:
                         print(f"❌ Error guardando salud: {e}")
                         r = "Hubo un error al guardar la condición."
