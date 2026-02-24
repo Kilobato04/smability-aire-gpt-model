@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import os
 import gzip
+import time
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from zoneinfo import ZoneInfo
@@ -16,6 +17,11 @@ s3 = boto3.client('s3')
 LIMITS = {'LAT_MIN': 19.13, 'LAT_MAX': 19.80, 'LON_MIN': -99.40, 'LON_MAX': -98.80}
 MAX_DISTANCE_KM = 10.0
 CACHED_GRID = None
+
+# --- FIX CACHE ---
+CACHED_GRID = None
+LAST_CACHE_TIME = 0
+CACHE_TTL = 300 # 🔥 5 minutos (300 segundos) para estar siempre sincronizados
 
 def get_s3_json(key):
     try:
@@ -36,11 +42,27 @@ def get_s3_gzip_json(key):
         return None
 
 def get_grid_data():
-    global CACHED_GRID
+    global CACHED_GRID, LAST_CACHE_TIME
+    
+    # 1. ¿Tenemos caché? Vamos a ver qué tan "fresca" está
+    if CACHED_GRID is not None:
+        edad_cache = time.time() - LAST_CACHE_TIME
+        if edad_cache < CACHE_TTL:
+            print(f"⚡ [CACHE HIT] Usando grid en RAM. Edad del dato: {int(edad_cache)}s / {CACHE_TTL}s permitidos.")
+            return CACHED_GRID
+        else:
+            print(f"♻️ [CACHE EXPIRED] El grid en RAM caducó (tenía {int(edad_cache)}s). Hay que renovar.")
+            
+    # 2. Si no hay caché o ya caducó, vamos a S3
+    print("☁️ [S3 FETCH] Descargando grid fresco de S3...")
     data = get_s3_json(GRID_KEY)
+    
     if data:
         CACHED_GRID = pd.DataFrame(data)
+        LAST_CACHE_TIME = time.time() # Guardamos la hora exacta de la descarga
+        print("✅ [CACHE UPDATED] Nuevo grid guardado exitosamente en memoria RAM.")
         return CACHED_GRID
+        
     return None
 
 def haversine_vectorized(lon1, lat1, df):
@@ -176,10 +198,13 @@ def lambda_handler(event, context):
         if not (LIMITS['LAT_MIN'] <= u_lat <= LIMITS['LAT_MAX'] and LIMITS['LON_MIN'] <= u_lon <= LIMITS['LON_MAX']):
             return {'statusCode': 200, 'body': json.dumps({"status": "out_of_bounds", "mensaje": "Fuera de zona"})}
 
-        if CACHED_GRID is None and get_grid_data() is None:
-            return {'statusCode': 503, 'body': 'Sistema iniciandose...'}
+        # Obtenemos el grid (la función decidirá si usa caché o baja de S3)
+        grid_actual = get_grid_data()
+        
+        if grid_actual is None:
+            return {'statusCode': 503, 'body': 'Error cargando datos de aire'}
 
-        distances = haversine_vectorized(u_lon, u_lat, CACHED_GRID)
+        distances = haversine_vectorized(u_lon, u_lat, grid_actual) # <-- Ojo, usamos grid_actual
         idx = np.argmin(distances)
         dist = distances[idx]
         p = CACHED_GRID.iloc[idx].replace({np.nan: None}).to_dict()
