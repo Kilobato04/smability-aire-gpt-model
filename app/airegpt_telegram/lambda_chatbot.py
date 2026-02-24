@@ -1463,22 +1463,27 @@ def lambda_handler(event, context):
                         key = resolve_location_key(user_id, in_name)
                         
                         # --- FIX: ESCUDO ANTI-ALUCINACIÓN ---
-                        # Si el LLM olvidó pasar el nombre, lo buscamos en el texto original del usuario
                         if not key:
                             key = resolve_location_key(user_id, user_content)
                             
                         if key and key in locs:
-                            in_lat = float(locs[key]['lat'])
-                            in_lon = float(locs[key]['lon'])
-                            in_name = locs[key].get('display_name', key.capitalize()) # Usa el nombre bonito real
+                            in_lat = float(locs[key].get('lat', 0))
+                            in_lon = float(locs[key].get('lon', 0))
+                            in_name = locs[key].get('display_name', key.capitalize()) 
                     
                     # 2. DECISIÓN: ¿Tenemos datos válidos?
                     if in_lat != 0 and in_lon != 0:
                         sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                         current_phase = sys_state.get('last_contingency_phase', 'None')
                         
-                        # --- FIX BANNERS VISUALES: Recibe 2 valores ---
-                        report_text, calidad = generate_report_card(first_name, disp_name, lat, lon, vehicle=veh, contingency_phase=current_phase, user_profile=user_profile)
+                        # Aseguramos extraer el vehículo del perfil limpio
+                        veh = user_profile.get('vehicle')
+                        
+                        # 🔥 FIX 1 APLICADO: Usamos in_name, in_lat, in_lon
+                        report_text, calidad = generate_report_card(
+                            first_name, in_name, in_lat, in_lon, 
+                            vehicle=veh, contingency_phase=current_phase, user_profile=user_profile
+                        )
                         
                         # Seleccionamos banner local
                         mapa_archivos = {
@@ -1487,21 +1492,16 @@ def lambda_handler(event, context):
                         }
                         calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
                         nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
-                        # --- FIX EXACTO: RUTA RELATIVA AL SCRIPT ---
+                        
                         import os
-                        # 1. ¿Dónde estoy parado ahora mismo? (Directorio de este script)
                         directorio_actual = os.path.dirname(os.path.abspath(__file__))
-                        
-                        # 2. Entra a la carpeta hermana 'banners' y agarra la imagen
                         ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
-                        # ------------------------------------------
                         
-                        # Enviamos Foto + Tarjeta
                         send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
                         return {'statusCode': 200, 'body': 'OK'}
                         
                     else:
-                        # ❌ FALLO: No hay coordenadas. Avisamos al LLM para que pregunte al usuario.
+                        # ❌ FALLO: No hay coordenadas.
                         r = f"⚠️ No encontré coordenadas para '{in_name}'. Pide al usuario que guarde la ubicación o envíe su ubicación actual."
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                         # Aquí NO hacemos return, dejamos que el flujo baje para que GPT explique el error en texto.
@@ -1616,29 +1616,41 @@ def lambda_handler(event, context):
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
                 elif fn == "consultar_resumen_configuracion":
-                    # 1. Obtener datos del usuario
-                    user = get_user_profile(user_id)
+                    # 🔥 FIX 2 APLICADO: Usamos el user_profile que YA viene limpio y sanitizado
+                    # NUNCA volver a llamar a get_user_profile() aquí adentro.
+                    user = user_profile 
+                    
                     sub_data = user.get('subscription', {})
-                    status_str = sub_data.get('status', 'FREE')
+                    # Blindaje extra: si por alguna extraña razón sub_data es un string, no explota
+                    if isinstance(sub_data, dict):
+                        status_str = sub_data.get('status', 'FREE')
+                    else:
+                        status_str = str(sub_data) if sub_data else 'FREE'
                     
                     # Detectar si es Premium o Trial para la lógica visual
                     is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
                     
-                    # 2. Generar Tarjeta Visual (Ahora funciona para FREE y PREMIUM)
-                    # La diferencia visual la maneja cards.py internamente usando 'status_str'
+                    # Blindaje final para las variables de la tarjeta (asegurando que sean dicts)
+                    locs_data = user.get('locations', {})
+                    if not isinstance(locs_data, dict): locs_data = {}
+                    
+                    alerts_data = user.get('alerts', {})
+                    if not isinstance(alerts_data, dict): alerts_data = {}
+
+                    # Generar Tarjeta Visual
                     r = cards.generate_summary_card(
                         first_name, 
-                        user.get('alerts', {}), 
+                        alerts_data, 
                         user.get('vehicle', None), 
-                        user.get('locations', {}), # OJO: Pasamos locations para listar "Casa/Trabajo"
-                        status_str, # Nuevo argumento vital para el Tag de Contingencia
-                        user.get('profile_transport', None) # <--- EL FIX FINAL AQUÍ
+                        locs_data, 
+                        status_str, 
+                        user.get('profile_transport', None)
                     )
                     
-                    # 3. Generar Botones Inteligentes (Upselling si es Free)
-                    markup = cards.get_summary_buttons(user.get('locations', {}), is_prem)
+                    # Generar Botones Inteligentes
+                    markup = cards.get_summary_buttons(locs_data, is_prem)
                     
-                    # 4. Enviar y Cortar (Hard Stop)
+                    # Enviar y Cortar (Hard Stop)
                     send_telegram(chat_id, r, markup)
                     return {'statusCode': 200, 'body': 'OK'}
 
