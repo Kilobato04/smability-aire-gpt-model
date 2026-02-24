@@ -1283,61 +1283,71 @@ def lambda_handler(event, context):
                 return {'statusCode': 200, 'body': 'OK'}
                 
             # =========================================================
-            # 📊 NUEVO BLOQUE: MI RESUMEN / PERFIL (FIX ÍTEM 9)
+            # 📊 NUEVO BLOQUE: MI RESUMEN / PERFIL (FIX DEFINITIVO)
             # =========================================================
             elif text_clean in ["mi resumen", "resumen", "perfil", "/perfil", "mi perfil"]:
                 print(f"👤 [PERFIL] Solicitado por: {user_id}")
                 
-                # 1. 🛡️ Blindaje de Ubicaciones
-                locs = user_profile.get('locations', {})
-                if not locs or not isinstance(locs, dict):
-                    locs_str = "No tienes ubicaciones guardadas."
-                else:
-                    locs_str = ""
-                    for k, v in locs.items():
-                        # Verificamos que 'v' sea dict antes de entrar
-                        if isinstance(v, dict) and v.get('active'):
-                            nombre_visual = v.get('display_name', k).capitalize()
-                            locs_str += f"• **{nombre_visual}**\n"
-                    
-                    if not locs_str: locs_str = "Sin ubicaciones activas."
+                user = user_profile 
                 
-                # 2. 🛡️ Blindaje de Vehículo
-                veh = user_profile.get('vehicle', {})
+                sub_data = user.get('subscription', {})
+                status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else (str(sub_data) if sub_data else 'FREE')
+                is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
+                
+                # 1. Ubicaciones
+                locs_data = user.get('locations', {})
+                locs_str = ""
+                for k, v in locs_data.items():
+                    if isinstance(v, dict) and v.get('active'):
+                        locs_str += f"• **{v.get('display_name', k).capitalize()}**\n"
+                if not locs_str: locs_str = "No tienes ubicaciones."
+
+                # 2. Vehículo y HNC
+                veh = user.get('vehicle', {})
                 if isinstance(veh, dict) and veh.get('active'):
-                    veh_str = f"Placa: {veh.get('plate_last_digit')} • Holograma: {veh.get('hologram')}"
+                    veh_str = f"Placa: {veh.get('plate_last_digit')} • Holo: {veh.get('hologram')}"
+                    hnc_rem = "✅ Activo" if veh.get('alert_config', {}).get('enabled') else "🔕 Desactivado"
                 else:
                     veh_str = "No registrado."
+                    hnc_rem = "No configurado."
 
-                # 3. Alertas
-                alerts_str = "Tus alertas inteligentes están activas."
+                # 3. Salud
+                health_data = user.get('health_profile', {})
+                condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
+                health_display = ", ".join(condiciones) if condiciones else "Ninguna *(Escribe 'Tengo asma' para añadir)*"
 
-                # 4. 🛡️ FIX CAMBIO C: EXTRAER SALUD CON SEGURIDAD
-                health_data = user_profile.get('health_profile', {})
-                condiciones = []
+                # 4. Transporte
+                transp = user.get('profile_transport', {})
+                transport_info = f"{str(transp.get('medio')).capitalize()} ({transp.get('horas')} hrs)" if isinstance(transp, dict) and transp.get('medio') else "No configurado."
+
+                # 5. Alertas
+                alerts_data = user.get('alerts', {})
+                contingency = "✅ Activada" if isinstance(alerts_data, dict) and alerts_data.get('contingency') else "🔕 Desactivada"
                 
-                # Verificamos que sea un diccionario antes de iterar
-                if isinstance(health_data, dict):
-                    for key, info in health_data.items():
-                        # Verificamos que cada condición sea un dict y esté activa
-                        if isinstance(info, dict) and info.get('active'):
-                            condiciones.append(info.get('condition', 'Condición'))
+                th_data = alerts_data.get('threshold', {}) if isinstance(alerts_data, dict) else {}
+                alerts_th = f"✅ {len(th_data)} lugares" if th_data else "Ninguna"
                 
-                if condiciones:
-                    health_display = f"🏥 **Salud:** {', '.join(condiciones)}"
-                else:
-                    health_display = "🏥 **Salud:** Ninguna *(Escribe 'Tengo asma' para añadir)*"
+                sch_data = alerts_data.get('schedule', {}) if isinstance(alerts_data, dict) else {}
+                alerts_sch = f"✅ {len(sch_data)} recordatorios" if sch_data else "Ninguno"
 
-                # 5. Formateamos y Enviamos la Tarjeta
-                msg_envio = cards.CARD_PROFILE.format(
+                # 🔥 FORMATEO MAGISTRAL (Inyectamos las 11 variables de CARD_SUMMARY)
+                msg_envio = cards.CARD_SUMMARY.format(
+                    user_name=first_name,
+                    plan_status=f"💎 {status_str}" if is_prem else f"📉 {status_str}",
+                    contingency_status=contingency,
                     locations_list=locs_str,
                     health_display=health_display,
-                    vehicle_display=veh_str,
-                    alerts_display=alerts_str,
-                    footer=cards.BOT_FOOTER
+                    transport_info=transport_info,
+                    vehicle_info=veh_str,
+                    alerts_threshold=alerts_th,
+                    alerts_schedule=alerts_sch,
+                    hnc_reminder=hnc_rem,
+                    tip_footer=cards.BOT_FOOTER
                 )
                 
-                send_telegram(chat_id, msg_envio)
+                # Pasamos los botones interactivos
+                markup = cards.get_summary_buttons(locs_data, is_prem)
+                send_telegram(chat_id, msg_envio, markup)
                 return {'statusCode': 200, 'body': 'OK'}
             # =========================================================
 
@@ -1616,57 +1626,61 @@ def lambda_handler(event, context):
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
                 elif fn == "consultar_resumen_configuracion":
-                    # Usamos el perfil que ya está limpio
                     user = user_profile 
                     
                     sub_data = user.get('subscription', {})
-                    if isinstance(sub_data, dict):
-                        status_str = sub_data.get('status', 'FREE')
-                    else:
-                        status_str = str(sub_data) if sub_data else 'FREE'
-                    
+                    status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else (str(sub_data) if sub_data else 'FREE')
                     is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
                     
-                    # 1. Armar Ubicaciones
+                    # 1. Ubicaciones
                     locs_data = user.get('locations', {})
-                    if not isinstance(locs_data, dict): locs_data = {}
-                    
                     locs_str = ""
                     for k, v in locs_data.items():
                         if isinstance(v, dict) and v.get('active'):
                             locs_str += f"• **{v.get('display_name', k).capitalize()}**\n"
-                    if not locs_str: locs_str = "No tienes ubicaciones activas."
+                    if not locs_str: locs_str = "No tienes ubicaciones."
 
-                    # 2. Armar Vehículo
+                    # 2. Vehículo y HNC
                     veh = user.get('vehicle', {})
                     if isinstance(veh, dict) and veh.get('active'):
-                        veh_str = f"Placa: {veh.get('plate_last_digit')} • Holograma: {veh.get('hologram')}"
+                        veh_str = f"Placa: {veh.get('plate_last_digit')} • Holo: {veh.get('hologram')}"
+                        hnc_rem = "✅ Activo" if veh.get('alert_config', {}).get('enabled') else "🔕 Desactivado"
                     else:
                         veh_str = "No registrado."
+                        hnc_rem = "No configurado."
 
-                    # 3. Alertas
-                    alerts_str = "Tus alertas inteligentes están activas."
-
-                    # 4. 🔥 FIX: Armar Salud (El causante del error)
+                    # 3. Salud
                     health_data = user.get('health_profile', {})
-                    condiciones = []
-                    if isinstance(health_data, dict):
-                        for key, info in health_data.items():
-                            if isinstance(info, dict) and info.get('active'):
-                                condiciones.append(info.get('condition', 'Condición'))
-                    
-                    if condiciones:
-                        health_display = f"🏥 **Salud:** {', '.join(condiciones)}"
-                    else:
-                        health_display = "🏥 **Salud:** Ninguna *(Escribe 'Tengo asma' para añadir)*"
+                    condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
+                    health_display = ", ".join(condiciones) if condiciones else "Ninguna"
 
-                    # 5. Formatear directamente la tarjeta (Bypass de la función vieja)
-                    r = cards.CARD_PROFILE.format(
+                    # 4. Transporte
+                    transp = user.get('profile_transport', {})
+                    transport_info = f"{str(transp.get('medio')).capitalize()} ({transp.get('horas')} hrs)" if isinstance(transp, dict) and transp.get('medio') else "No configurado."
+
+                    # 5. Alertas
+                    alerts_data = user.get('alerts', {})
+                    contingency = "✅ Activada" if isinstance(alerts_data, dict) and alerts_data.get('contingency') else "🔕 Desactivada"
+                    
+                    th_data = alerts_data.get('threshold', {}) if isinstance(alerts_data, dict) else {}
+                    alerts_th = f"✅ {len(th_data)} lugares" if th_data else "Ninguna"
+                    
+                    sch_data = alerts_data.get('schedule', {}) if isinstance(alerts_data, dict) else {}
+                    alerts_sch = f"✅ {len(sch_data)} recordatorios" if sch_data else "Ninguno"
+
+                    # 🔥 FORMATEO MAGISTRAL (Inyectamos las 11 variables de CARD_SUMMARY)
+                    r = cards.CARD_SUMMARY.format(
+                        user_name=first_name,
+                        plan_status=f"💎 {status_str}" if is_prem else f"📉 {status_str}",
+                        contingency_status=contingency,
                         locations_list=locs_str,
-                        health_display=health_display, # <--- ¡AQUÍ ESTÁ LA VARIABLE SALVADORA!
-                        vehicle_display=veh_str,
-                        alerts_display=alerts_str,
-                        footer=cards.BOT_FOOTER
+                        health_display=health_display,
+                        transport_info=transport_info,
+                        vehicle_info=veh_str,
+                        alerts_threshold=alerts_th,
+                        alerts_schedule=alerts_sch,
+                        hnc_reminder=hnc_rem,
+                        tip_footer=cards.BOT_FOOTER
                     )
                     
                     markup = cards.get_summary_buttons(locs_data, is_prem)
