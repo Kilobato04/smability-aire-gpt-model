@@ -286,8 +286,19 @@ def process_user(user, current_hour_str, contingency_data):
                             ubic = data.get('ubicacion', {}) # <--- NUEVO (Ubicación)
                             f_block = cards.format_forecast_block(data.get('pronostico_timeline', []))
                             
-                            cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extrema"}
-                            cat = cat_map.get(qa.get('riesgo'), "Regular")
+                            # 🔥 FIX: Lógica Matemática Unificada de IAS a Color (CDMX)
+                            cur_ias = qa.get('ias', 0)
+                            if cur_ias <= 50:
+                                cat = "Buena"
+                            elif cur_ias <= 100:
+                                cat = "Regular"
+                            elif cur_ias <= 150:
+                                cat = "Mala"
+                            elif cur_ias <= 200:
+                                cat = "Muy Mala"
+                            else:
+                                cat = "Extremadamente Mala"
+                                
                             info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Regular'])
                             
                             print(f"⏰ [NOTIFY] Enviando Reporte Diario a {first_name}")
@@ -403,9 +414,20 @@ def process_user(user, current_hour_str, contingency_data):
 
                             if count < 3:
                                 f_short = interpret_timeline_short(cur_ias, data.get('pronostico_timeline', []))
-                                cat_map = {"Bajo": "Buena", "Moderado": "Regular", "Alto": "Mala", "Muy Alto": "Muy Mala", "Extremadamente Alto": "Extremadamente Mala"}
-                                cat = cat_map.get(qa.get('riesgo'), "Regular")
-                                info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Mala'])
+                                # 🔥 FIX: Lógica Matemática Unificada de IAS a Color (CDMX)
+                                cur_ias = qa.get('ias', 0)
+                                if cur_ias <= 50:
+                                    cat = "Buena"
+                                elif cur_ias <= 100:
+                                    cat = "Regular"
+                                elif cur_ias <= 150:
+                                    cat = "Mala"
+                                elif cur_ias <= 200:
+                                    cat = "Muy Mala"
+                                else:
+                                    cat = "Extremadamente Mala"
+                                    
+                                info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Regular'])
                                 
                                 print(f"   📤 [SENDING] Enviando mensaje a Telegram...")
                                 
