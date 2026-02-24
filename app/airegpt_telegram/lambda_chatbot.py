@@ -1838,8 +1838,10 @@ def lambda_handler(event, context):
                         return {'statusCode': 200, 'body': 'OK'}
 
                 # --- TOOL DE SALUD (CON GATEKEEPER) ---
-                elif fn == "registrar_condicion_salud":
-                    condicion_raw = args.get('condicion', '').lower()
+                # 🔥 FIX: Renombrado a como lo llama GPT realmente en el JSON
+                elif fn == "guardar_perfil_salud":
+                    # Atrapamos el argumento exacto que vimos en los logs
+                    condicion_raw = args.get('tipo_padecimiento', '').lower()
                     
                     # 1. Filtro estricto
                     palabras_clave_validas = [
@@ -1850,30 +1852,39 @@ def lambda_handler(event, context):
                     
                     es_valida = any(palabra in condicion_raw for palabra in palabras_clave_validas)
                     
-                    if not es_valida:
+                    if not es_valida and condicion_raw != "ninguno":
                         r = f"⚠️ Smability solo monitorea condiciones afectadas por la calidad del aire. Dile al usuario amablemente que no es necesario registrar '{condicion_raw}'."
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                         continue 
                     
                     # 2. Guardar en BD (Con el FIX Anti-Crash de DynamoDB)
                     try:
-                        cond_id = condicion_raw.strip().replace(" ", "_")
-                        
-                        # PASO A: Crear la 'carpeta' health_profile si el usuario es nuevo y no la tiene
-                        table.update_item(
-                            Key={'user_id': str(user_id)},
-                            UpdateExpression="SET health_profile = if_not_exists(health_profile, :empty)",
-                            ExpressionAttributeValues={':empty': {}}
-                        )
-                        
-                        # PASO B: Guardar el padecimiento como un diccionario válido y estructurado
-                        table.update_item(
-                            Key={'user_id': str(user_id)},
-                            UpdateExpression="SET health_profile.#c = :val",
-                            ExpressionAttributeNames={'#c': cond_id},
-                            ExpressionAttributeValues={':val': {'condition': condicion_raw.capitalize(), 'active': True}}
-                        )
-                        r = f"✅ Condición '{condicion_raw.capitalize()}' guardada exitosamente."
+                        if condicion_raw == "ninguno":
+                            # Si el usuario dice que ya no tiene nada, limpiamos su perfil
+                            table.update_item(
+                                Key={'user_id': str(user_id)},
+                                UpdateExpression="SET health_profile = :empty",
+                                ExpressionAttributeValues={':empty': {}}
+                            )
+                            r = "✅ Perfil de salud restablecido a 'Ninguno'."
+                        else:
+                            cond_id = condicion_raw.strip().replace(" ", "_")
+                            
+                            # PASO A: Crear la 'carpeta' health_profile si el usuario es nuevo y no la tiene
+                            table.update_item(
+                                Key={'user_id': str(user_id)},
+                                UpdateExpression="SET health_profile = if_not_exists(health_profile, :empty)",
+                                ExpressionAttributeValues={':empty': {}}
+                            )
+                            
+                            # PASO B: Guardar el padecimiento como un diccionario válido y estructurado
+                            table.update_item(
+                                Key={'user_id': str(user_id)},
+                                UpdateExpression="SET health_profile.#c = :val",
+                                ExpressionAttributeNames={'#c': cond_id},
+                                ExpressionAttributeValues={':val': {'condition': condicion_raw.capitalize(), 'active': True}}
+                            )
+                            r = f"✅ Condición '{condicion_raw.capitalize()}' guardada exitosamente."
                     except Exception as e:
                         print(f"❌ Error guardando salud: {e}")
                         r = "Hubo un error al guardar la condición."
