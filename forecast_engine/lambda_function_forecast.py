@@ -184,45 +184,25 @@ def interpolate_on_grid(grid_df, x_src, y_src, z_src, method='linear'):
     
     return grid_z
 
-def generate_forecast_summary():
+def generate_forecast_summary(archivos_nuevos):
     """
-    Busca los 24 archivos de pronóstico futuros generados,
+    Toma la lista de los 24 archivos que se acaban de generar,
     extrae el IAS y arma un vector ligero comprimido en S3.
     """
-    print("\n🔮 [FORECAST SUMMARY] Consolidando el vector del futuro...")
+    print(f"\n🔮 [FORECAST SUMMARY] Integrando {len(archivos_nuevos)} archivos recién creados...")
     try:
-        tz = ZoneInfo("America/Mexico_City")
-        now_mx = datetime.now(tz)
-        
-        response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=S3_FORECAST_PREFIX)
-        archivos = response.get('Contents', [])
-        
-        if not archivos:
-            print("❌ No se encontraron archivos de pronóstico para resumir.")
+        if not archivos_nuevos:
+            print("❌ No hay archivos nuevos para resumir.")
             return False
             
-        # 1. Filtrar cronológicamente (Ignorar pronósticos viejos de días anteriores)
-        futuros = []
-        for obj in archivos:
-            key = obj['Key']
-            filename = key.split('/')[-1].replace('.json', '')
-            try:
-                file_dt = datetime.strptime(filename, "%Y-%m-%d_%H-%M").replace(tzinfo=tz)
-                # Solo tomamos archivos que sean de la hora actual en adelante (con 1 hora de margen)
-                if file_dt >= now_mx - timedelta(hours=1):
-                    futuros.append((file_dt, key))
-            except Exception:
-                continue
-                
-        # 2. Ordenar y tomar las primeras 24 horas
-        futuros.sort(key=lambda x: x[0])
-        archivos_target = futuros[:24]
-        
         resumen = {"origen": "forecast", "celdas": {}}
         archivos_procesados = 0
         
-        # 3. Procesar archivos
-        for idx, (file_dt, key) in enumerate(archivos_target):
+        # Procesar exactamente los 24 archivos que nos pasaron
+        for idx, filename in enumerate(archivos_nuevos):
+            if idx >= 24: break # Seguro anti-desbordes
+            
+            key = f"{S3_FORECAST_PREFIX}{filename}"
             try:
                 resp = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
                 datos_hora = json.loads(resp['Body'].read().decode('utf-8'))
@@ -243,7 +223,7 @@ def generate_forecast_summary():
             except Exception as e:
                 print(f"⚠️ Error procesando {key} para el resumen: {e}")
 
-        # 4. Comprimir y Subir a S3
+        # Comprimir y Subir a S3
         json_str = json.dumps(resumen, separators=(',', ':'))
         comprimido = gzip.compress(json_str.encode('utf-8'))
         output_key = "forecast_summary/latest_forecast.json.gz"
@@ -444,9 +424,9 @@ def lambda_handler(event, context):
 
         print(f"✅ FORECAST COMPLETADO: {len(generated_files)} archivos generados.")
         
-        # --- NUEVO: Generar el resumen ligero inmediatamente después de crear los archivos ---
+        # --- NUEVO: Generar el resumen ligero pasándole los archivos directamente ---
         if len(generated_files) > 0:
-            generate_forecast_summary()
+            generate_forecast_summary(generated_files)
             
         return {'statusCode': 200, 'body': json.dumps({'files': len(generated_files), 'summary_generated': True})}
 
