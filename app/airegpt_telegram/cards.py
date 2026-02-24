@@ -304,8 +304,8 @@ CARD_SUMMARY = """
 🚫 **Tu Auto Circula Hoy?:**
 {hnc_reminder}
 
-💡 *{tip_footer}*
-"""
+💡 *Tip: Dile al bot 'Cambia mi transporte a...' para ajustar tu rutina.*
+{footer}"""
 
 CARD_VERIFICATION = """🚗 **ESTATUS DE VERIFICACIÓN**
 🚘 **Auto:** {plate_info} | {engomado}
