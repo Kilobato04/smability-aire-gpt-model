@@ -786,6 +786,34 @@ def lambda_handler(event, context):
     # ---------------------------------------------------------
     try:
         body = json.loads(event.get('body', '{}'))
+
+        # --- 🕵️‍♂️ PASO 0: UNIFICAR IDENTIDAD (Extraer ID sin importar qué mandaron) ---
+        # Detectamos si es botón (callback_query) o mensaje (message)
+        update_origin = body.get('callback_query') or body.get('message')
+        
+        if not update_origin: 
+            return {'statusCode': 200, 'body': 'OK'} # No es nada procesable
+
+        user_id = update_origin['from']['id']
+        raw_name = update_origin['from'].get('first_name', 'Usuario')
+        first_name = str(raw_name).replace("_", " ").replace("*", "").replace("`", "")
+
+        # --- 🛡️ PASO 1: CARGAR PERFIL Y SANITIZAR DE INMEDIATO (Cambio A) ---
+        # Esto se ejecuta PARA TODO: botones, texto y GPS.
+        user_profile = get_user_profile(user_id)
+        
+        campos_dict = ['locations', 'alerts', 'vehicle', 'health_profile', 'subscription']
+        for campo in campos_dict:
+            if not isinstance(user_profile.get(campo), dict):
+                user_profile[campo] = {}
+        
+        # Limpieza profunda de ubicaciones (evita strings en lugar de objetos)
+        locs_validadas = {}
+        for k, v in user_profile.get('locations', {}).items():
+            if isinstance(v, dict): 
+                locs_validadas[k] = v
+        user_profile['locations'] = locs_validadas
+        # --- 🏁 TERMINA SANITIZACIÓN ---
         
         # 1. CALLBACKS
         if 'callback_query' in body:
@@ -1260,29 +1288,40 @@ def lambda_handler(event, context):
             elif text_clean in ["mi resumen", "resumen", "perfil", "/perfil", "mi perfil"]:
                 print(f"👤 [PERFIL] Solicitado por: {user_id}")
                 
-                # 1. Preparamos Ubicaciones
+                # 1. 🛡️ Blindaje de Ubicaciones
                 locs = user_profile.get('locations', {})
-                if not locs:
+                if not locs or not isinstance(locs, dict):
                     locs_str = "No tienes ubicaciones guardadas."
                 else:
                     locs_str = ""
                     for k, v in locs.items():
-                        if v.get('active'):
-                            locs_str += f"• **{v.get('display_name', k).capitalize()}**\n"
+                        # Verificamos que 'v' sea dict antes de entrar
+                        if isinstance(v, dict) and v.get('active'):
+                            nombre_visual = v.get('display_name', k).capitalize()
+                            locs_str += f"• **{nombre_visual}**\n"
+                    
+                    if not locs_str: locs_str = "Sin ubicaciones activas."
                 
-                # 2. Preparamos Vehículo
+                # 2. 🛡️ Blindaje de Vehículo
                 veh = user_profile.get('vehicle', {})
-                if veh and veh.get('active'):
+                if isinstance(veh, dict) and veh.get('active'):
                     veh_str = f"Placa: {veh.get('plate_last_digit')} • Holograma: {veh.get('hologram')}"
                 else:
                     veh_str = "No registrado."
 
-                # 3. Preparamos Alertas (Básico)
+                # 3. Alertas
                 alerts_str = "Tus alertas inteligentes están activas."
 
-                # 4. FIX ÍTEM 9: EXTRAER SALUD
+                # 4. 🛡️ FIX CAMBIO C: EXTRAER SALUD CON SEGURIDAD
                 health_data = user_profile.get('health_profile', {})
-                condiciones = [info['condition'] for key, info in health_data.items() if info.get('active')]
+                condiciones = []
+                
+                # Verificamos que sea un diccionario antes de iterar
+                if isinstance(health_data, dict):
+                    for key, info in health_data.items():
+                        # Verificamos que cada condición sea un dict y esté activa
+                        if isinstance(info, dict) and info.get('active'):
+                            condiciones.append(info.get('condition', 'Condición'))
                 
                 if condiciones:
                     health_display = f"🏥 **Salud:** {', '.join(condiciones)}"
@@ -1305,14 +1344,7 @@ def lambda_handler(event, context):
         print(f"📨 [MSG] User: {user_id} | Content: {user_content}") # LOG CRITICO
 
         save_interaction_and_draft(user_id, first_name, lat, lon)
-        user_profile = get_user_profile(user_id)
         
-        # --- SANITIZADOR DE DATOS (Anti-Crash) ---
-        # Si DynamoDB nos da un string donde esperamos un diccionario, lo corregimos en vivo
-        for campo in ['locations', 'alerts', 'vehicle', 'health_profile', 'subscription']:
-            if not isinstance(user_profile.get(campo), dict):
-                user_profile[campo] = {}
-        # -----------------------------------------
         # Parche de seguridad
         if isinstance(user_profile.get('alerts'), str): user_profile['alerts'] = {}
         
@@ -1845,8 +1877,8 @@ def lambda_handler(event, context):
                     
                 # --- NUEVA TOOL: MIS UBICACIONES (URL FIX) ---
                 elif fn == "consultar_ubicaciones_guardadas":
-                    user = get_user_profile(user_id)
-                    locs = user.get('locations', {})
+                    # Nota: Ya no llamamos a get_user_profile porque user_profile ya viene sanitizado desde el inicio del handler
+                    locs = user_profile.get('locations', {})
                     
                     if not locs:
                         r = "📭 No tienes ubicaciones guardadas."
@@ -1854,30 +1886,34 @@ def lambda_handler(event, context):
                     else:
                         lista_txt = ""
                         for k, v in locs.items():
-                            # --- FIX: SANITIZACIÓN DE TEXTO Y URL ---
-                            # 1. Limpiamos caracteres peligrosos del nombre
+                            # --- 🛡️ FIX CAMBIO B: VALIDAR QUE 'v' SEA DICCIONARIO ---
+                            if not isinstance(v, dict):
+                                print(f"⚠️ Saltando ubicación mal formada: {k}")
+                                continue 
+                            
+                            # Ahora es 100% seguro usar .get()
                             raw_disp = v.get('display_name', 'Ubicación')
                             display = str(raw_disp).replace("_", " ").replace("*", "").replace("[", "").replace("]", "")
                             key_clean = str(k).capitalize().replace("_", " ")
                             
-                            # 2. Validamos coordenadas para evitar None
                             lat = v.get('lat', 0)
                             lon = v.get('lon', 0)
-                            
-                            # 3. URL Segura (Formato API Google Maps Universal)
                             maps_url = f"http://www.google.com/maps/place/{lat},{lon}"
                             
                             lista_txt += f"🏠 **[{key_clean}]({maps_url}):** {display}\n\n"
                         
-                        card = cards.CARD_MY_LOCATIONS.format(
-                            user_name=first_name, # Ya viene limpio del FIX 1
-                            locations_list=lista_txt.strip(),
-                            footer=cards.BOT_FOOTER
-                        )
-                        
-                        markup = cards.get_locations_buttons(locs)
-                        send_telegram(chat_id, card, markup)
-                        return {'statusCode': 200, 'body': 'OK'}
+                        if not lista_txt:
+                            r = "⚠️ Tus ubicaciones guardadas no tienen el formato correcto."
+                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        else:
+                            card = cards.CARD_MY_LOCATIONS.format(
+                                user_name=first_name, 
+                                locations_list=lista_txt.strip(),
+                                footer=cards.BOT_FOOTER
+                            )
+                            markup = cards.get_locations_buttons(locs)
+                            send_telegram(chat_id, card, markup)
+                            return {'statusCode': 200, 'body': 'OK'}
 
                 elif fn == "configurar_alerta_contingencia":
                     val = args.get('activar')
