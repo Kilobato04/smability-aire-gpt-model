@@ -174,10 +174,10 @@ Para avisarte exactamente qué días no circulas y cuándo te toca verificar, re
 # ACTUALIZADA: Se agregó {trend_arrow} para aprovechar el dato de la nueva API
 
 CARD_REPORT = """🌤️ **{greeting}, {user_name}!**
-Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
+Tu *reporte* para 📍 **[{location_name}]({maps_url})**:
 🗺️ {region} • 🕒 {report_time}
 
-{risk_circle} **Calidad {risk_category} ({ias_value} pts)** ☣️ **Dominante:** {pollutant}
+{risk_circle} **Calidad {risk_category} ({ias_value} pts)** |☣️ {pollutant}
 
 🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
 📊 **Tendencia:** {trend}
@@ -191,7 +191,7 @@ Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
 CARD_ALERT_IAS = """🚨 **¡ALERTA DE CALIDAD DEL AIRE!** 🚨
 Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** a las 🕒 {report_time} ha superado tu límite de seguridad.
 
-{risk_circle} **Calidad {risk_category} ({ias_value} pts)** ☣️ **Dominante:** {pollutant}
+{risk_circle} **Calidad {risk_category} ({ias_value} pts)** |☣️ {pollutant}
 *Tu umbral configurado es: {threshold} pts*
 
 📊 **Tendencia:** {forecast_msg}
@@ -200,11 +200,10 @@ Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** a 
 {footer}"""
 
 CARD_REMINDER = """⏰ **{greeting}, {user_name}!**
-Aquí tienes el *reporte* para 📍 **[{location_name}]({maps_url})**:
+Tu *reporte* para 📍 **[{location_name}]({maps_url})**:
 🗺️ {region} • 🕒 {report_time}
 
-{risk_circle} **Calidad {risk_category} ({ias_value} pts)**
-☣️ **Contaminante dominante:** {pollutant}
+{risk_circle} **Calidad {risk_category} ({ias_value} pts)** |☣️ {pollutant}
 
 🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
 📊 **Tendencia:** {trend}
