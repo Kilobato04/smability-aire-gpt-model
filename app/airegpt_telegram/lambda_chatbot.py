@@ -635,6 +635,15 @@ def send_telegram(chat_id, text, markup=None):
         if r.status_code != 200: print(f"❌ [TG FAIL] {r.text}")
     except Exception as e: print(f"❌ [TG NET ERROR]: {e}")
 
+def send_telegram_action(chat_id, action="typing"):
+    """Envía un estado a Telegram (ej. 'escribiendo...') para que el usuario sepa que el bot está procesando"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendChatAction"
+    payload = {"chat_id": chat_id, "action": action}
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        print(f"❌ Error enviando chat action: {e}")
+
 def send_persistent_gps_button(chat_id):
     """Envía el botón nativo de Telegram que solicita el GPS en tiempo real"""
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
