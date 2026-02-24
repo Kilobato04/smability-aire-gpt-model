@@ -195,7 +195,20 @@ def generate_forecast_summary(archivos_nuevos):
             print("❌ No hay archivos nuevos para resumir.")
             return False
             
-        resumen = {"origen": "forecast", "celdas": {}}
+        # Obtenemos la fecha/hora del PRIMER archivo (la hora "cero" de nuestro arreglo futuro)
+        # Recordatorio: filename viene como "2026-02-24_18-00.json"
+        primer_archivo = archivos_nuevos[0]
+        primer_dt_str = primer_archivo.split('/')[-1].replace('.json', '') # "2026-02-24_18-00"
+        
+        # Lo formateamos a ISO para que la API Ligera lo lea facilísimo
+        start_dt = datetime.strptime(primer_dt_str, "%Y-%m-%d_%H-%M").replace(tzinfo=ZoneInfo("America/Mexico_City"))
+        timestamp_start_iso = start_dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+        
+        resumen = {
+            "origen": "forecast", 
+            "timestamp_start": timestamp_start_iso, # <--- ¡AQUÍ ESTÁ LA HORA CERO!
+            "celdas": {}
+        }
         archivos_procesados = 0
         
         # Procesar exactamente los 24 archivos que nos pasaron
