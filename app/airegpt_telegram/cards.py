@@ -277,34 +277,33 @@ CARD_HNC_DETAILED = """🚗 **Reporte Mensual HNC: {mes_nombre}**
 
 {footer}"""
 
-CARD_SUMMARY = """
-📊 **RESUMEN DE CUENTA**
+CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
 👤 {user_name} | Plan: {plan_status}
 
-🚨 **Alerta Contingencia:** {contingency_status}
+🚨 *Alerta Contingencia:* {contingency_status}
 
-📍 **Tus Ubicaciones:**
+📍 *Tus Ubicaciones:*
 {locations_list}
 
-🏥 **Tu Salud:**
+🏥 *Tu Salud:*
 {health_display}
 
-🚇 **Tu Rutina (Cálculo de Exposición):**
+🚇 *Tu Rutina (Cálculo de Exposición):*
 {transport_info}
 
-🚗 **Tu Auto:**
+🚗 *Tu Auto:*
 {vehicle_info}
 
-🔔 **Alertas Aire (Por Nivel/Umbral):**
+🔔 *Alertas Aire (Por Nivel/Umbral):*
 {alerts_threshold}
 
-⏰ **Reportes Aire (Programados):**
+⏰ *Reportes Aire (Programados):*
 {alerts_schedule}
 
-🚫 **Tu Auto Circula Hoy?:**
+🚫 *Tu Auto Circula Hoy?:*
 {hnc_reminder}
 
-💡 *Tip: Dile al bot 'Cambia mi transporte a...' para ajustar tu rutina.*
+💡 _Tip: Dile al bot 'Cambia mi transporte a...' para ajustar tu rutina._
 {footer}"""
 
 CARD_VERIFICATION = """🚗 **ESTATUS DE VERIFICACIÓN**
