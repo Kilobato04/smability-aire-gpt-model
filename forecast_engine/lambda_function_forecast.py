@@ -187,7 +187,7 @@ def interpolate_on_grid(grid_df, x_src, y_src, z_src, method='linear'):
 def generate_forecast_summary(archivos_nuevos):
     """
     Toma la lista de los 24 archivos que se acaban de generar,
-    extrae el IAS y arma un vector ligero comprimido en S3.
+    extrae el IAS y los gases principales, y arma un vector ligero en S3.
     """
     print(f"\n🔮 [FORECAST SUMMARY] Integrando {len(archivos_nuevos)} archivos recién creados...")
     try:
@@ -213,11 +213,20 @@ def generate_forecast_summary(archivos_nuevos):
                     geo_key = f"{lat},{lon}"
                     
                     if geo_key not in resumen['celdas']:
-                        resumen['celdas'][geo_key] = {"ias": [0.0]*24}
+                        resumen['celdas'][geo_key] = {
+                            "ias": [0]*24,
+                            "o3_1h": [0.0]*24,
+                            "pm10_12h": [0.0]*24,
+                            "pm25_12h": [0.0]*24
+                        }
                     
-                    # Extraer el IAS
-                    ias_val = celda.get('ias', 0)
-                    resumen['celdas'][geo_key]['ias'][idx] = int(ias_val)
+                    # --- EXTRAER TODOS LOS CONTAMINANTES ---
+                    resumen['celdas'][geo_key]['ias'][idx] = int(celda.get('ias', 0))
+                    
+                    # Manejo seguro para los gases (por si la llave varía un poco)
+                    resumen['celdas'][geo_key]['o3_1h'][idx] = float(celda.get('o3 1h', celda.get('o3', 0.0)))
+                    resumen['celdas'][geo_key]['pm10_12h'][idx] = float(celda.get('pm10 12h', celda.get('pm10', 0.0)))
+                    resumen['celdas'][geo_key]['pm25_12h'][idx] = float(celda.get('pm25 12h', celda.get('pm25', 0.0)))
                     
                 archivos_procesados += 1
             except Exception as e:
@@ -235,7 +244,7 @@ def generate_forecast_summary(archivos_nuevos):
             ContentType='application/json', 
             ContentEncoding='gzip'
         )
-        print(f"✅ [FORECAST SUMMARY] Guardado en S3: {output_key} ({archivos_procesados} horas integradas)")
+        print(f"✅ [FORECAST SUMMARY] Guardado en S3: {output_key} ({archivos_procesados} horas integradas con Gases)")
         return True
     except Exception as e:
         print(f"❌ [FORECAST SUMMARY] Error crítico: {e}")
