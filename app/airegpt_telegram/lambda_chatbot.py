@@ -1153,18 +1153,21 @@ def lambda_handler(event, context):
                         sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
                 alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
 
+                # 🔥 ESCUDO ANTI-MARKDOWN
+                safe_name = str(first_name).replace("_", " ").replace("*", "")
+                
                 # 🔥 FORMATEO FINAL
                 card_resumen = cards.CARD_SUMMARY.format(
-                    user_name=first_name,
+                    user_name=safe_name,
                     plan_status=status_str.upper(),
                     contingency_status=contingency,
-                    locations_list=locs_str,
-                    health_display=health_str,
-                    transport_info=transport_info,
-                    vehicle_info=veh_str,
-                    alerts_threshold=alerts_th,
-                    alerts_schedule=alerts_sch,
-                    hnc_reminder=hnc_rem,
+                    locations_list=locs_str.replace("_", " "),
+                    health_display=health_str.replace("_", " "),
+                    transport_info=transport_info.replace("_", " "),
+                    vehicle_info=veh_str.replace("_", " "),
+                    alerts_threshold=alerts_th.replace("_", " "),
+                    alerts_schedule=alerts_sch.replace("_", " "),
+                    hnc_reminder=hnc_rem.replace("_", " "),
                     footer=cards.BOT_FOOTER
                 )
                 
@@ -1459,18 +1462,21 @@ def lambda_handler(event, context):
                         sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
                 alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
 
+                # 🔥 ESCUDO ANTI-MARKDOWN
+                safe_name = str(first_name).replace("_", " ").replace("*", "")
+                
                 # 🔥 FORMATEO FINAL USANDO cards.py
                 msg_envio = cards.CARD_SUMMARY.format(
-                    user_name=first_name,
+                    user_name=safe_name,
                     plan_status=status_str.upper(),
                     contingency_status=contingency,
-                    locations_list=locs_str,
-                    health_display=health_str,
-                    transport_info=transport_info,
-                    vehicle_info=veh_str,
-                    alerts_threshold=alerts_th,
-                    alerts_schedule=alerts_sch,
-                    hnc_reminder=hnc_rem,
+                    locations_list=locs_str.replace("_", " "),
+                    health_display=health_str.replace("_", " "),
+                    transport_info=transport_info.replace("_", " "),
+                    vehicle_info=veh_str.replace("_", " "),
+                    alerts_threshold=alerts_th.replace("_", " "),
+                    alerts_schedule=alerts_sch.replace("_", " "),
+                    hnc_reminder=hnc_rem.replace("_", " "),
                     footer=cards.BOT_FOOTER
                 )
                 
@@ -1837,19 +1843,22 @@ def lambda_handler(event, context):
                             sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
                     alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
 
+                    # 🔥 ESCUDO ANTI-MARKDOWN
+                    safe_name = str(first_name).replace("_", " ").replace("*", "")
+                    
                     # 🔥 FORMATEO FINAL USANDO cards.py
                     r = cards.CARD_SUMMARY.format(
-                        user_name=first_name,
+                        user_name=safe_name,
                         plan_status=status_str.upper(),
                         contingency_status=contingency,
-                        locations_list=locs_str,
-                        health_display=health_str,
-                        transport_info=transport_info,
-                        vehicle_info=veh_str,
-                        alerts_threshold=alerts_th,
-                        alerts_schedule=alerts_sch,
-                        hnc_reminder=hnc_rem,
-                        footer=cards.BOT_FOOTER # <--- Añadido el campo 'footer' que faltaba
+                        locations_list=locs_str.replace("_", " "),
+                        health_display=health_str.replace("_", " "),
+                        transport_info=transport_info.replace("_", " "),
+                        vehicle_info=veh_str.replace("_", " "),
+                        alerts_threshold=alerts_th.replace("_", " "),
+                        alerts_schedule=alerts_sch.replace("_", " "),
+                        hnc_reminder=hnc_rem.replace("_", " "),
+                        footer=cards.BOT_FOOTER 
                     )
                     
                     markup = cards.get_summary_buttons(locs_data, is_prem)
