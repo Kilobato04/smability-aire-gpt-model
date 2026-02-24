@@ -1616,41 +1616,60 @@ def lambda_handler(event, context):
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
                 elif fn == "consultar_resumen_configuracion":
-                    # 🔥 FIX 2 APLICADO: Usamos el user_profile que YA viene limpio y sanitizado
-                    # NUNCA volver a llamar a get_user_profile() aquí adentro.
+                    # Usamos el perfil que ya está limpio
                     user = user_profile 
                     
                     sub_data = user.get('subscription', {})
-                    # Blindaje extra: si por alguna extraña razón sub_data es un string, no explota
                     if isinstance(sub_data, dict):
                         status_str = sub_data.get('status', 'FREE')
                     else:
                         status_str = str(sub_data) if sub_data else 'FREE'
                     
-                    # Detectar si es Premium o Trial para la lógica visual
                     is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
                     
-                    # Blindaje final para las variables de la tarjeta (asegurando que sean dicts)
+                    # 1. Armar Ubicaciones
                     locs_data = user.get('locations', {})
                     if not isinstance(locs_data, dict): locs_data = {}
                     
-                    alerts_data = user.get('alerts', {})
-                    if not isinstance(alerts_data, dict): alerts_data = {}
+                    locs_str = ""
+                    for k, v in locs_data.items():
+                        if isinstance(v, dict) and v.get('active'):
+                            locs_str += f"• **{v.get('display_name', k).capitalize()}**\n"
+                    if not locs_str: locs_str = "No tienes ubicaciones activas."
 
-                    # Generar Tarjeta Visual
-                    r = cards.generate_summary_card(
-                        first_name, 
-                        alerts_data, 
-                        user.get('vehicle', None), 
-                        locs_data, 
-                        status_str, 
-                        user.get('profile_transport', None)
+                    # 2. Armar Vehículo
+                    veh = user.get('vehicle', {})
+                    if isinstance(veh, dict) and veh.get('active'):
+                        veh_str = f"Placa: {veh.get('plate_last_digit')} • Holograma: {veh.get('hologram')}"
+                    else:
+                        veh_str = "No registrado."
+
+                    # 3. Alertas
+                    alerts_str = "Tus alertas inteligentes están activas."
+
+                    # 4. 🔥 FIX: Armar Salud (El causante del error)
+                    health_data = user.get('health_profile', {})
+                    condiciones = []
+                    if isinstance(health_data, dict):
+                        for key, info in health_data.items():
+                            if isinstance(info, dict) and info.get('active'):
+                                condiciones.append(info.get('condition', 'Condición'))
+                    
+                    if condiciones:
+                        health_display = f"🏥 **Salud:** {', '.join(condiciones)}"
+                    else:
+                        health_display = "🏥 **Salud:** Ninguna *(Escribe 'Tengo asma' para añadir)*"
+
+                    # 5. Formatear directamente la tarjeta (Bypass de la función vieja)
+                    r = cards.CARD_PROFILE.format(
+                        locations_list=locs_str,
+                        health_display=health_display, # <--- ¡AQUÍ ESTÁ LA VARIABLE SALVADORA!
+                        vehicle_display=veh_str,
+                        alerts_display=alerts_str,
+                        footer=cards.BOT_FOOTER
                     )
                     
-                    # Generar Botones Inteligentes
                     markup = cards.get_summary_buttons(locs_data, is_prem)
-                    
-                    # Enviar y Cortar (Hard Stop)
                     send_telegram(chat_id, r, markup)
                     return {'statusCode': 200, 'body': 'OK'}
 
