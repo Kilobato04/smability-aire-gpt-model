@@ -148,6 +148,103 @@ def generate_daily_summary():
         print(f"❌ [DAILY SUMMARY] Error crítico: {e}")
         return False
 
+def generate_today_summary():
+    """
+    Consolida los archivos generados en lo que va del día de hoy
+    para que la API Ligera tenga el 'presente' al instante.
+    """
+    print("\n☀️ [TODAY SUMMARY] Construyendo el puente del presente...")
+    try:
+        tz = ZoneInfo("America/Mexico_City")
+        hoy_dt = datetime.now(tz)
+        fecha_hoy_str = hoy_dt.strftime("%Y-%m-%d")
+        
+        # Buscamos todos los archivos generados HOY
+        prefix = f"live_grid/grid_{fecha_hoy_str}"
+        response = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix)
+        archivos = response.get('Contents', [])
+        
+        if not archivos:
+            print(f"⚠️ [TODAY SUMMARY] Aún no hay archivos generados para hoy ({fecha_hoy_str})")
+            return False
+            
+        resumen = {
+            "origen": "today", 
+            "fecha": fecha_hoy_str,
+            "ultima_hora_procesada": -1,
+            "celdas": {}
+        }
+        
+        def safe_extract(c_dict, key1, key2):
+            val = c_dict.get(key1, c_dict.get(key2))
+            return float(val) if val is not None else 0.0
+
+        max_hora = -1
+        
+        for obj in archivos:
+            key = obj['Key']
+            try:
+                # Extraer hora: live_grid/grid_2026-02-24_17-20.json -> 17
+                hora_str = key.split('_')[-1].split('-')[0]
+                hora_int = int(hora_str)
+                if hora_int > max_hora: max_hora = hora_int
+            except:
+                continue
+                
+            try:
+                resp = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
+                datos_hora = json.loads(resp['Body'].read().decode('utf-8'))
+                
+                for celda in datos_hora:
+                    lat, lon = round(celda['lat'], 3), round(celda['lon'], 3)
+                    geo_key = f"{lat},{lon}"
+                    
+                    if geo_key not in resumen['celdas']:
+                        # Inicializamos las 24 horas con 'None' (null en JSON)
+                        resumen['celdas'][geo_key] = {
+                            "ias": [None]*24,
+                            "pm25_12h": [None]*24,
+                            "pm10_12h": [None]*24,
+                            "o3_1h": [None]*24
+                        }
+                    
+                    # Guardamos el dato en el índice de la hora correspondiente
+                    resumen['celdas'][geo_key]['ias'][hora_int] = int(safe_extract(celda, 'ias', 'ias'))
+                    resumen['celdas'][geo_key]['pm25_12h'][hora_int] = safe_extract(celda, 'pm25 12h', 'pm25')
+                    resumen['celdas'][geo_key]['pm10_12h'][hora_int] = safe_extract(celda, 'pm10 12h', 'pm10')
+                    resumen['celdas'][geo_key]['o3_1h'][hora_int] = safe_extract(celda, 'o3 1h', 'o3')
+                    
+            except Exception as e:
+                print(f"⚠️ Error procesando {key}: {e}")
+        
+        resumen['ultima_hora_procesada'] = max_hora
+
+        # Interpolación rápida: Si la Lambda falló alguna hora de hoy, repetimos la hora anterior para tapar el hueco
+        for geo_key, series in resumen['celdas'].items():
+            for param in ['ias', 'pm25_12h', 'pm10_12h', 'o3_1h']:
+                for i in range(1, max_hora + 1):
+                    if series[param][i] is None and series[param][i-1] is not None:
+                        series[param][i] = series[param][i-1]
+
+        # Comprimir y guardar
+        json_str = json.dumps(resumen, separators=(',', ':'))
+        comprimido = gzip.compress(json_str.encode('utf-8'))
+        output_key = "daily_summaries/summary_today.json.gz"
+        
+        s3_client.put_object(
+            Bucket=S3_BUCKET, 
+            Key=output_key, 
+            Body=comprimido, 
+            ContentType='application/json', 
+            ContentEncoding='gzip'
+        )
+        print(f"✅ [TODAY SUMMARY] Guardado en S3: {output_key} (Datos actualizados hasta la hora {max_hora})")
+        return True
+        
+    except Exception as e:
+        print(f"❌ [TODAY SUMMARY] Error crítico: {e}")
+        return False
+
 # --- 3. FUNCIONES DE CARGA Y PROCESAMIENTO ---
 def load_models():
     """Descarga modelos desde S3 y los carga en XGBoost"""
@@ -753,6 +850,9 @@ def lambda_handler(event, context):
         s3_client.put_object(Bucket=S3_BUCKET, Key=history_key, Body=final_json, ContentType='application/json')
         
         print(f"📦 SUCCESS: Grid Generado V58.3 (Logs Premium).")
+        
+        # --- NUEVO: Generar el resumen de HOY inmediatamente después de guardar la malla actual ---
+        generate_today_summary()
         
         return {
             'statusCode': 200, 
