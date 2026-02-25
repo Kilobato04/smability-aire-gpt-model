@@ -212,6 +212,11 @@ class CalculadoraRiesgoSmability:
         }
 
     def calcular_usuario(self, vector_casa, perfil_usuario, vector_trabajo=None, es_home_office=False):
+        # 1. 🛡️ ESCUDO: Asegurar que los vectores sean válidos
+        if not vector_casa:
+            return None # Fallo crítico, no hay datos base
+
+        # Si es home office o no mandaron trabajo, el trabajo ES la casa
         if es_home_office or not vector_trabajo:
             vector_trabajo = vector_casa
             hora_salida, hora_llegada_casa, factor_transporte = 25, 25, 1.0
@@ -226,21 +231,26 @@ class CalculadoraRiesgoSmability:
             factor_transporte = self.FACTORES_TRANSPORTE.get(modo_transporte, 1.0)
 
         suma_exposicion_acumulada = 0.0
-        suma_ias_acumulada = 0.0 # <--- NUEVO ACUMULADOR PARA IAS
+        suma_ias_acumulada = 0.0 
         
-        # FIX: Por si la API manda el vector sin la llave 'ias' (mientras se refresca)
+        # 2. 🛡️ ESCUDO: Extracción segura con fallbacks de 24 horas
         vector_casa_ias = vector_casa.get('ias', [0]*24)
         vector_trabajo_ias = vector_trabajo.get('ias', [0]*24)
+        
+        c_pm25 = vector_casa.get('pm25_12h', [0.0]*24)
+        c_o3 = vector_casa.get('o3_1h', [0.0]*24)
+        t_pm25 = vector_trabajo.get('pm25_12h', [0.0]*24)
+        t_o3 = vector_trabajo.get('o3_1h', [0.0]*24)
 
         for hora in range(24):
-            # 1. Contaminación EXTERIOR bruta (de la calle)
-            ext_casa = vector_casa['pm25_12h'][hora] + (vector_casa['o3_1h'][hora] * self.K_O3_A_PM)
-            ext_trab = vector_trabajo['pm25_12h'][hora] + (vector_trabajo['o3_1h'][hora] * self.K_O3_A_PM)
+            # 3. Contaminación EXTERIOR bruta (de la calle)
+            ext_casa = c_pm25[hora] + (c_o3[hora] * self.K_O3_A_PM)
+            ext_trab = t_pm25[hora] + (t_o3[hora] * self.K_O3_A_PM)
             
             ias_ext_casa = vector_casa_ias[hora]
             ias_ext_trab = vector_trabajo_ias[hora]
 
-            # 2. Contaminación INTERIOR (Con escudo del edificio aplicado)
+            # 4. Contaminación INTERIOR (Con escudo del edificio aplicado)
             int_casa = ext_casa * self.FACTOR_INTRAMUROS
             int_trab = ext_trab * self.FACTOR_INTRAMUROS
             
@@ -248,7 +258,7 @@ class CalculadoraRiesgoSmability:
             ias_int_casa = ias_ext_casa * self.FACTOR_INTRAMUROS
             ias_int_trab = ias_ext_trab * self.FACTOR_INTRAMUROS
 
-            # 3. Reconstrucción de la película del día
+            # 5. Reconstrucción de la película del día
             if es_home_office:
                 nivel_hora = int_casa # Todo el día protegido en casa
                 ias_hora = ias_int_casa
@@ -269,33 +279,28 @@ class CalculadoraRiesgoSmability:
                     ias_hora = ((ias_ext_casa + ias_ext_trab) / 2) * factor_transporte
 
             suma_exposicion_acumulada += nivel_hora
-            suma_ias_acumulada += ias_hora # <--- SUMAMOS EL IAS DE ESTA HORA
+            suma_ias_acumulada += ias_hora
 
         promedio = suma_exposicion_acumulada / 24.0
         cigarros = promedio / self.K_CIGARRO
         
-        # FIX REDONDEO: math.ceil para igualar a la API Ligera
+        # Redondeo final
         promedio_ias = math.ceil(suma_ias_acumulada / 24.0) 
         
-        # FIX CATEGORÍAS: Diccionario unificado (26 es Buena)
+        # Categorías
         from cards import get_emoji_for_quality
-        if promedio_ias <= 50:
-            cat_ias = "Buena"
-        elif promedio_ias <= 100:
-            cat_ias = "Regular"
-        elif promedio_ias <= 150:
-            cat_ias = "Mala"
-        elif promedio_ias <= 200:
-            cat_ias = "Muy Mala"
-        else:
-            cat_ias = "Extremadamente Mala"
+        if promedio_ias <= 50: cat_ias = "Buena"
+        elif promedio_ias <= 100: cat_ias = "Regular"
+        elif promedio_ias <= 150: cat_ias = "Mala"
+        elif promedio_ias <= 200: cat_ias = "Muy Mala"
+        else: cat_ias = "Extremadamente Mala"
         
         return {
             "cigarros": round(cigarros, 1), 
             "dias_perdidos": round(cigarros * self.K_ENVEJECIMIENTO, 1),
             "promedio_riesgo": round(promedio, 1),
-            "promedio_ias": promedio_ias, # <--- SE LO MANDAMOS A LA TARJETA YA REDONDEADO
-            "calidad_ias": f"{get_emoji_for_quality(cat_ias)} Calidad {cat_ias}" # <--- TEXTO LISTO Y CORREGIDO
+            "promedio_ias": promedio_ias,
+            "calidad_ias": f"{get_emoji_for_quality(cat_ias)} Calidad {cat_ias}" 
         }
 
 # --- TOOLS ---
