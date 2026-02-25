@@ -1,23 +1,31 @@
 version: 0.2
 
+env:
+  variables:
+    AWS_DEFAULT_REGION: "us-east-1"
+    REPO_NAME: "smability-graphics"
+    LAMBDA_FUNC_NAME: "smability-graphics-core"
+
 phases:
   pre_build:
     commands:
-      - echo "🔑 Iniciando sesión en Amazon ECR..."
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/smability-graphics
-      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo "Obteniendo AWS Account ID..."
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - echo "🔑 Iniciando sesion en Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - echo "📂 Verificando repositorio ECR (creandolo si no existe)..."
+      - aws ecr create-repository --repository-name $REPO_NAME --region $AWS_DEFAULT_REGION || true
+
   build:
     commands:
-      - echo "🐳 Construyendo la imagen Docker de Gráficas..."
-      - docker build -t $REPOSITORY_URI:latest .
-      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+      - echo "🐳 Construyendo imagen Docker de Graficas..."
+      - docker build -t $REPO_NAME .
+      - docker tag $REPO_NAME:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPO_NAME:latest
+
   post_build:
     commands:
-      - echo "⬆️ Haciendo push de la imagen a ECR..."
-      - docker push $REPOSITORY_URI:latest
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo "🔄 Actualizando la función Lambda smability-graphics-core..."
-      - aws lambda update-function-code --function-name smability-graphics-core --image-uri $REPOSITORY_URI:latest
-      - echo "✅ Despliegue completado."
+      - echo "⬆️ Subiendo imagen a ECR..."
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPO_NAME:latest
+      - echo "🔄 Actualizando funcion Lambda..."
+      - aws lambda update-function-code --function-name $LAMBDA_FUNC_NAME --image-uri $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPO_NAME:latest --publish
+      - echo "✅ Despliegue completado desde CodeBuild."
