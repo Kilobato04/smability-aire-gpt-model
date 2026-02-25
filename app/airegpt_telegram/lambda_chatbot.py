@@ -1203,7 +1203,9 @@ def lambda_handler(event, context):
                 try:
                     lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
                     resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
-                    vector_c = resp_c.get("vector_exposicion_ayer")
+                    
+                    # 🛠️ FIX 1: Apuntamos al nuevo paquete 'vectores' > 'ayer'
+                    vector_c = resp_c.get("vectores", {}).get("ayer")
                     
                     vector_t = None
                     es_ho = (transp.get('medio') == 'home_office')
@@ -1211,12 +1213,13 @@ def lambda_handler(event, context):
                     if 'trabajo' in locs and not es_ho:
                         lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
                         resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}").json()
-                        vector_t = resp_t.get("vector_exposicion_ayer")
+                        
+                        # 🛠️ FIX 2: Igual para el trabajo
+                        vector_t = resp_t.get("vectores", {}).get("ayer")
 
                     if vector_c:
                         calc = CalculadoraRiesgoSmability()
                         perfil = {"transporte_default": transp.get('medio', 'auto_ventana'), "tiempo_traslado_horas": transp.get('horas', 2)}
-                        res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
                         
                         cigs, dias = res['cigarros'], res['dias_perdidos']
 
