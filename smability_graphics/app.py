@@ -387,7 +387,7 @@ def generar_grafica_serpiente(user_id):
     mplcyberpunk.add_underglow(ax1, alpha_underglow=0.1)
 
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight', transparent=True, dpi=120)
+    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, transparent=False, facecolor='#000000', dpi=120)
     buf.seek(0)
     plt.close(fig1) 
 
