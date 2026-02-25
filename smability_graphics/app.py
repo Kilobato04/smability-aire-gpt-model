@@ -5,6 +5,19 @@ import requests
 from datetime import datetime, timedelta
 import io
 
+# --- NUEVOS IMPORTS PARA GRÁFICAS ---
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import matplotlib.patches as mpatches 
+import mplcyberpunk
+from matplotlib.collections import LineCollection
+from matplotlib.colors import ListedColormap, BoundaryNorm
+from scipy.interpolate import make_interp_spline
+import qrcode
+from qrcode.image.styledpil import StyledPilImage
+from qrcode.image.styles.moduledrawers.pil import RoundedModuleDrawer
+
 # Importamos tu clase matemática
 from calculos import CalculadoraRiesgoSmability
 
@@ -167,11 +180,207 @@ def subir_imagen_a_s3(buffer, file_name):
 
 def generar_grafica_serpiente(user_id):
     print(f"🐍 Generando SERPIENTE para {user_id}...")
-    # ---> AQUÍ METEREMOS EL CÓDIGO MATPLOTLIB DEL COLAB DE SERPIENTE <---
-    # 1. Leer vectores de API Ligera (ayer, hoy, mañana)
-    # 2. Generar plot en buffer
-    # 3. url = subir_imagen_a_s3(buffer, f"serpiente_{user_id}.png")
-    return {"status": "success", "url": "https://placehold.co/600x400/png", "tipo": "serpiente_placeholder"}
+    
+    # 1. Leer datos del usuario desde DynamoDB
+    response = table.get_item(Key={'user_id': user_id})
+    user = response.get('Item')
+    if not user or 'locations' not in user or 'casa' not in user['locations']:
+        return {"status": "error", "error": "Usuario no tiene casa configurada"}
+
+    locs = user['locations']
+    
+    # --- LÓGICA DINÁMICA DE TRANSPORTE ---
+    transp = user.get('profile_transport', {'medio': 'auto_ventana', 'tiempo_traslado_horas': 2})
+    medio_transporte = transp.get('medio', 'transito').upper().replace('_', ' ')
+    duracion_traslado = float(transp.get('tiempo_traslado_horas', 2))
+    es_ho = (transp.get('medio') == 'home_office')
+
+    if es_ho or 'trabajo' not in locs:
+        hora_salida, hora_llegada_casa = 25, 25 # Nunca ocurre en un día de 24h
+        hora_llegada_trabajo, hora_salida_trabajo = 25, 25
+    else:
+        hora_salida = 7  # Sale de casa a las 7 AM
+        mitad_traslado = math.ceil(duracion_traslado / 2.0)
+        hora_llegada_trabajo = hora_salida + mitad_traslado
+        hora_salida_trabajo = 18 # Sale de la oficina a las 6 PM
+        hora_llegada_casa = hora_salida_trabajo + mitad_traslado
+
+    # 2. Traer Vectores de API Ligera (CASA)
+    lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
+    resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}", timeout=5).json()
+    
+    # Traer Vectores (TRABAJO - Si aplica)
+    resp_t = resp_c 
+    if 'trabajo' in locs and not es_ho:
+        lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
+        resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}", timeout=5).json()
+
+    # 3. MOTOR DE MEZCLA
+    ultima_hora = resp_c.get("metadata_tiempo", {}).get("hoy_ultima_hora", 12)
+    
+    casa_full = resp_c["vectores"]["ayer"]["ias"] + resp_c["vectores"]["hoy"]["ias"][:ultima_hora+1] + resp_c["vectores"]["futuro"]["ias"]
+    trabajo_full = resp_t["vectores"]["ayer"]["ias"] + resp_t["vectores"]["hoy"]["ias"][:ultima_hora+1] + resp_t["vectores"]["futuro"]["ias"]
+
+    ahora_idx = 24 + ultima_hora 
+    vector_completo = []
+    estados = []
+    horas_labels = []
+
+    ts_str = resp_c.get("ts", get_mexico_time().strftime("%Y-%m-%d %H:%M:%S"))
+    base_dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(minute=0, second=0)
+
+    for offset in range(-24, 13): 
+        i = ahora_idx + offset
+        if i >= len(casa_full): i = len(casa_full) - 1 
+        h = base_dt.hour + offset
+        h_norm = h % 24
+        
+        # --- APLICACIÓN DE LA RUTINA DEL USUARIO ---
+        if es_ho or 'trabajo' not in locs:
+            estado = 'casa'
+            val = casa_full[i]
+        else:
+            if h_norm < hora_salida or h_norm >= hora_llegada_casa:
+                estado = 'casa'
+                val = casa_full[i]
+            elif hora_salida <= h_norm < hora_llegada_trabajo:
+                estado = 'transito'
+                val = max(casa_full[i], trabajo_full[i]) + 15 
+            elif hora_llegada_trabajo <= h_norm < hora_salida_trabajo:
+                estado = 'trabajo'
+                val = trabajo_full[i]
+            elif hora_salida_trabajo <= h_norm < hora_llegada_casa:
+                estado = 'transito'
+                val = max(casa_full[i], trabajo_full[i]) + 15
+            else:
+                estado = 'casa'
+                val = casa_full[i]
+            
+        vector_completo.append(val)
+        estados.append(estado)
+        
+        point_dt = base_dt + timedelta(hours=offset)
+        hora_str = point_dt.strftime("%H:%M")
+        
+        if offset == 0: 
+            horas_labels.append(f"AHORA\n({hora_str})")
+        else: 
+            horas_labels.append(hora_str)
+
+    # 4. CONFIGURACIÓN VISUAL Y RENDERIZADO
+    BOT_URL = "https://t.me/airegptcdmx_bot"
+    fecha_str = base_dt.strftime("%d %b %Y • %I:%M %p")
+
+    plt.style.use("cyberpunk")
+    fig1, ax1 = plt.subplots(figsize=(10, 14), dpi=120) 
+    fig1.patch.set_alpha(0.0) 
+    ax1.set_facecolor('none')
+
+    ax_grad = fig1.add_axes([0, 0, 1, 1], zorder=-1)
+    gradient = np.linspace(0, 1, 256).reshape(-1, 1)
+    cmap_grad = mcolors.LinearSegmentedColormap.from_list("cyber_grad", ['#1a0b2e', '#000000'])
+    ax_grad.imshow(gradient, aspect='auto', cmap=cmap_grad, extent=[0, 1, 0, 1])
+    ax_grad.axis('off')
+
+    x = np.arange(len(vector_completo))
+    y = np.array(vector_completo)
+    x_smooth = np.linspace(x.min(), x.max(), 500)
+    y_smooth = np.clip(make_interp_spline(x, y, k=3)(x_smooth), 0, None)
+
+    cmap1 = ListedColormap(['#00FF00', '#FFFF00', '#FF9900', '#FF0000', '#CC00FF'])
+    norm1 = BoundaryNorm([0, 50, 100, 150, 200, 500], cmap1.N)
+    points = np.array([x_smooth, y_smooth]).T.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+
+    mask_past = x_smooth[:-1] <= 24
+    lc_past = LineCollection(segments[mask_past], cmap=cmap1, norm=norm1, linewidth=5)
+    lc_past.set_array(y_smooth[:-1][mask_past])
+    ax1.add_collection(lc_past)
+
+    mask_future = x_smooth[:-1] > 24
+    lc_future = LineCollection(segments[mask_future], cmap=cmap1, norm=norm1, linewidth=5, linestyles='dotted')
+    lc_future.set_array(y_smooth[:-1][mask_future])
+    ax1.add_collection(lc_future)
+
+    max_idx = np.argmax(vector_completo)
+    max_val = vector_completo[max_idx]
+    peak_color = '#00FF00' if max_val<=50 else '#FFFF00' if max_val<=100 else '#FF9900' if max_val<=150 else '#FF0000' if max_val<=200 else '#CC00FF'
+    ax1.annotate(f"{int(max_val)} IAS", xy=(max_idx, max_val), xytext=(0, 15), textcoords="offset points", ha='center', va='bottom',
+                 fontsize=14, fontweight='black', color='black' if max_val <= 100 else 'white',
+                 bbox=dict(boxstyle="round,pad=0.4", fc=peak_color, ec="white", lw=2))
+
+    ax1.set_xlim(x_smooth.min(), x_smooth.max())
+    ax1.set_ylim(0, max(140, max_val + 30)) 
+
+    legend_patches = [
+        mpatches.Patch(facecolor='#CC00FF', edgecolor='white', linewidth=1.5, label='Extremadamente Mala'),
+        mpatches.Patch(facecolor='#FF0000', edgecolor='white', linewidth=1.5, label='Muy Mala'),
+        mpatches.Patch(facecolor='#FF9900', edgecolor='white', linewidth=1.5, label='Mala'),
+        mpatches.Patch(facecolor='#FFFF00', edgecolor='white', linewidth=1.5, label='Regular'),
+        mpatches.Patch(facecolor='#00FF00', edgecolor='white', linewidth=1.5, label='Buena')
+    ]
+    ax1.legend(handles=legend_patches, loc='upper left', facecolor='#1c1c28', edgecolor='#08F7FE', fontsize=10, framealpha=0.8)
+
+    ax1.axhline(y=100, color='red', linestyle='--', alpha=0.3)
+    ax1.text(35, 102, "Límite", color='red', alpha=0.6, fontsize=12, ha='right')
+    ax1.axvline(x=24, color='white', linestyle='-', alpha=0.5, linewidth=2)
+
+    ax1.set_xticks(range(0, 37, 4))
+    ax1.set_xticklabels(horas_labels[::4], rotation=0, fontsize=10, color='#aaaaaa', fontweight='bold')
+    ax1.set_ylabel("Índice Aire y Salud (IAS)", fontsize=14, color='#aaaaaa', fontweight='bold')
+
+    y_base = ax1.get_ylim()[1] * 0.03
+    estilos = {
+        'casa': dict(facecolor='#1c1c28', edgecolor='#08F7FE', boxstyle='round,pad=0.4', alpha=0.9, lw=1.5),
+        'trabajo': dict(facecolor='#1c1c28', edgecolor='#FE53BB', boxstyle='round,pad=0.4', alpha=0.9, lw=1.5),
+        'transito': dict(facecolor='#08F7FE', edgecolor='none', boxstyle='round,pad=0.2', alpha=0.8)
+    }
+
+    current_state = estados[0]
+    start_x = 0
+
+    for x_idx in range(1, len(estados) + 1):
+        if x_idx == len(estados) or estados[x_idx] != current_state:
+            end_x = x_idx - 1
+            mid_x = (start_x + end_x) / 2
+            
+            if current_state == 'casa':
+                ax1.axvspan(start_x, end_x, color='white', alpha=0.02)
+                if end_x - start_x >= 2: ax1.text(mid_x, y_base, " CASA ", fontsize=11, fontweight='bold', ha='center', color='white', bbox=estilos['casa'])
+            elif current_state == 'trabajo':
+                ax1.axvspan(start_x, end_x, color='white', alpha=0.02)
+                if end_x - start_x >= 2: ax1.text(mid_x, y_base, " TRABAJO ", fontsize=11, fontweight='bold', ha='center', color='white', bbox=estilos['trabajo'])
+            elif current_state == 'transito':
+                ax1.axvspan(start_x, end_x, color='#08F7FE', alpha=0.05)
+                # Ponemos dinámicamente el medio de transporte del usuario
+                ax1.text(mid_x, y_base, medio_transporte, fontsize=9, fontweight='bold', ha='center', va='bottom', color='black', bbox=estilos['transito'], rotation=90)
+            
+            if x_idx < len(estados):
+                current_state = estados[x_idx]
+                start_x = x_idx
+
+    fig1.text(0.38, 0.92, "Mi exposición al humo de la CDMX\n¡Conoce tu ruta en AIreGPT!", fontsize=16, color='white', ha='center', va='center', fontweight='bold', bbox=dict(facecolor='#1c1c28', edgecolor='#FE53BB', boxstyle='round,pad=1.0', alpha=0.9, lw=2.5), rotation=2)
+    
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=1)
+    qr.add_data(BOT_URL)
+    qr.make(fit=True)
+    qr_img = qr.make_image(image_factory=StyledPilImage, module_drawer=RoundedModuleDrawer(radius_ratio=1)).convert("RGBA")
+    qr_ax = fig1.add_axes([0.735, 0.78, 0.15, 0.10]) 
+    qr_ax.imshow(qr_img)
+    qr_ax.axis('off')
+    fig1.text(0.5, 0.02, f"{fecha_str} | AIreGPT | Smability.io", color='#888888', fontsize=11, ha='center', va='center')
+
+    mplcyberpunk.add_underglow(ax1, alpha_underglow=0.1)
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight', transparent=True, dpi=120)
+    buf.seek(0)
+    plt.close(fig1) 
+
+    file_name = f"serpiente_{user_id}_{datetime.now().strftime('%H%M%S')}.png"
+    url = subir_imagen_a_s3(buf, file_name)
+
+    return {"status": "success", "url": url, "tipo": "serpiente"}
 
 def generar_grafica_tetris(user_id):
     print(f"🧱 Generando TETRIS para {user_id}...")
