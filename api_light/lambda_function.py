@@ -98,65 +98,6 @@ def get_contexto_aire(ias):
     except: return "Desconocida", "Gris", "Datos no disponibles."
 
 # --- NUEVO: Motor de Forecast en Paralelo (Tu Idea) ⚡ ---
-def fetch_forecast_hour(target_dt, lat, lon):
-    """Baja un archivo de forecast específico y extrae el dato para esa lat/lon"""
-    # Formato de archivo: forecast/2026-01-28_11-00.json
-    fname = target_dt.strftime("%Y-%m-%d_%H-00") 
-    key = f"forecast/{fname}.json"
-    
-    data = get_s3_json(key)
-    if not data: return None
-    
-    # Encontrar el punto más cercano en ESE archivo de forecast
-    # (Hacemos esto porque el forecast es un grid completo)
-    df = pd.DataFrame(data)
-    
-    # Calculamos distancia rápida (asumimos que el grid es igual, pero por seguridad recalculamos)
-    # Optimizacion: Si el grid es identico, podriamos usar el mismo indice, 
-    # pero para asegurar precision buscamos de nuevo.
-    distances = haversine_vectorized(lon, lat, df)
-    idx = np.argmin(distances)
-    
-    row = df.iloc[idx]
-    
-    # Extraemos info
-    return {
-        "hora": target_dt.strftime("%H:%M"),
-        "ias": safe_int(get_smart_val(row, ['ias', 'ias_mean'])),
-        "riesgo": row.get('risk', 'N/A'),
-        "dominante": row.get('dominant', 'N/A')
-    }
-
-def get_parallel_forecast(start_dt_str, lat, lon):
-    """Lanza 4 hilos para buscar las siguientes 4 horas"""
-    forecast_timeline = []
-    
-    try:
-        # Parseamos fecha actual. Asumimos formato ISO o similar "YYYY-MM-DD HH:MM:SS"
-        # Cortamos a 16 chars "2026-01-28 10:20"
-        current_dt = datetime.strptime(start_dt_str[:16], "%Y-%m-%d %H:%M")
-        
-        # Generamos las 4 horas objetivo (Next Hour en punto)
-        # Si son 10:20, la siguiente es 11:00, 12:00, 13:00, 14:00
-        next_hour = (current_dt + timedelta(hours=1)).replace(minute=0, second=0)
-        target_hours = [next_hour + timedelta(hours=i) for i in range(4)]
-        
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            # Lanzamos las tareas
-            future_to_hour = {executor.submit(fetch_forecast_hour, h, lat, lon): h for h in target_hours}
-            
-            for future in as_completed(future_to_hour):
-                res = future.result()
-                if res:
-                    forecast_timeline.append(res)
-        
-        # Ordenamos por hora porque los hilos pueden terminar en desorden
-        forecast_timeline.sort(key=lambda x: x['hora'])
-        
-    except Exception as e:
-        print(f"Error forecast paralelo: {e}")
-        
-    return forecast_timeline
 
 def lambda_handler(event, context):
     global CACHED_GRID
@@ -216,46 +157,85 @@ def lambda_handler(event, context):
         so2_val = get_smart_val(p, ['so2', 'so2 1h', 'so2_1h'])
         co_val = get_smart_val(p, ['co', 'co 8h', 'co_8h'])
         
-        # --- PRONÓSTICO PARALELO (Tu solución) ---
         current_ts_str = p.get('timestamp', '')
-        future_forecast = []
-        if current_ts_str:
-            future_forecast = get_parallel_forecast(current_ts_str, u_lat, u_lon)
-
-        # Tendencia
-        current_ias = safe_int(p.get('ias', 0))
-        trend = "Estable ➡️"
-        if future_forecast:
-            if future_forecast[0]['ias'] > current_ias + 5: trend = "Subiendo ↗️"
-            elif future_forecast[0]['ias'] < current_ias - 5: trend = "Bajando ↘️"
-
-        calidad, color, mensaje_corto = get_contexto_aire(current_ias)
 
         # =====================================================================
-        # 🌟 NUEVA SECCIÓN: EXTRAER VECTOR DE EXPOSICIÓN (AYER) 🌟
+        # 🌟 EXTRACCIÓN PARALELA DE LA TRINIDAD DE VECTORES 🌟
         # =====================================================================
-        vector_exposicion = None
+        vector_ayer = None
+        vector_hoy = None
+        vector_futuro = None
+        meta_hoy_hora = None
+        meta_futuro_start = None
+        
         try:
-            # Determinamos la fecha de "Ayer"
             tz = ZoneInfo("America/Mexico_City")
             now_mx = datetime.now(tz)
             ayer_str = (now_mx - timedelta(days=1)).strftime("%Y-%m-%d")
             
-            # FIX: Usamos las coordenadas de la celda de la malla (p), NO las del usuario
-            grid_lat = p.get('lat', 0.0)
-            grid_lon = p.get('lon', 0.0)
+            grid_lat, grid_lon = p.get('lat', 0.0), p.get('lon', 0.0)
             geo_key = f"{round(grid_lat, 3)},{round(grid_lon, 3)}"
             
-            # Buscamos el archivo en S3
-            resumen_diario = get_s3_gzip_json(f"daily_summaries/summary_{ayer_str}.json.gz")
+            # Descarga concurrente
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                f_ayer = executor.submit(get_s3_gzip_json, f"daily_summaries/summary_{ayer_str}.json.gz")
+                f_hoy = executor.submit(get_s3_gzip_json, "daily_summaries/summary_today.json.gz")
+                f_futuro = executor.submit(get_s3_gzip_json, "forecast_summary/latest_forecast.json.gz")
+                res_ayer, res_hoy, res_futuro = f_ayer.result(), f_hoy.result(), f_futuro.result()
             
-            if resumen_diario and "celdas" in resumen_diario:
-                # Búsqueda directa ultrarrápida O(1)
-                if geo_key in resumen_diario["celdas"]:
-                    vector_exposicion = resumen_diario["celdas"][geo_key]
+            # Asignaciones
+            if res_ayer and "celdas" in res_ayer and geo_key in res_ayer["celdas"]:
+                vector_ayer = res_ayer["celdas"][geo_key]
+                
+            if res_hoy and "celdas" in res_hoy and geo_key in res_hoy["celdas"]:
+                vector_hoy = res_hoy["celdas"][geo_key]
+                meta_hoy_hora = res_hoy.get("ultima_hora_procesada")
+                
+            if res_futuro and "celdas" in res_futuro and geo_key in res_futuro["celdas"]:
+                vector_futuro = res_futuro["celdas"][geo_key]
+                meta_futuro_start = res_futuro.get("timestamp_start")
+                
         except Exception as e:
-            print(f"⚠️ Error extrayendo vector de exposición: {e}")
+            print(f"⚠️ Error extrayendo trinidad de vectores: {e}")
+
         # =====================================================================
+        # ⏱️ RECONSTRUIR TIMELINE DE 4 HORAS (Compatibilidad Bot)
+        # =====================================================================
+        pronostico_timeline = []
+        if vector_futuro and 'ias' in vector_futuro and meta_futuro_start:
+            try:
+                start_dt = datetime.strptime(meta_futuro_start[:16], "%Y-%m-%dT%H:%M")
+                
+                lista_dominantes = vector_futuro.get('dominante', ["N/A"] * 24)
+                
+                for i in range(min(4, len(vector_futuro['ias']))):
+                    hora_dt = start_dt + timedelta(hours=i)
+                    ias_val = vector_futuro['ias'][i]
+                    
+                    if ias_val <= 50: riesgo = "Bajo"
+                    elif ias_val <= 100: riesgo = "Moderado"
+                    elif ias_val <= 150: riesgo = "Alto"
+                    elif ias_val <= 200: riesgo = "Muy Alto"
+                    else: riesgo = "Extremadamente Alto"
+                    
+                    pronostico_timeline.append({
+                        "hora": hora_dt.strftime("%H:%M"),
+                        "ias": ias_val,
+                        "riesgo": riesgo,
+                        "dominante": lista_dominantes[i]
+                    })
+            except Exception as e:
+                print(f"⚠️ Error armando timeline de compatibilidad: {e}")
+
+        # Tendencia
+        current_ias = safe_int(p.get('ias', 0))
+        trend = "Estable ➡️"
+        if pronostico_timeline:
+            ias_next = pronostico_timeline[0]['ias']
+            if ias_next > current_ias + 5: trend = "Subiendo ↗️"
+            elif ias_next < current_ias - 5: trend = "Bajando ↘️"
+
+        calidad, color, mensaje_corto = get_contexto_aire(current_ias)
 
         response = {
             "status": "success" if dist <= MAX_DISTANCE_KM else "warning",
@@ -287,8 +267,16 @@ def lambda_handler(event, context):
                 "rh": safe_float(p.get('rh')),
                 "wsp": safe_float(p.get('wsp'))
             },
-            "pronostico_timeline": future_forecast,
-            "vector_exposicion_ayer": vector_exposicion
+            "pronostico_timeline": pronostico_timeline,
+            "vectores": {
+                "ayer": vector_ayer,
+                "hoy": vector_hoy,
+                "futuro": vector_futuro
+            },
+            "metadata_tiempo": {
+                "hoy_ultima_hora": meta_hoy_hora,
+                "forecast_start": meta_futuro_start
+            }
         }
         
         return {'statusCode': 200, 'headers': {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}, 'body': json.dumps(response)}
