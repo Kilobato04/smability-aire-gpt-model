@@ -1,4 +1,6 @@
 import os
+# --- FIX PARA MATPLOTLIB EN LAMBDA ---
+os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
 import json
 import boto3
 import requests
