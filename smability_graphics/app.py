@@ -210,13 +210,13 @@ def generar_grafica_serpiente(user_id):
 
     # 2. Traer Vectores de API Ligera (CASA)
     lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
-    resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}", timeout=5).json()
+    resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}", timeout=20).json()
     
     # Traer Vectores (TRABAJO - Si aplica)
     resp_t = resp_c 
     if 'trabajo' in locs and not es_ho:
         lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
-        resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}", timeout=5).json()
+        resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}", timeout=20).json()
 
     # 3. MOTOR DE MEZCLA
     ultima_hora = resp_c.get("metadata_tiempo", {}).get("hoy_ultima_hora", 12)
