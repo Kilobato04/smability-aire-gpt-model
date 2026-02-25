@@ -1,6 +1,8 @@
-requests
 boto3
+requests
+numpy
 matplotlib
 scipy
 Pillow
 mplcyberpunk
+qrcode[pil]
