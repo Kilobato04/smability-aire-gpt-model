@@ -230,16 +230,20 @@ def generate_forecast_summary(archivos_nuevos):
                             "ias": [0]*24,
                             "o3_1h": [0.0]*24,
                             "pm10_12h": [0.0]*24,
-                            "pm25_12h": [0.0]*24
+                            "pm25_12h": [0.0]*24,
+                            "dominante": ["N/A"]*24  # <--- NUEVO ARREGLO
                         }
                     
                     # --- EXTRAER TODOS LOS CONTAMINANTES ---
                     resumen['celdas'][geo_key]['ias'][idx] = int(celda.get('ias', 0))
                     
-                    # Manejo seguro para los gases (por si la llave varía un poco)
+                    # Manejo seguro para los gases
                     resumen['celdas'][geo_key]['o3_1h'][idx] = float(celda.get('o3 1h', celda.get('o3', 0.0)))
                     resumen['celdas'][geo_key]['pm10_12h'][idx] = float(celda.get('pm10 12h', celda.get('pm10', 0.0)))
                     resumen['celdas'][geo_key]['pm25_12h'][idx] = float(celda.get('pm25 12h', celda.get('pm25', 0.0)))
+                    
+                    # --- EXTRAER EL DOMINANTE ---
+                    resumen['celdas'][geo_key]['dominante'][idx] = celda.get('dominant', 'N/A')
                     
                 archivos_procesados += 1
             except Exception as e:
