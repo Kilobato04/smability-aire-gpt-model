@@ -326,10 +326,21 @@ def generar_grafica_serpiente(user_id):
 
     ax1.axhline(y=100, color='red', linestyle='--', alpha=0.3)
     ax1.text(35, 102, "Límite", color='red', alpha=0.6, fontsize=12, ha='right')
-    ax1.axvline(x=24, color='white', linestyle='-', alpha=0.5, linewidth=2)
+    
+    # 1. LÍNEA DIVISORIA EN AZUL NEÓN (Pasado vs Futuro)
+    azul_neon = '#08F7FE'
+    ax1.axvline(x=24, color=azul_neon, linestyle='-', alpha=0.8, linewidth=2)
 
     ax1.set_xticks(range(0, 37, 4))
-    ax1.set_xticklabels(horas_labels[::4], rotation=0, fontsize=10, color='#aaaaaa', fontweight='bold')
+    
+    # 2. DIBUJAR ETIQUETAS Y CAJA PARA "AHORA"
+    etiquetas_x = ax1.set_xticklabels(horas_labels[::4], rotation=0, fontsize=10, color='#aaaaaa', fontweight='bold')
+    
+    for etiqueta in etiquetas_x:
+        if "AHORA" in etiqueta.get_text():
+            etiqueta.set_color(azul_neon)
+            etiqueta.set_bbox(dict(facecolor='#1c1c28', edgecolor=azul_neon, boxstyle='round,pad=0.4', lw=1.5))
+
     ax1.set_ylabel("Índice Aire y Salud (IAS)", fontsize=14, color='#aaaaaa', fontweight='bold')
 
     y_base = ax1.get_ylim()[1] * 0.03
