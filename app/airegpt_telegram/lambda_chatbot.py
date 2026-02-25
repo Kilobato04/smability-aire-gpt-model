@@ -16,6 +16,7 @@ from decimal import Decimal
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 API_LIGHT_URL = os.environ.get('API_LIGHT_URL', 'https://vuy3dprsp2udtuelnrb5leg6ay0ygsky.lambda-url.us-east-1.on.aws/')
+URL_LAMBDA_GRAFICAS = "https://myvuewtfcagpeqoesc6tcdsopi0lbmgv.lambda-url.us-east-1.on.aws/" # <--- NUEVA LÍNEA
 DYNAMODB_TABLE = 'SmabilityUsers'
 
 # --- HELPER TIMEZONE ---
@@ -1059,6 +1060,12 @@ def lambda_handler(event, context):
                         
                         # Generamos botón para compartir
                         markup_viral = cards.get_share_exposure_button(cigs, dias)
+                        # --- INYECCIÓN DEL BOTÓN DE GRÁFICA ---
+                        if markup_viral and "inline_keyboard" in markup_viral:
+                            markup_viral["inline_keyboard"].insert(0, [{"text": "🎨 Ver mi Ruta Visual", "callback_data": "GET_GRAPHIC"}])
+                        else:
+                            markup_viral = {"inline_keyboard": [[{"text": "🎨 Ver mi Ruta Visual", "callback_data": "GET_GRAPHIC"}]]}
+                        # --------------------------------------
                         
                         if 'trabajo' not in locs and not es_ho: 
                             card += "\n\n💡 *Tip: Guarda la ubicación de tu 'Trabajo' para un cálculo más exacto.*"
@@ -1072,6 +1079,38 @@ def lambda_handler(event, context):
                     
                 return {'statusCode': 200, 'body': 'OK'}
 
+            # --- NUEVO: BOTÓN GENERAR GRÁFICA VISUAL ---
+            elif data == "GET_GRAPHIC":
+                # 1. UX: Mensaje de espera y capturar su ID para borrarlo después
+                msg_id = None
+                url_send = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+                payload = {"chat_id": chat_id, "text": "🎨 *Dibujando tu ruta tóxica...*\nDame unos 10 a 15 segunditos ⏱️", "parse_mode": "Markdown"}
+                try:
+                    r = requests.post(url_send, json=payload).json()
+                    if r.get("ok"): msg_id = r["result"]["message_id"]
+                except: pass
+
+                # 2. Llamar a tu nueva Lambda de Gráficas
+                try:
+                    send_telegram_action(chat_id, "upload_photo") # Animación de "Enviando foto..."
+                    resp = requests.get(f"{URL_LAMBDA_GRAFICAS}?action=serpiente&user_id={user_id}", timeout=30).json()
+                    
+                    if resp.get("status") == "success":
+                        photo_url = resp["url"]
+                        # 3. Magia de Telegram: Le pasamos la URL de S3 directa
+                        url_photo = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
+                        requests.post(url_photo, json={"chat_id": chat_id, "photo": photo_url, "caption": "¡Aquí tienes tu exposición al humo de hoy! 🐍💨", "parse_mode": "Markdown"})
+                    else:
+                        send_telegram(chat_id, "Hubo un error al generar tu gráfica 😔. Revisa tus ubicaciones.")
+                except Exception as e:
+                    send_telegram(chat_id, "El dibujante se tardó un poco de más 😅. Intenta de nuevo por favor.")
+
+                # 4. Borrar el mensajito de "espera" para mantener limpio el chat
+                if msg_id:
+                    url_del = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage"
+                    requests.post(url_del, json={"chat_id": chat_id, "message_id": msg_id})
+                    
+                return {'statusCode': 200, 'body': 'OK'}
             # --- NUEVO: BOTÓN "MI RESUMEN" DESDE ALERTAS ---
             elif data == "ver_resumen":
                 # 1. Avisar a Telegram que recibimos el clic (quita el relojito de "pensando" al instante)
@@ -1276,6 +1315,12 @@ def lambda_handler(event, context):
                         )
                         
                         markup_viral = cards.get_share_exposure_button(cigs, dias)
+                        # --- INYECCIÓN DEL BOTÓN DE GRÁFICA ---
+                        if markup_viral and "inline_keyboard" in markup_viral:
+                            markup_viral["inline_keyboard"].insert(0, [{"text": "🎨 Ver mi Ruta Visual", "callback_data": "GET_GRAPHIC"}])
+                        else:
+                            markup_viral = {"inline_keyboard": [[{"text": "🎨 Ver mi Ruta Visual", "callback_data": "GET_GRAPHIC"}]]}
+                        # --------------------------------------
                         
                         if 'trabajo' not in locs and not es_ho: 
                             card += "\n\n💡 *Tip: Guarda la ubicación de tu 'Trabajo' para un cálculo más exacto.*"
