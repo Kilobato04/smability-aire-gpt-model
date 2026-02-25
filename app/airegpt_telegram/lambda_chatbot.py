@@ -1062,9 +1062,9 @@ def lambda_handler(event, context):
                         markup_viral = cards.get_share_exposure_button(cigs, dias)
                         # --- INYECCIÓN DEL BOTÓN DE GRÁFICA ---
                         if markup_viral and "inline_keyboard" in markup_viral:
-                            markup_viral["inline_keyboard"].insert(0, [{"text": "🎨 Ver mi Ruta Visual", "callback_data": "GET_GRAPHIC"}])
+                            markup_viral["inline_keyboard"].insert(0, [{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}])
                         else:
-                            markup_viral = {"inline_keyboard": [[{"text": "🎨 Ver mi Ruta Visual", "callback_data": "GET_GRAPHIC"}]]}
+                            markup_viral = {"inline_keyboard": [[{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}]]}
                         # --------------------------------------
                         
                         if 'trabajo' not in locs and not es_ho: 
@@ -1079,12 +1079,28 @@ def lambda_handler(event, context):
                     
                 return {'statusCode': 200, 'body': 'OK'}
 
-            # --- NUEVO: BOTÓN GENERAR GRÁFICA VISUAL ---
+            # --- NUEVO: BOTÓN GENERAR GRÁFICA VISUAL (CON CANDADO) ---
             elif data == "GET_GRAPHIC":
+                # 0. 🔒 EL CANDADO (15 Minutos)
+                last_req = user_profile.get('last_graphic_ts')
+                now_utc = datetime.utcnow()
+                
+                if last_req:
+                    last_dt = datetime.fromisoformat(last_req)
+                    segundos_pasados = (now_utc - last_dt).total_seconds()
+                    
+                    if segundos_pasados < 900: # 900 segundos = 15 minutos
+                        minutos_faltantes = 15 - int(segundos_pasados / 60)
+                        send_telegram(chat_id, f"⏳ *¡Calma, velocista!*\nYa dibujé tu ruta hace ratito. Por favor espera **{minutos_faltantes} minutos** para generar una nueva gráfica actualizada.")
+                        return {'statusCode': 200, 'body': 'OK'}
+                
+                # Si pasa el candado, le cobramos el "ticket" guardando la hora actual
+                table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET last_graphic_ts = :t", ExpressionAttributeValues={':t': now_utc.isoformat()})
+
                 # 1. UX: Mensaje de espera y capturar su ID para borrarlo después
                 msg_id = None
                 url_send = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-                payload = {"chat_id": chat_id, "text": "🎨 *Dibujando tu ruta tóxica...*\nDame unos 10 a 15 segunditos ⏱️", "parse_mode": "Markdown"}
+                payload = {"chat_id": chat_id, "text": "🚇 *Dibujando tu ruta tóxica...*\nDame unos 10 a 15 segunditos ⏱️", "parse_mode": "Markdown"}
                 try:
                     r = requests.post(url_send, json=payload).json()
                     if r.get("ok"): msg_id = r["result"]["message_id"]
@@ -1092,17 +1108,19 @@ def lambda_handler(event, context):
 
                 # 2. Llamar a tu nueva Lambda de Gráficas
                 try:
-                    send_telegram_action(chat_id, "upload_photo") # Animación de "Enviando foto..."
+                    send_telegram_action(chat_id, "upload_photo") 
                     resp = requests.get(f"{URL_LAMBDA_GRAFICAS}?action=serpiente&user_id={user_id}", timeout=30).json()
                     
                     if resp.get("status") == "success":
                         photo_url = resp["url"]
-                        # 3. Magia de Telegram: Le pasamos la URL de S3 directa
                         url_photo = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
                         requests.post(url_photo, json={"chat_id": chat_id, "photo": photo_url, "caption": "¡Aquí tienes tu exposición al humo de hoy! 🐍💨", "parse_mode": "Markdown"})
                     else:
+                        # Si hubo error en la generación, le borramos el candado para que pueda reintentar
+                        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE last_graphic_ts")
                         send_telegram(chat_id, "Hubo un error al generar tu gráfica 😔. Revisa tus ubicaciones.")
                 except Exception as e:
+                    table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE last_graphic_ts")
                     send_telegram(chat_id, "El dibujante se tardó un poco de más 😅. Intenta de nuevo por favor.")
 
                 # 4. Borrar el mensajito de "espera" para mantener limpio el chat
@@ -1317,9 +1335,9 @@ def lambda_handler(event, context):
                         markup_viral = cards.get_share_exposure_button(cigs, dias)
                         # --- INYECCIÓN DEL BOTÓN DE GRÁFICA ---
                         if markup_viral and "inline_keyboard" in markup_viral:
-                            markup_viral["inline_keyboard"].insert(0, [{"text": "🎨 Ver mi Ruta Visual", "callback_data": "GET_GRAPHIC"}])
+                            markup_viral["inline_keyboard"].insert(0, [{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}])
                         else:
-                            markup_viral = {"inline_keyboard": [[{"text": "🎨 Ver mi Ruta Visual", "callback_data": "GET_GRAPHIC"}]]}
+                            markup_viral = {"inline_keyboard": [[{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}]]}
                         # --------------------------------------
                         
                         if 'trabajo' not in locs and not es_ho: 
