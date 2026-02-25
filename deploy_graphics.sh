@@ -5,7 +5,7 @@
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 REGION="us-east-1"
-PROJECT_NAME="smability-graphics-builder" # Tendrás que crear este CodeBuild
+PROJECT_NAME="airegpt-smability-graphics-builder"
 BUCKET_NAME="smability-builds-$ACCOUNT_ID"
 ZIP_FILE="graphics_source.zip"
 
