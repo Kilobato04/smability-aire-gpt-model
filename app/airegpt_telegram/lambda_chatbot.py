@@ -996,14 +996,14 @@ def lambda_handler(event, context):
                     
                     lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
                     resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
-                    vector_c = resp_c.get("vector_exposicion_ayer")
+                    vector_c = resp_c.get("vectores", {}).get("ayer")
                     
                     vector_t = None
                     es_ho = False
                     if 'trabajo' in locs:
                         lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
                         resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}").json()
-                        vector_t = resp_t.get("vector_exposicion_ayer")
+                        vector_t = resp_t.get("vectores", {}).get("ayer")
 
                     if vector_c:
                         calc = CalculadoraRiesgoSmability()
@@ -1708,14 +1708,14 @@ def lambda_handler(event, context):
                     else:
                         lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
                         resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
-                        vector_c = resp_c.get("vector_exposicion_ayer")
+                        vector_c = resp_c.get("vectores", {}).get("ayer")
                         
                         vector_t = None
                         es_ho = True
                         if 'trabajo' in locs:
                             lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
                             resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}").json()
-                            vector_t = resp_t.get("vector_exposicion_ayer")
+                            vector_t = resp_t.get("vectores", {}).get("ayer")
                             es_ho = False
 
                         if vector_c:
