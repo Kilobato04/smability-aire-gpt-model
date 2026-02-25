@@ -1208,8 +1208,6 @@ def lambda_handler(event, context):
                 try:
                     lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
                     resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
-                    
-                    # 🛠️ FIX 1: Apuntamos al nuevo paquete 'vectores' > 'ayer'
                     vector_c = resp_c.get("vectores", {}).get("ayer")
                     
                     vector_t = None
@@ -1218,14 +1216,19 @@ def lambda_handler(event, context):
                     if 'trabajo' in locs and not es_ho:
                         lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
                         resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}").json()
-                        
-                        # 🛠️ FIX 2: Igual para el trabajo
                         vector_t = resp_t.get("vectores", {}).get("ayer")
 
                     if vector_c:
                         calc = CalculadoraRiesgoSmability()
                         perfil = {"transporte_default": transp.get('medio', 'auto_ventana'), "tiempo_traslado_horas": transp.get('horas', 2)}
                         
+                        # 🔥🔥🔥 AQUÍ ESTÁ LA LÍNEA MÁGICA QUE SE HABÍA BORRADO 🔥🔥🔥
+                        res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
+                        
+                        if not res:
+                            send_telegram(chat_id, "⚠️ Hubo un error interno calculando tu exposición.")
+                            return {'statusCode': 200, 'body': 'OK'}
+
                         cigs, dias = res['cigarros'], res['dias_perdidos']
 
                         # 1. Calcular fecha de ayer en texto
@@ -1250,7 +1253,6 @@ def lambda_handler(event, context):
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
                         else:
                             emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
-                            # Inyectamos la aclaración de Casa ↔ Trabajo
                             rutina_txt = f"{emoji_rut} **Tu rutina:** Casa ↔ Trabajo\n⏱️ **Tiempo:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* en tu recorrido y estancia."
                         
@@ -1262,8 +1264,8 @@ def lambda_handler(event, context):
                             fecha_ayer=fecha_ayer_str, 
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
                             rutina_str=rutina_txt,
-                            calidad_ias=res['calidad_ias'],    # <--- NUEVO
-                            promedio_ias=res['promedio_ias'],  # <--- NUEVO
+                            calidad_ias=res['calidad_ias'],    
+                            promedio_ias=res['promedio_ias'],  
                             emoji_cigarro=grafico_humo, 
                             texto_cigarros=cigs_txt,
                             cigarros=cigs, 
@@ -1273,7 +1275,6 @@ def lambda_handler(event, context):
                             footer=cards.BOT_FOOTER
                         )
                         
-                        # Generamos botón para compartir
                         markup_viral = cards.get_share_exposure_button(cigs, dias)
                         
                         if 'trabajo' not in locs and not es_ho: 
