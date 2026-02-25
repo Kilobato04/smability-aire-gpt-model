@@ -362,7 +362,7 @@ def generar_grafica_serpiente(user_id):
                 current_state = estados[x_idx]
                 start_x = x_idx
 
-    fig1.text(0.38, 0.92, "Mi exposición al humo de la CDMX\n¡Conoce tu ruta en AIreGPT!", fontsize=16, color='white', ha='center', va='center', fontweight='bold', bbox=dict(facecolor='#1c1c28', edgecolor='#FE53BB', boxstyle='round,pad=1.0', alpha=0.9, lw=2.5), rotation=2)
+    fig1.text(0.38, 0.92, "Mi exposición al humo de hoy en CDMX/EDMX\n¡Conoce el tuyo en AIreGPT!", fontsize=16, color='white', ha='center', va='center', fontweight='bold', bbox=dict(facecolor='#1c1c28', edgecolor='#FE53BB', boxstyle='round,pad=1.0', alpha=0.9, lw=2.5), rotation=2)
     
     qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=1)
     qr.add_data(BOT_URL)
