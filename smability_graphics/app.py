@@ -83,12 +83,13 @@ def ejecutar_job_nocturno():
                 }
 
                 # 4. Lógica de DynamoDB (Semana vs Histórico)
-                health_stats = user.get('health_stats', {})
-                current_week = health_stats.get('current_week', [])
-                historical_weeks = health_stats.get('historical_weeks', [])
+                health_stats = user.get('health_stats')
 
                 if es_domingo:
                     # Sumamos la semana acumulada + el día de hoy (domingo)
+                    current_week = health_stats.get('current_week', []) if health_stats else []
+                    historical_weeks = health_stats.get('historical_weeks', []) if health_stats else []
+                    
                     total_cigarros = sum(float(dia.get('cigarros', 0)) for dia in current_week) + cigarros_val
                     total_dias_edad = sum(float(dia.get('dias_edad', 0)) for dia in current_week) + dias_edad_val
                     
@@ -99,21 +100,43 @@ def ejecutar_job_nocturno():
                     }
                     historical_weeks.append(resumen_semanal)
                     
-                    # Actualizamos: Guardamos histórico y limpiamos la semana actual
-                    table.update_item(
-                        Key={'user_id': user_id},
-                        UpdateExpression="SET health_stats.historical_weeks = :hist, health_stats.current_week = :empty",
-                        ExpressionAttributeValues={':hist': historical_weeks, ':empty': []}
-                    )
+                    if not health_stats:
+                        # Si es domingo y es su primer día usando la app
+                        table.update_item(
+                            Key={'user_id': user_id},
+                            UpdateExpression="SET health_stats = :hs",
+                            ExpressionAttributeValues={
+                                ':hs': {'current_week': [], 'historical_weeks': historical_weeks}
+                            }
+                        )
+                    else:
+                        table.update_item(
+                            Key={'user_id': user_id},
+                            UpdateExpression="SET health_stats.historical_weeks = :hist, health_stats.current_week = :empty",
+                            ExpressionAttributeValues={':hist': historical_weeks, ':empty': []}
+                        )
                     print(f"✅ [CIERRE SEMANAL] Usuario {user_id}: {round(total_cigarros,1)} cigs totales.")
+                    
                 else:
-                    # Lunes a Sábado: Solo agregamos el día al arreglo de la semana
-                    table.update_item(
-                        Key={'user_id': user_id},
-                        UpdateExpression="SET health_stats = if_not_exists(health_stats, :empty_obj), health_stats.current_week = list_append(if_not_exists(health_stats.current_week, :empty_list), :new_day)",
-                        ExpressionAttributeValues={':empty_obj': {}, ':empty_list': [], ':new_day': [dato_diario]}
-                    )
+                    # Lunes a Sábado
+                    if not health_stats:
+                        # El usuario es completamente nuevo en esta métrica, creamos el esqueleto
+                        table.update_item(
+                            Key={'user_id': user_id},
+                            UpdateExpression="SET health_stats = :hs",
+                            ExpressionAttributeValues={
+                                ':hs': {'current_week': [dato_diario], 'historical_weeks': []}
+                            }
+                        )
+                    else:
+                        # El usuario ya tiene health_stats, solo agregamos al arreglo current_week
+                        table.update_item(
+                            Key={'user_id': user_id},
+                            UpdateExpression="SET health_stats.current_week = list_append(if_not_exists(health_stats.current_week, :empty_list), :new_day)",
+                            ExpressionAttributeValues={':empty_list': [], ':new_day': [dato_diario]}
+                        )
                     print(f"✅ [DIARIO] Usuario {user_id}: {cigarros_val} cigs.")
+                
                 procesados += 1
             else:
                  print(f"⚠️ Usuario {user_id}: Sin datos vectoriales de ayer.")
