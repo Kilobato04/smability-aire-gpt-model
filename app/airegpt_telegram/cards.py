@@ -63,59 +63,60 @@ def get_health_advice(calidad, user_condition=None):
 
 # --- PLANTILLAS DE TARJETAS ---
 
-CARD_IAS_INFO = """📊 **¿Qué es el IAS (Índice de Aire y Salud)?**
+CARD_IAS_INFO = """📊 *¿Qué es el IAS (Índice de Aire y Salud)?*
 
-El **IAS** es el indicador oficial actual para medir la contaminación. Sustituyó al antiguo *IMECA* en 2019 y está diseñado para proteger tu salud.
+El *IAS* es el indicador oficial actual para medir la contaminación. Sustituyó al antiguo *IMECA* en 2019 y está diseñado para proteger tu salud.
 
-**Escala Oficial (Puntos):**
+*Escala Oficial (Puntos):*
 
-🟢 **Buena (0 a 50 pts)**
+🟢 *Buena (0 a 50 pts)*
 Riesgo bajo. Excelente para cualquier actividad al aire libre.
 
-🟡 **Regular (51 a 100 pts)**
+🟡 *Regular (51 a 100 pts)*
 Riesgo moderado. *Grupos sensibles* (niños, adultos mayores, personas con asma) deben reducir esfuerzos pesados.
 
-🟠 **Mala (101 a 150 pts)**
+🟠 *Mala (101 a 150 pts)*
 Riesgo alto. *Grupos sensibles* no deben hacer actividades al aire libre. La población general debe reducir esfuerzos.
 
-🔴 **Muy Mala (151 a 200 pts)**
+🔴 *Muy Mala (151 a 200 pts)*
 Riesgo muy alto. *Nadie* debería realizar actividades al aire libre. Mantente en interiores.
 
-🟣 **Extremadamente Mala (>200 pts)**
+🟣 *Extremadamente Mala (>200 pts)*
 Riesgo extremo. Peligro sanitario. Cierra ventanas y no salgas de casa.
 
 {footer}"""
 
-CARD_RULES = """⚙️ **REGLAS DE OPERACIÓN Y ALCANCE**
+CARD_RULES = """⚙️ *REGLAS DE OPERACIÓN Y ALCANCE*
 Para mantener a AIreGPT rápido, preciso y sin hacer spam, opero bajo estas reglas:
 
-🌃 **Horario de Descanso:** Solo envío alertas entre las 6:00 AM y las 11:00 PM. Las "Alertas" se envía 20 min después de cada hora.
-📍 **Ubicaciones (Max 3):** Solo "Casa" y "Trabajo" se utilizan para calcular tu exposición.
-🛑 **Filtro Anti-Spam:** Las alertas de emergencia requieren un mínimo de 100 pts IAS. Me silenciaré tras 3 avisos.
-🗺️ **Cobertura:** Alertas de *Contingencia* y *Hoy No Circula* exclusivas para CDMX y ZMVM.
-🧠 **Motor de IA:** Funciono con *GPT-4o-mini*. Por favor, verifica la información crítica.
-🔬 **Ciencia de Exposición:** El cálculo de "cigarros invisibles" usa algoritmos que miden tu exposición al exterior (según tu transporte y tiempo) y asume que pasas el resto del día en interiores, donde se filtra el 60% de las partículas.
-📡 **Fuente de Verdad:** Mis datos provienen del modelo científico: [Monitoreo de Calidad del Aire y Gemelo Digital en Tiempo Real 🚦🌎](https://airmodelcdmx.netlify.app/)
-🏢 **Desarrollo:** Producto desarrollado por **Smability.io**.
+🌃 *Horario de Descanso:* Solo envío alertas entre las 6:00 AM y las 11:00 PM. Las "Alertas" se envía 20 min después de cada hora.
+📍 *Ubicaciones (Max 3):* Solo "Casa" y "Trabajo" se utilizan para calcular tu exposición.
+🛑 *Filtro Anti-Spam:* Las alertas de emergencia requieren un mínimo de 100 pts IAS. Me silenciaré tras 3 avisos.
+🗺️ *Cobertura:* Alertas de *Contingencia* y *Hoy No Circula* exclusivas para CDMX y ZMVM.
+🧠 *Motor de IA:* Funciono con *GPT-4o-mini*. Por favor, verifica la información crítica.
+🔬 *Ciencia de Exposición:* El cálculo de "cigarros invisibles" usa algoritmos que miden tu exposición al exterior (según tu transporte y tiempo) y asume que pasas el resto del día en interiores, donde se filtra el 60% de las partículas.
+📡 *Fuente de Verdad:* Mis datos provienen del modelo científico: [Monitoreo de Calidad del Aire y Gemelo Digital en Tiempo Real 🚦🌎](https://airmodelcdmx.netlify.app/)
+🏢 *Desarrollo:* Producto desarrollado por *Smability.io*.
+
 {footer}"""
 
-CARD_PROMPTS = """💡 **GUÍA DE USO: ¿QUÉ PUEDES PREGUNTARME?**
+CARD_PROMPTS = """💡 *GUÍA DE USO: ¿QUÉ PUEDES PREGUNTARME?*
 Puedes hablarme de forma natural. Aquí tienes los ejemplos más útiles para sacarme provecho:
 
-💨 **Calidad del Aire y Clima:**
+💨 *Calidad del Aire y Clima:*
 • *"¿Cómo está el aire en Casa?"*
 • *"Dame el pronóstico para el Trabajo."*
 • *"Soy asmático, ¿me recomiendas salir a correr hoy?"*
 
-🚗 **Movilidad y Auto:**
+🚗 *Movilidad y Auto:*
 • *"¿Circula mi auto hoy?"*
 • *"¿Me toca verificar este mes?"*
 
-🚬 **Salud y Exposición:**
+🚬 *Salud y Exposición:*
 • *"Calcula mi exposición: Viajo 2 horas en metro."*
 • *"Hoy hice Home Office."*
 
-⚙️ **Configuración:**
+⚙️ *Configuración:*
 • *"Avisa si el aire supera los 100 puntos IAS en Casa."*
 • *"Mándame un reporte todos los días a las 7:30 AM de Casa."*
 • *"Dame mi resumen."*
@@ -123,20 +124,20 @@ Puedes hablarme de forma natural. Aquí tienes los ejemplos más útiles para sa
 ¡Copia, pega y prueba cualquiera de estos mensajes ahora mismo! 👇
 {footer}"""
 
-CARD_MENU = """🛠️ **MENÚ DE CAPACIDADES**
+CARD_MENU = """🛠️ *MENÚ DE CAPACIDADES*
 Soy AIreGPT, tu asistente inteligente de salud urbana. Aquí tienes todo lo que podemos hacer juntos:
 
-🚨 **Contingencias en Tiempo Real:** *(¡Nuestra especialidad!)* Te enviaré una alerta inmediata en el segundo exacto en que se **active o suspenda** una Contingencia Ambiental.
-📍 **Reportes y Pronósticos:** Guarda hasta 3 ubicaciones (Casa, Trabajo, Escuela) y pídeme la calidad del aire actual, el pronóstico y recomendaciones de salud.
-🚬 **Exposición:** Dime cómo y cuánto tiempo viajas para calcular cuántos *cigarros invisibles* respiras y tu Edad Urbana.
-🚗 **Auto y Movilidad:** Registra tu placa y holograma. Te diré si circulas hoy y los meses que te toca **verificar**.
-⏰ **Alertas Inteligentes:** Programa un reporte diario a la hora que sales o alertas automáticas si la contaminación supera tu límite.
-📊 **Tu Resumen:** Escribe *"Dame mi resumen"* para ver toda tu configuración y estatus.
+🚨 *Contingencias en Tiempo Real:* *(¡Nuestra especialidad!)* Te enviaré una alerta inmediata en el segundo exacto en que se *active o suspenda* una Contingencia Ambiental.
+📍 *Reportes y Pronósticos:* Guarda hasta 3 ubicaciones (Casa, Trabajo, Escuela) y pídeme la calidad del aire actual, el pronóstico y recomendaciones de salud.
+🚬 *Exposición:* Dime cómo y cuánto tiempo viajas para calcular cuántos *cigarros invisibles* respiras y tu Edad Urbana.
+🚗 *Auto y Movilidad:* Registra tu placa y holograma. Te diré si circulas hoy y los meses que te toca **verificar**.
+⏰ *Alertas Inteligentes:* Programa un reporte diario a la hora que sales o alertas automáticas si la contaminación supera tu límite.
+📊 *Tu Resumen:* Escribe *"Dame mi resumen"* para ver toda tu configuración y estatus.
 
-💡 *Tip: Háblame de forma natural. Ej: "Avísame a las 8 am cómo está el aire en casa".*
+💡 _*Tip: Háblame de forma natural. Ej: "Avísame a las 8 am cómo está el aire en casa".*_
 {footer}"""
 
-CARD_ONBOARDING = """👋 **¡Hola, {user_name}! Bienvenido a AIreGPT tu Agente Ambiental.**
+CARD_ONBOARDING = """👋 *¡Hola, {user_name}! Bienvenido a AIreGPT tu Agente Ambiental.*
 
 Conmigo podrás:
 💨 Ver la calidad del aire y el pronóstico exacto de tus zonas.
@@ -146,134 +147,141 @@ Conmigo podrás:
 
 Para protegerte, necesito saber dónde te mueves. 
 
-👇 **Toca el botón de abajo para empezar a configurar tu CASA:**
+👇 *Toca el botón de abajo para empezar a configurar tu CASA:*
+
 {footer}"""
 
 # Esta tarjeta se lanza cuando el usuario guarda su Casa (Callbacks)
-CARD_ONBOARDING_WORK = """✅ **¡Tu Casa está protegida!**
+CARD_ONBOARDING_WORK = """✅ *¡Tu Casa está protegida!*
 
-🚀 **PASO 2: Tu destino principal.**
+🚀 *PASO 2: Tu destino principal.*
 Para calcular cuánto humo te *"fumas"* en el tráfico, necesito saber a dónde vas todos los días.
 
-👇 **Por favor, toca el clip 📎 (abajo a la izquierda), selecciona "Ubicación" y envíame la ubicación de tu TRABAJO o escuela.**
+👇 *Por favor, toca el clip 📎 (abajo a la izquierda), selecciona "Ubicación" y envíame la ubicación de tu TRABAJO o escuela.*
+
 {footer}"""
 
 # Esta tarjeta se lanza cuando el usuario guarda su Trabajo (Callbacks)
-CARD_ONBOARDING_VEHICLE = """✅ **¡Ruta Casa ↔ Trabajo configurada!**
+CARD_ONBOARDING_VEHICLE = """✅ *¡Ruta Casa ↔ Trabajo configurada!*
 
-🚗 **PASO 3: Blindaje Anti-Multas (Opcional pero recomendado).**
+🚗 *PASO 3: Blindaje Anti-Multas (Opcional pero recomendado).*
 Para avisarte exactamente qué días no circulas y cuándo te toca verificar, registra tu auto.
 
-💬 **Escríbeme un mensaje normal como este:**
+💬 *Escríbeme un mensaje normal como este:*
 *"Mi placa termina en 5 y soy holograma 0"*
 
 *(Si no tienes auto, simplemente ignora este paso y pídeme la "Calidad del aire" para empezar).*
+
 {footer}"""
 
 
 # ACTUALIZADA: Se agregó {trend_arrow} para aprovechar el dato de la nueva API
 
-CARD_REPORT = """🌤️ **{greeting}, {user_name}!**
-Tu *reporte* para 📍 **[{location_name}]({maps_url})**:
+CARD_REPORT = """🌤️ *{greeting}, {user_name}!*
+Tu *reporte* de 📍 *[{location_name}]({maps_url})*:
 🗺️ {region} • 🕒 {report_time}
 
-{risk_circle} **Calidad {risk_category} ({ias_value} pts)** |☣️ {pollutant}
+{risk_circle} *Calidad {risk_category} ({ias_value} pts)* | ☣️ {pollutant}
 
 🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
-📊 **Tendencia:** {trend}
+📊 *Tendencia:* {trend}
 
-📈 **Pronóstico (Próximas hrs):**
+📈 *Pronóstico (Próximas hrs):*
 {forecast_block}
 
-🛡️ **Salud:** {health_recommendation}
+🛡️ *Salud:* {health_recommendation}
+
 {footer}"""
 
-CARD_ALERT_IAS = """🚨 **¡ALERTA DE CALIDAD DEL AIRE!** 🚨
-Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** a las 🕒 {report_time} ha superado tu límite de seguridad.
+CARD_ALERT_IAS = """🚨 *¡ALERTA DE CALIDAD DEL AIRE!* 🚨
+Hola {user_name}, la contaminación en 📍 *[{location_name}]({maps_url})* a las 🕒 {report_time} ha superado tu límite de seguridad.
 
-{risk_circle} **Calidad {risk_category} ({ias_value} pts)** |☣️ {pollutant}
+{risk_circle} *Calidad {risk_category} ({ias_value} pts)* | ☣️ {pollutant}
 *Tu umbral configurado es: {threshold} pts*
 
-📊 **Tendencia:** {forecast_msg}
+📊 *Tendencia:* {forecast_msg}
 
-🛡️ **Acción inmediata:** {health_recommendation}
+🛡️ *Acción inmediata:* {health_recommendation}
+
 {footer}"""
 
-CARD_REMINDER = """⏰ **{greeting}, {user_name}!**
-Tu *reporte* para 📍 **[{location_name}]({maps_url})**:
+CARD_REMINDER = """⏰ *{greeting}, {user_name}!*
+Tu *reporte* de 📍 *[{location_name}]({maps_url})*:
 🗺️ {region} • 🕒 {report_time}
 
-{risk_circle} **Calidad {risk_category} ({ias_value} pts)** |☣️ {pollutant}
+{risk_circle} *Calidad {risk_category} ({ias_value} pts)* | ☣️ {pollutant}
 
 🌡️ {temp}°C | 💧 {humidity}% | 🌬️ {wind_speed} km/h
-📊 **Tendencia:** {trend}
+📊 *Tendencia:* {trend}
 
-📈 **Pronóstico (Próximas hrs):**
+📈 *Pronóstico (Próximas hrs):*
 {forecast_block}
 
-🛡️ **Salud:** {health_recommendation}
+🛡️ *Salud:* {health_recommendation}
 {footer}"""
 
-CARD_CONTINGENCY = """🚨 **¡CONTINGENCIA AMBIENTAL!** 🚨
+CARD_CONTINGENCY = """🚨 *¡CONTINGENCIA AMBIENTAL!* 🚨
 🌎 Zona Metropolitana del Valle de México
 🕒 {report_time}
 
-⚠️ **FASE ACTIVA:** {phase}
-☣️ **Detalle:** {pollutant_info}
-📍 **Estación Crítica:** {station_info}
+⚠️ *FASE ACTIVA:* {phase}
+☣️ *Detalle:* {pollutant_info}
+📍 *Estación Crítica:* {station_info}
 
-🛑 **Restricciones Vehiculares:**
+🛑 *Restricciones Vehiculares:*
 {restrictions_txt}
 📄 [Leer Comunicado Oficial]({oficial_link})
 
-🛡️ **Acción:**
+🛡️ *Acción:*
 • Cierra ventanas y evita salir.
 • No realices ejercicio al aire libre.
 📌 *La contingencia se mantiene vigente hasta que la CAMe emita el comunicado oficial de suspensión. No saques tu auto hasta confirmarlo.*
 
 {footer}"""
 
-CARD_CONTINGENCY_LIFTED = """🟢 **CONTINGENCIA SUSPENDIDA**
+CARD_CONTINGENCY_LIFTED = """🟢 *CONTINGENCIA SUSPENDIDA*
 🌎 Zona Metropolitana del Valle de México
 🕒 {report_time}
 
-🎉 **¡Buenas noticias!**
+🎉 *¡Buenas noticias!*
 La CAMe informa que las condiciones del aire han mejorado.
 
-🚗 **Movilidad:**
+🚗 *Movilidad:*
 Se levantan las restricciones del Doble Hoy No Circula. Tu auto vuelve a su calendario normal.
 📄 [Leer Comunicado Oficial]({oficial_link})
 
-_Fuente: CAMe / Smability_
+_Fuente: SIMAT / Smability_
+
 {footer}"""
 
-CARD_HNC_RESULT = """🚗 **HOY NO CIRCULA**
-📅 **Fecha:** {fecha_str} ({dia_semana})
-🚘 **Auto:** {plate_info} (Holo {hologram})
+CARD_HNC_RESULT = """🚗 *HOY NO CIRCULA*
+📅 *Fecha:* {fecha_str} ({dia_semana})
+🚘 *Auto:* {plate_info} (Holo {hologram})
 
-{status_emoji} **{status_title}**
+{status_emoji} *{status_title}*
 {status_message}
 
 ⚠️ *Razón:* {reason}
+
 {footer}"""
 
-CARD_HNC_DETAILED = """🚗 **Reporte Mensual HNC: {mes_nombre}**
-🚘 **Placa:** ...{plate} | **Engomado:** {color}
-**Holograma:** {holo}
+CARD_HNC_DETAILED = """🚗 *Reporte Mensual HNC: {mes_nombre}*
+🚘 *Placa:* ...{plate} | *Engomado:* {color}
+*Holograma:* {holo}
 
-📅 **VERIFICACIÓN:** {verificacion_txt}
+📅 *VERIFICACIÓN:* {verificacion_txt}
 
-📅 **DÍAS QUE NO CIRCULAS:**
+📅 *DÍAS QUE NO CIRCULAS:*
 {dias_semana_txt}
 {sabados_txt}
-🕒 **Horario:** 05:00 - 22:00 hrs
+🕒 *Horario:* 05:00 - 22:00 hrs
 
-📋 **Fechas específicas este mes:**
+📋 *Fechas específicas este mes:*
 {lista_fechas}
 
-👮 **RIESGO DE MULTA (Si omites):**
-🏛️ **CDMX:** {multa_cdmx} + Corralón
-🏛️ **Edomex:** {multa_edomex} + Retención
+👮 *RIESGO DE MULTA (Si omites):*
+🏛️ *CDMX:* {multa_cdmx} + Corralón
+🏛️ *Edomex:* {multa_edomex} + Retención
 
 {footer}"""
 
@@ -306,42 +314,45 @@ CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
 💡 _Tip: Dile al bot 'Cambia mi transporte a...' para ajustar tu rutina._
 {footer}"""
 
-CARD_VERIFICATION = """🚗 **ESTATUS DE VERIFICACIÓN**
-🚘 **Auto:** {plate_info} | {engomado}
+CARD_VERIFICATION = """🚗 *ESTATUS DE VERIFICACIÓN*
+🚘 *Auto:* {plate_info} | {engomado}
 
-📅 **Tu Periodo:**
+📅 *Tu Periodo:*
 {period_txt}
 
-⚠️ **Fecha Límite:** {deadline}
+⚠️ *Fecha Límite:* {deadline}
 
-💰 **MULTA (Extemporánea):**
-💸 **${fine_amount} MXN** (20 UMAS)
+💰 *MULTA (Extemporánea):*
+💸 *${fine_amount} MXN* (20 UMAS)
 + Corralón si eres detenido circulando.
 
-💡 *Recuerda agendar tu cita una semana antes.*
+💡 _Recuerda agendar tu cita una semana antes._
+
 {footer}"""
 
-CARD_MY_LOCATIONS = """📍 **MIS UBICACIONES GUARDADAS**
+CARD_MY_LOCATIONS = """📍 *MIS UBICACIONES GUARDADAS*
 👤 {user_name}
 
 {locations_list}
 
 👇 *Usa los botones para consultar o eliminar.*
+
 {footer}"""
 
 # --- NUEVA TARJETA: EXPOSICIÓN (GAMIFICACIÓN) ---
 CARD_EXPOSICION = """{emoji_alerta} *Reporte de Exposición*
 👤 {user_name}
 
-Ayer **{fecha_ayer}** te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
+Ayer *{fecha_ayer}* te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
 
 {rutina_str}
-😷 **Aire que respiraste:** {calidad_ias} ({promedio_ias} pts IAS)
+😷 *Aire que respiraste:* {calidad_ias} ({promedio_ias} pts IAS)
 
 {emoji_cigarro} Respiraste el equivalente a *{cigarros} cigarros invisibles* en tu rutina.
 {emoji_edad} Esto sumó *{dias} días extra* de desgaste a tu Edad Urbana.
 
 _*Promedio de exposición {promedio_riesgo} µg/m³ eq.*_
+
 {footer}"""
 
 # --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
