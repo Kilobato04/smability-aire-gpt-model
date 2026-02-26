@@ -122,10 +122,11 @@ Puedes hablarme de forma natural. Aquí tienes los ejemplos más útiles para sa
 • *"Dame mi resumen."*
 
 ¡Copia, pega y prueba cualquiera de estos mensajes ahora mismo! 👇
+
 {footer}"""
 
 CARD_MENU = """🛠️ *MENÚ DE CAPACIDADES*
-Soy AIreGPT, tu asistente inteligente de salud urbana. Aquí tienes todo lo que podemos hacer juntos:
+Soy *AIreGPT*, tu asistente inteligente de salud urbana. Aquí tienes todo lo que podemos hacer juntos:
 
 🚨 *Contingencias en Tiempo Real:* *(¡Nuestra especialidad!)* Te enviaré una alerta inmediata en el segundo exacto en que se *active o suspenda* una Contingencia Ambiental.
 📍 *Reportes y Pronósticos:* Guarda hasta 3 ubicaciones (Casa, Trabajo, Escuela) y pídeme la calidad del aire actual, el pronóstico y recomendaciones de salud.
@@ -135,6 +136,7 @@ Soy AIreGPT, tu asistente inteligente de salud urbana. Aquí tienes todo lo que 
 📊 *Tu Resumen:* Escribe *"Dame mi resumen"* para ver toda tu configuración y estatus.
 
 💡 _*Tip: Háblame de forma natural. Ej: "Avísame a las 8 am cómo está el aire en casa".*_
+
 {footer}"""
 
 CARD_ONBOARDING = """👋 *¡Hola, {user_name}! Bienvenido a AIreGPT tu Agente Ambiental.*
@@ -178,7 +180,7 @@ Para avisarte exactamente qué días no circulas y cuándo te toca verificar, re
 # ACTUALIZADA: Se agregó {trend_arrow} para aprovechar el dato de la nueva API
 
 CARD_REPORT = """🌤️ *{greeting}, {user_name}!*
-Tu *reporte* de 📍 *[{location_name}]({maps_url})*:
+Tu *reporte* de 📍 **[{location_name}]({maps_url})**:
 🗺️ {region} • 🕒 {report_time}
 
 {risk_circle} *Calidad {risk_category} ({ias_value} pts)* | ☣️ {pollutant}
@@ -194,7 +196,7 @@ Tu *reporte* de 📍 *[{location_name}]({maps_url})*:
 {footer}"""
 
 CARD_ALERT_IAS = """🚨 *¡ALERTA DE CALIDAD DEL AIRE!* 🚨
-Hola {user_name}, la contaminación en 📍 *[{location_name}]({maps_url})* a las 🕒 {report_time} ha superado tu límite de seguridad.
+Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** a las 🕒 {report_time} ha superado tu límite de seguridad.
 
 {risk_circle} *Calidad {risk_category} ({ias_value} pts)* | ☣️ {pollutant}
 *Tu umbral configurado es: {threshold} pts*
@@ -206,7 +208,7 @@ Hola {user_name}, la contaminación en 📍 *[{location_name}]({maps_url})* a la
 {footer}"""
 
 CARD_REMINDER = """⏰ *{greeting}, {user_name}!*
-Tu *reporte* de 📍 *[{location_name}]({maps_url})*:
+Tu *reporte* de 📍 **[{location_name}]({maps_url})**:
 🗺️ {region} • 🕒 {report_time}
 
 {risk_circle} *Calidad {risk_category} ({ias_value} pts)* | ☣️ {pollutant}
@@ -230,6 +232,7 @@ CARD_CONTINGENCY = """🚨 *¡CONTINGENCIA AMBIENTAL!* 🚨
 
 🛑 *Restricciones Vehiculares:*
 {restrictions_txt}
+
 📄 [Leer Comunicado Oficial]({oficial_link})
 
 🛡️ *Acción:*
@@ -248,6 +251,7 @@ La CAMe informa que las condiciones del aire han mejorado.
 
 🚗 *Movilidad:*
 Se levantan las restricciones del Doble Hoy No Circula. Tu auto vuelve a su calendario normal.
+
 📄 [Leer Comunicado Oficial]({oficial_link})
 
 _Fuente: SIMAT / Smability_
@@ -266,6 +270,7 @@ CARD_HNC_RESULT = """🚗 *HOY NO CIRCULA*
 {footer}"""
 
 CARD_HNC_DETAILED = """🚗 *Reporte Mensual HNC: {mes_nombre}*
+
 🚘 *Placa:* ...{plate} | *Engomado:* {color}
 *Holograma:* {holo}
 
@@ -315,6 +320,7 @@ CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
 {footer}"""
 
 CARD_VERIFICATION = """🚗 *ESTATUS DE VERIFICACIÓN*
+
 🚘 *Auto:* {plate_info} | {engomado}
 
 📅 *Tu Periodo:*
@@ -341,7 +347,7 @@ CARD_MY_LOCATIONS = """📍 *MIS UBICACIONES GUARDADAS*
 
 # --- NUEVA TARJETA: EXPOSICIÓN (GAMIFICACIÓN) ---
 CARD_EXPOSICION = """{emoji_alerta} *Reporte de Exposición*
-👤 {user_name}
+👋 Hola {user_name}!
 
 Ayer *{fecha_ayer}* te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
 
