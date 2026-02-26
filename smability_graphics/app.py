@@ -569,16 +569,10 @@ def generar_grafica_tetris(user_id):
         line = plt.Line2D((0.3, 0.7), (0.67, 0.67), color='#FF00FF', lw=1, alpha=0.4, transform=fig.transFigure, zorder=5)
         fig.lines.append(line)
 
-     
-        # --- FIX: TEXTO RICO (Números gigantes, enunciados pequeños) ---
-        # 1. Edad Urbana (Centramos el número y anclamos el texto a sus lados)
-        fig.text(0.5, 0.64, f"{anios_edad_urbana} años", fontsize=15, color='#FF9900', ha='center', va='bottom', fontweight='black', zorder=5)
-        fig.text(0.44, 0.64, "Tu exposición te ha sumado", fontsize=10, color='#FF9900', ha='right', va='bottom', zorder=5)
-        fig.text(0.56, 0.64, "a tu edad urbana", fontsize=10, color='#FF9900', ha='left', va='bottom', zorder=5)
-
-        # 2. Promedio IAS
-        fig.text(0.51, 0.615, "Tu promedio IAS del mes es de", fontsize=10, color='#FFFF00', ha='right', va='bottom', fontname='monospace', zorder=5)
-        fig.text(0.53, 0.615, f"{promedio_ias_mes}", fontsize=15, color='#FFFF00', ha='left', va='bottom', fontweight='black', fontname='monospace', zorder=5)
+    
+        # --- FIX: MICROCOPY (Textos cortos, uniformes y centrados) ---
+        fig.text(0.5, 0.64, f"{anios_edad_urbana} años más a tu edad urbana", fontsize=12, color='#FF9900', ha='center', va='center', fontweight='bold', zorder=5)
+        fig.text(0.5, 0.615, f"{promedio_ias_mes} puntos de IAS promedio al mes", fontsize=12, color='#FFFF00', ha='center', va='center', fontweight='bold', fontname='monospace', zorder=5)
 
         ax.set_position([0.2, 0.06, 0.6, 0.52])
 
