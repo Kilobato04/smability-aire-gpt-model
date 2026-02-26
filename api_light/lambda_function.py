@@ -205,25 +205,38 @@ def lambda_handler(event, context):
         if vector_futuro and 'ias' in vector_futuro and meta_futuro_start:
             try:
                 start_dt = datetime.strptime(meta_futuro_start[:16], "%Y-%m-%dT%H:%M")
-                
                 lista_dominantes = vector_futuro.get('dominante', ["N/A"] * 24)
                 
-                for i in range(min(4, len(vector_futuro['ias']))):
+                # 1. Obtenemos la hora actual truncada para tener una línea base
+                tz = ZoneInfo("America/Mexico_City")
+                hora_actual = datetime.now(tz).replace(minute=0, second=0, microsecond=0, tzinfo=None)
+                
+                agregados = 0
+                for i in range(len(vector_futuro['ias'])):
                     hora_dt = start_dt + timedelta(hours=i)
-                    ias_val = vector_futuro['ias'][i]
                     
-                    if ias_val <= 50: riesgo = "Bajo"
-                    elif ias_val <= 100: riesgo = "Moderado"
-                    elif ias_val <= 150: riesgo = "Alto"
-                    elif ias_val <= 200: riesgo = "Muy Alto"
-                    else: riesgo = "Extremadamente Alto"
-                    
-                    pronostico_timeline.append({
-                        "hora": hora_dt.strftime("%H:%M"),
-                        "ias": ias_val,
-                        "riesgo": riesgo,
-                        "dominante": lista_dominantes[i]
-                    })
+                    # 2. EL FIX: Solo agregamos horas que sean MAYORES a la hora actual
+                    if hora_dt > hora_actual:
+                        ias_val = vector_futuro['ias'][i]
+                        
+                        if ias_val <= 50: riesgo = "Bajo"
+                        elif ias_val <= 100: riesgo = "Moderado"
+                        elif ias_val <= 150: riesgo = "Alto"
+                        elif ias_val <= 200: riesgo = "Muy Alto"
+                        else: riesgo = "Extremadamente Alto"
+                        
+                        pronostico_timeline.append({
+                            "hora": hora_dt.strftime("%H:%M"),
+                            "ias": ias_val,
+                            "riesgo": riesgo,
+                            "dominante": lista_dominantes[i] if i < len(lista_dominantes) else "N/A"
+                        })
+                        agregados += 1
+                        
+                    # 3. Cortamos exactamente al tener 4 horas futuras
+                    if agregados == 4:
+                        break
+                        
             except Exception as e:
                 print(f"⚠️ Error armando timeline de compatibilidad: {e}")
 
