@@ -389,7 +389,7 @@ def generar_grafica_serpiente(user_id):
                 current_state = estados[x_idx]
                 start_x = x_idx
 
-    fig1.text(0.38, 0.92, "Mi exposición al humo de hoy en CDMX/EDMX\n¡Conoce el tuyo en AIreGPT!", fontsize=16, color='white', ha='center', va='center', fontweight='bold', bbox=dict(facecolor='#1c1c28', edgecolor='#FE53BB', boxstyle='round,pad=1.0', alpha=0.9, lw=2.5), rotation=2)
+    fig1.text(0.38, 0.92, "Mi exposición al humo de hoy en CDMX/EDOMX\n¡Conoce el tuyo en AIreGPT!", fontsize=16, color='white', ha='center', va='center', fontweight='bold', bbox=dict(facecolor='#1c1c28', edgecolor='#FE53BB', boxstyle='round,pad=1.0', alpha=0.9, lw=2.5), rotation=2)
     
     qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=1)
     qr.add_data(BOT_URL)
@@ -523,11 +523,13 @@ def generar_grafica_tetris(user_id):
             y = i // columnas 
             
             if i < semanas_transcurridas:
-                color = obtener_color_cigarros(cigarros_semana[i])
-                dibujar_bloque_tetris(ax, x, y, color)
-                
-                # Número dentro del bloque (solo si es > 0)
-                if cigarros_semana[i] > 0:
+                # --- FIX 1: Si hay 0 cigarros, apagamos el bloque visualmente ---
+                if cigarros_semana[i] == 0:
+                    dibujar_bloque_tetris(ax, x, y, None, is_empty=True)
+                else:
+                    color = obtener_color_cigarros(cigarros_semana[i])
+                    dibujar_bloque_tetris(ax, x, y, color)
+                    
                     texto_color = 'white' if color == '#FF00FF' else 'black'
                     ax.text(x+0.5, y+0.5, str(cigarros_semana[i]), color=texto_color, ha='center', va='center', fontsize=10, fontweight='black')
                 
@@ -567,13 +569,14 @@ def generar_grafica_tetris(user_id):
         line = plt.Line2D((0.3, 0.7), (0.67, 0.67), color='#FF00FF', lw=1, alpha=0.4, transform=fig.transFigure, zorder=5)
         fig.lines.append(line)
 
-        fig.text(0.5, 0.64, f"Tu exposición te ha sumado {anios_edad_urbana} años a tu edad urbana", fontsize=10, color='#FF9900', ha='center', fontweight='bold', zorder=5)
-        fig.text(0.5, 0.615, f"Tu promedio IAS del mes es de {promedio_ias_mes}", fontsize=11, color='#FFFF00', ha='center', fontweight='bold', fontname='monospace', zorder=5)
+     
+        fig.text(0.5, 0.64, f"Tu exposición te ha sumado {anios_edad_urbana} años a tu edad urbana", fontsize=12, color='#FF9900', ha='center', fontweight='black', zorder=5)
+        fig.text(0.5, 0.61, f"Tu promedio IAS del mes es de {promedio_ias_mes}", fontsize=13, color='#FFFF00', ha='center', fontweight='black', fontname='monospace', zorder=5)
 
         ax.set_position([0.2, 0.06, 0.6, 0.52])
 
         # Cintillo y Footer
-        texto_viral = "Mi partida de Tetris Tóxico en CDMX\n¡Juega la tuya en AIreGPT!"
+        texto_viral = "Mi partida de Tetris Tóxico en CDMX/EDOMEX\n¡Juega la tuya en AIreGPT!"
         fig.text(0.35, 0.94, texto_viral, fontsize=14, color='white', ha='center', va='center', fontweight='bold', bbox=dict(facecolor='#2b002b', edgecolor='#FF00FF', boxstyle='round,pad=0.8', alpha=0.9, lw=2.5), rotation=3, fontname='monospace')
         generar_qr_eje(fig)
 
