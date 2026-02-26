@@ -570,8 +570,15 @@ def generar_grafica_tetris(user_id):
         fig.lines.append(line)
 
      
-        fig.text(0.5, 0.64, f"Tu exposición te ha sumado {anios_edad_urbana} años a tu edad urbana", fontsize=12, color='#FF9900', ha='center', fontweight='black', zorder=5)
-        fig.text(0.5, 0.61, f"Tu promedio IAS del mes es de {promedio_ias_mes}", fontsize=13, color='#FFFF00', ha='center', fontweight='black', fontname='monospace', zorder=5)
+        # --- FIX: TEXTO RICO (Números gigantes, enunciados pequeños) ---
+        # 1. Edad Urbana (Centramos el número y anclamos el texto a sus lados)
+        fig.text(0.5, 0.64, f"{anios_edad_urbana} años", fontsize=15, color='#FF9900', ha='center', va='bottom', fontweight='black', zorder=5)
+        fig.text(0.44, 0.64, "Tu exposición te ha sumado", fontsize=10, color='#FF9900', ha='right', va='bottom', zorder=5)
+        fig.text(0.56, 0.64, "a tu edad urbana", fontsize=10, color='#FF9900', ha='left', va='bottom', zorder=5)
+
+        # 2. Promedio IAS
+        fig.text(0.51, 0.615, "Tu promedio IAS del mes es de", fontsize=10, color='#FFFF00', ha='right', va='bottom', fontname='monospace', zorder=5)
+        fig.text(0.53, 0.615, f"{promedio_ias_mes}", fontsize=15, color='#FFFF00', ha='left', va='bottom', fontweight='black', fontname='monospace', zorder=5)
 
         ax.set_position([0.2, 0.06, 0.6, 0.52])
 
