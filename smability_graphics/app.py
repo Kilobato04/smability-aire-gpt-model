@@ -229,8 +229,8 @@ def generar_grafica_serpiente(user_id):
     estados = []
     horas_labels = []
 
-    ts_str = resp_c.get("ts", get_mexico_time().strftime("%Y-%m-%d %H:%M:%S"))
-    base_dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(minute=0, second=0)
+    ts_str = resp_c.get("ts", get_mexico_time().strftime("%Y-%m-%d %H:20:00"))
+    base_dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(minute=20, second=0)
 
     for offset in range(-24, 13): 
         i = ahora_idx + offset
@@ -305,12 +305,28 @@ def generar_grafica_serpiente(user_id):
     lc_future.set_array(y_smooth[:-1][mask_future])
     ax1.add_collection(lc_future)
 
-    max_idx = np.argmax(vector_completo)
+    # 1. CAJA DEL VALOR MÁXIMO (PICO DE EXPOSICIÓN)
+    max_idx = int(np.argmax(vector_completo))
     max_val = vector_completo[max_idx]
     peak_color = '#00FF00' if max_val<=50 else '#FFFF00' if max_val<=100 else '#FF9900' if max_val<=150 else '#FF0000' if max_val<=200 else '#CC00FF'
-    ax1.annotate(f"{int(max_val)} IAS", xy=(max_idx, max_val), xytext=(0, 15), textcoords="offset points", ha='center', va='bottom',
-                 fontsize=14, fontweight='black', color='black' if max_val <= 100 else 'white',
+    
+    # Matemáticas para sacar la hora exacta del pico (índice 24 es el centro)
+    peak_dt = base_dt + timedelta(hours=(max_idx - 24))
+    peak_time_str = peak_dt.strftime("%H:%M")
+    
+    ax1.annotate(f"{int(max_val)} IAS\n{peak_time_str}", xy=(max_idx, max_val), xytext=(0, 15), textcoords="offset points", ha='center', va='bottom',
+                 fontsize=11, fontweight='black', color='black' if max_val <= 100 else 'white',
                  bbox=dict(boxstyle="round,pad=0.4", fc=peak_color, ec="white", lw=2))
+
+    # 2. CAJA DEL VALOR ACTUAL (AHORA)
+    # Lógica de UX: Solo la dibujamos si el pico no está ocurriendo AHORA mismo, para no encimar globos.
+    if max_idx != 24: 
+        current_val = vector_completo[24]
+        current_color = '#00FF00' if current_val<=50 else '#FFFF00' if current_val<=100 else '#FF9900' if current_val<=150 else '#FF0000' if current_val<=200 else '#CC00FF'
+        
+        ax1.annotate(f"{int(current_val)} IAS\nAHORA", xy=(24, current_val), xytext=(0, 15), textcoords="offset points", ha='center', va='bottom',
+                     fontsize=10, fontweight='black', color='black' if current_val <= 100 else 'white',
+                     bbox=dict(boxstyle="round,pad=0.4", fc=current_color, ec='#08F7FE', lw=2))
 
     ax1.set_xlim(x_smooth.min(), x_smooth.max())
     ax1.set_ylim(0, max(140, max_val + 30)) 
@@ -341,7 +357,7 @@ def generar_grafica_serpiente(user_id):
             etiqueta.set_color(azul_neon)
             etiqueta.set_bbox(dict(facecolor='#1c1c28', edgecolor=azul_neon, boxstyle='round,pad=0.4', lw=1.5))
 
-    ax1.set_ylabel("Índice Aire y Salud (IAS)", fontsize=14, color='#aaaaaa', fontweight='bold')
+    ax1.set_ylabel("Exposición Personal en IAS", fontsize=14, color='#aaaaaa', fontweight='bold')
 
     y_base = ax1.get_ylim()[1] * 0.03
     estilos = {
