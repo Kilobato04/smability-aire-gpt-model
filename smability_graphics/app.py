@@ -414,11 +414,189 @@ def generar_grafica_serpiente(user_id):
 
 def generar_grafica_tetris(user_id):
     print(f"🧱 Generando TETRIS para {user_id}...")
-    # ---> AQUÍ METEREMOS EL CÓDIGO MATPLOTLIB DEL COLAB DE TETRIS <---
-    # 1. Leer DynamoDB (health_stats.current_week)
-    # 2. Generar plot en buffer
-    # 3. url = subir_imagen_a_s3(buffer, f"tetris_{user_id}.png")
-    return {"status": "success", "url": "https://placehold.co/400x600/png", "tipo": "tetris_placeholder"}
+    try:
+        # ==========================================
+        # 1. LEER DATOS DE DYNAMODB
+        # ==========================================
+        response = table.get_item(Key={'user_id': str(user_id)})
+        user = response.get('Item', {})
+
+        health_stats = user.get('health_stats', {})
+        current_week = health_stats.get('current_week', [])
+        historical_weeks = health_stats.get('historical_weeks', [])
+        all_logs = current_week + historical_weeks
+
+        # ==========================================
+        # 2. PROCESAMIENTO MATEMÁTICO
+        # ==========================================
+        now_mx = get_mexico_time()
+        semanas_totales = 52
+        semanas_transcurridas = now_mx.isocalendar()[1]
+
+        cigarros_float = np.zeros(semanas_totales)
+        ias_suma = np.zeros(semanas_totales)
+        dias_con_datos = np.zeros(semanas_totales)
+
+        for log in all_logs:
+            fecha_str = log.get('fecha')
+            if not fecha_str: continue
+            
+            dt = datetime.strptime(fecha_str, "%Y-%m-%d")
+            if dt.year != now_mx.year: continue # Filtro año en curso
+            
+            w_idx = dt.isocalendar()[1] - 1 # Índice de array (0 a 51)
+            if w_idx < 0 or w_idx >= 52: continue
+            
+            cigarros_float[w_idx] += float(log.get('cigarros', 0))
+            
+            pm25 = float(log.get('promedio_pm25', 0))
+            ias_val = float(log.get('promedio_ias', pm25 * 4)) 
+            
+            ias_suma[w_idx] += ias_val
+            dias_con_datos[w_idx] += 1
+
+        cigarros_semana = np.ceil(cigarros_float).astype(int)
+        total_cigarros_ytd = int(np.sum(cigarros_semana))
+        anios_edad_urbana = round((total_cigarros_ytd * 2.0) / 365.0, 2)
+
+        idx_inicio = max(0, semanas_transcurridas - 4)
+        suma_ias_mes = np.sum(ias_suma[idx_inicio:semanas_transcurridas])
+        suma_dias_mes = np.sum(dias_con_datos[idx_inicio:semanas_transcurridas])
+        promedio_ias_mes = int(suma_ias_mes / suma_dias_mes) if suma_dias_mes > 0 else 0
+
+        # ==========================================
+        # 3. HELPERS DE DISEÑO (Anidados)
+        # ==========================================
+        def generar_qr_eje(fig, x_pos=0.72):
+            qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=1)
+            qr.add_data("https://t.me/airegptcdmx_bot")
+            qr.make(fit=True)
+            qr_img = qr.make_image(image_factory=StyledPilImage, module_drawer=RoundedModuleDrawer(radius_ratio=1)).convert("RGBA")
+            qr_ax = fig.add_axes([x_pos, 0.88, 0.15, 0.10]) 
+            qr_ax.imshow(qr_img)
+            qr_ax.axis('off')
+
+        def obtener_color_cigarros(cantidad):
+            if cantidad < 15: return '#08F7FE'      # Cyan (Bien)
+            elif cantidad < 25: return '#00FF00'    # Verde (Regular)
+            elif cantidad < 35: return '#FFFF00'    # Amarillo (Malo)
+            elif cantidad < 45: return '#FF7F00'    # Naranja (Muy Malo)
+            else: return '#FF00FF'                  # Magenta (Peligro)
+
+        def dibujar_bloque_tetris(ax, x, y, color, is_empty=False):
+            if is_empty:
+                ax.add_patch(mpatches.Rectangle((x+0.1, y+0.1), 0.8, 0.8, fill=False, edgecolor='#333333', lw=1, ls=':'))
+                return
+            ax.add_patch(mpatches.Rectangle((x+0.02, y+0.02), 0.96, 0.96, facecolor='black'))
+            ax.add_patch(mpatches.Rectangle((x+0.05, y+0.05), 0.9, 0.9, facecolor=color))
+            ax.add_patch(mpatches.Polygon([(x+0.05, y+0.95), (x+0.95, y+0.95), (x+0.8, y+0.8), (x+0.2, y+0.8)], facecolor='white', alpha=0.4))
+            ax.add_patch(mpatches.Polygon([(x+0.05, y+0.05), (x+0.05, y+0.95), (x+0.2, y+0.8), (x+0.2, y+0.2)], facecolor='white', alpha=0.2))
+            ax.add_patch(mpatches.Polygon([(x+0.05, y+0.05), (x+0.95, y+0.05), (x+0.8, y+0.2), (x+0.2, y+0.2)], facecolor='black', alpha=0.3))
+            ax.add_patch(mpatches.Polygon([(x+0.95, y+0.05), (x+0.95, y+0.95), (x+0.8, y+0.8), (x+0.8, y+0.2)], facecolor='black', alpha=0.4))
+            ax.add_patch(mpatches.Rectangle((x+0.2, y+0.2), 0.6, 0.6, facecolor=color, alpha=0.8))
+
+        # ==========================================
+        # 4. RENDERIZADO VISUAL
+        # ==========================================
+        plt.style.use("cyberpunk")
+        fig, ax = plt.subplots(figsize=(9, 16), dpi=120)
+        fig.patch.set_facecolor('none')
+        ax.set_facecolor('none')
+
+        # Degradado de fondo
+        ax_grad = fig.add_axes([0, 0, 1, 1], zorder=-1)
+        gradient = np.linspace(0, 1, 256).reshape(-1, 1)
+        cmap = mcolors.LinearSegmentedColormap.from_list("cyber_grad", ['#1a0525', '#000000'])
+        ax_grad.imshow(gradient, aspect='auto', cmap=cmap, extent=[0, 1, 0, 1])
+        ax_grad.axis('off')
+
+        columnas = 4
+        filas = 13 
+
+        meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        for m_idx, mes in enumerate(meses):
+            y_pos = m_idx * (13 / 12) + 0.5
+            ax.text(-0.5, y_pos, mes, color='#aaaaaa', ha='right', va='center', fontsize=11, fontweight='bold', fontname='monospace')
+
+        for i in range(semanas_totales):
+            x = i % columnas
+            y = i // columnas 
+            
+            if i < semanas_transcurridas:
+                color = obtener_color_cigarros(cigarros_semana[i])
+                dibujar_bloque_tetris(ax, x, y, color)
+                
+                # Número dentro del bloque (solo si es > 0)
+                if cigarros_semana[i] > 0:
+                    texto_color = 'white' if color == '#FF00FF' else 'black'
+                    ax.text(x+0.5, y+0.5, str(cigarros_semana[i]), color=texto_color, ha='center', va='center', fontsize=10, fontweight='black')
+                
+                # Marco punteado de semana actual
+                if i == semanas_transcurridas - 1:
+                    ax.add_patch(mpatches.Rectangle((x, y), 1, 1, fill=False, edgecolor='white', lw=3, ls='--'))
+            else:
+                dibujar_bloque_tetris(ax, x, y, None, is_empty=True)
+
+        ax.set_xlim(-1.0, 5.0) 
+        ax.set_ylim(-1, 22) 
+        ax.axis('off')
+
+        ax.plot([-0.5, 4.5], [-0.1, -0.1], color='#08F7FE', linewidth=4)
+        ax.text(2, -1.2, f"Año {now_mx.year} (52 Semanas)", color='#aaaaaa', ha='center', fontsize=14, fontname='monospace')
+
+        # Leyenda centrada
+        leyenda_y = 15
+        ax.text(1.9, leyenda_y + 1, "Nivel de Toxicidad (Cigarros/Sem):", color='white', ha='center', fontsize=12, fontname='monospace')
+        colores_leyenda = [('#08F7FE', '<15'), ('#00FF00', '15-24'), ('#FFFF00', '25-34'), ('#FF7F00', '35-44'), ('#FF00FF', '+45')]
+        for idx, (col, txt) in enumerate(colores_leyenda):
+            lx = -0.5 + (idx * 0.95)
+            dibujar_bloque_tetris(ax, lx, leyenda_y - 0.5, col)
+            ax.text(lx+0.4, leyenda_y - 1.2, txt, color='#aaaaaa', ha='center', fontsize=10, fontname='monospace')
+
+        # Scorecard Limpia
+        card_x, card_y, card_w, card_h = 0.25, 0.60, 0.50, 0.25
+        shadow = mpatches.FancyBboxPatch((card_x+0.01, card_y-0.01), card_w, card_h, boxstyle="round,pad=0.03", facecolor='black', alpha=0.5, transform=fig.transFigure, zorder=2)
+        fig.patches.append(shadow)
+
+        card_outer = mpatches.FancyBboxPatch((card_x, card_y), card_w, card_h, boxstyle="round,pad=0.03", facecolor='#0d0212', edgecolor='#08F7FE', lw=3.5, transform=fig.transFigure, zorder=4)
+        fig.patches.append(card_outer)
+
+        fig.text(0.5, 0.77, f"{total_cigarros_ytd}", fontsize=75, color='#08F7FE', ha='center', va='center', fontweight='heavy', fontname='monospace', zorder=5)
+        fig.text(0.5, 0.70, "Cigarros equivalentes a la fecha", fontsize=11, color='#aaaaaa', ha='center', fontname='monospace', zorder=5)
+
+        line = plt.Line2D((0.3, 0.7), (0.67, 0.67), color='#FF00FF', lw=1, alpha=0.4, transform=fig.transFigure, zorder=5)
+        fig.lines.append(line)
+
+        fig.text(0.5, 0.64, f"Tu exposición te ha sumado {anios_edad_urbana} años a tu edad urbana", fontsize=10, color='#FF9900', ha='center', fontweight='bold', zorder=5)
+        fig.text(0.5, 0.615, f"Tu promedio IAS del mes es de {promedio_ias_mes}", fontsize=11, color='#FFFF00', ha='center', fontweight='bold', fontname='monospace', zorder=5)
+
+        ax.set_position([0.2, 0.06, 0.6, 0.52])
+
+        # Cintillo y Footer
+        texto_viral = "Mi partida de Tetris Tóxico en CDMX\n¡Juega la tuya en AIreGPT!"
+        fig.text(0.35, 0.94, texto_viral, fontsize=14, color='white', ha='center', va='center', fontweight='bold', bbox=dict(facecolor='#2b002b', edgecolor='#FF00FF', boxstyle='round,pad=0.8', alpha=0.9, lw=2.5), rotation=3, fontname='monospace')
+        generar_qr_eje(fig)
+
+        footer_text = "AIreGPT | Smability.io\nNota: Esto es un estimado algorítmico y no representa un diagnóstico de salud oficial.\nEl número en el bloque representa la suma de cigarros equivalentes de esa semana."
+        fig.text(0.5, 0.015, footer_text, color='#666666', fontsize=10, ha='center', linespacing=1.6)
+
+        # ==========================================
+        # 5. EXPORTAR Y SUBIR A S3
+        # ==========================================
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0, transparent=False, facecolor='#000000', dpi=120)
+        buf.seek(0)
+        plt.close(fig)
+
+        # Usando tu propia función subir_imagen_a_s3
+        file_name = f"tetris_{user_id}_{now_mx.strftime('%H%M%S')}.png"
+        url = subir_imagen_a_s3(buf, file_name)
+
+        return {"status": "success", "url": url, "tipo": "tetris"}
+
+    except Exception as e:
+        print(f"❌ Error en generar_grafica_tetris: {e}")
+        return {"status": "error", "error": str(e), "tipo": "tetris"}
 
 
 # ========================================================
