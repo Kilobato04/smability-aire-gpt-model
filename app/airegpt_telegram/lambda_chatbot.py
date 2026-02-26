@@ -1129,6 +1129,58 @@ def lambda_handler(event, context):
                     requests.post(url_del, json={"chat_id": chat_id, "message_id": msg_id})
                     
                 return {'statusCode': 200, 'body': 'OK'}
+            
+            # ==========================================
+            # 🧱 BOTÓN: HISTORIAL SEMANAL (TETRIS)
+            # ==========================================
+            elif data == "GET_TETRIS":
+                # 0. 🔒 EL CANDADO (15 Minutos independientes para el Tetris)
+                last_req = user_profile.get('last_tetris_ts')
+                now_utc = datetime.utcnow()
+                
+                if last_req:
+                    last_dt = datetime.fromisoformat(last_req)
+                    segundos_pasados = (now_utc - last_dt).total_seconds()
+                    
+                    if segundos_pasados < 900: # 15 minutos
+                        minutos_faltantes = 15 - int(segundos_pasados / 60)
+                        send_telegram(chat_id, f"⏳ *¡Calma!*\nYa dibujé tu historial hace ratito. Por favor espera **{minutos_faltantes} minutos** para generar uno nuevo.")
+                        return {'statusCode': 200, 'body': 'OK'}
+                
+                # Cobramos el "ticket" guardando la hora actual
+                table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET last_tetris_ts = :t", ExpressionAttributeValues={':t': now_utc.isoformat()})
+
+                # 1. UX: Mensaje de espera
+                msg_id = None
+                try:
+                    r = requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage", 
+                                      json={"chat_id": chat_id, "text": "🧱 *Dibujando tu historial acumulado...*\nDame unos 15 segunditos ⏱️", "parse_mode": "Markdown"}).json()
+                    if r.get("ok"): msg_id = r["result"]["message_id"]
+                except: pass
+
+                # 2. Llamar a Lambda Gráficas (Tetris)
+                try:
+                    send_telegram_action(chat_id, "upload_photo") 
+                    resp = requests.get(f"{URL_LAMBDA_GRAFICAS}?action=tetris&user_id={user_id}", timeout=30).json()
+                    
+                    if resp.get("status") == "success":
+                        photo_url = resp["url"]
+                        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto", 
+                                      json={"chat_id": chat_id, "photo": photo_url, "caption": "¡Aquí está tu mapa de exposición! 🧱🏙️\n_Cada bloque es una semana. Mantente en colores claros._", "parse_mode": "Markdown"})
+                    else:
+                        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE last_tetris_ts")
+                        send_telegram(chat_id, "Aún no tengo suficientes datos tuyos para generar el historial. Intenta mañana 😔")
+                except Exception as e:
+                    print(f"Error generando Tetris: {e}")
+                    table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE last_tetris_ts")
+                    send_telegram(chat_id, "El dibujante se tardó un poco de más 😅. Intenta de nuevo por favor.")
+
+                # 3. Borrar el mensajito de "espera"
+                if msg_id:
+                    requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteMessage", json={"chat_id": chat_id, "message_id": msg_id})
+                    
+                return {'statusCode': 200, 'body': 'OK'}
+                
             # --- NUEVO: BOTÓN "MI RESUMEN" DESDE ALERTAS ---
             elif data == "ver_resumen":
                 # 1. Avisar a Telegram que recibimos el clic (quita el relojito de "pensando" al instante)
@@ -1333,11 +1385,15 @@ def lambda_handler(event, context):
                         )
                         
                         markup_viral = cards.get_share_exposure_button(cigs, dias)
-                        # --- INYECCIÓN DEL BOTÓN DE GRÁFICA ---
+                        # --- INYECCIÓN DEL BOTÓN DE GRÁFICA (REEMPLAZA ESTE BLOQUE) ---
                         if markup_viral and "inline_keyboard" in markup_viral:
                             markup_viral["inline_keyboard"].insert(0, [{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}])
+                            markup_viral["inline_keyboard"].insert(1, [{"text": "🧱 Ver Historial Semanal", "callback_data": "GET_TETRIS"}])
                         else:
-                            markup_viral = {"inline_keyboard": [[{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}]]}
+                            markup_viral = {"inline_keyboard": [
+                                [{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}],
+                                [{"text": "🧱 Ver Historial Semanal", "callback_data": "GET_TETRIS"}]
+                            ]}
                         # --------------------------------------
                         
                         if 'trabajo' not in locs and not es_ho: 
