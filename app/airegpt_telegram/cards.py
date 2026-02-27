@@ -18,7 +18,7 @@ def get_emoji_for_quality(calidad):
     """Extrae el emoji de forma segura para el chatbot"""
     return IAS_INFO.get(calidad, {}).get("emoji", "⚪")
 
-def get_health_advice(calidad, user_condition=None):
+def get_health_advice(calidad, user_condition=None, is_premium=False):
     advice = {
         "Buena": "Disfruta tus actividades al aire libre sin restricciones.",
         "Regular": "Reduce actividades intensas si eres muy sensible a la contaminación.",
@@ -35,7 +35,11 @@ def get_health_advice(calidad, user_condition=None):
     if not user_condition or user_condition.lower() == "ninguno": 
         return base_rec
         
-    # --- NUEVA LÓGICA DE HIPER-PERSONALIZACIÓN ---
+    # 🔒 BLOQUEO PARA USUARIOS FREE (Le damos la recomendación general y le vendemos la suya)
+    if not is_premium:
+        return f"{base_rec}\n❤️ *Consejo para tu {user_condition.capitalize()}:* 🔒 Exclusivo Premium"
+        
+    # --- NUEVA LÓGICA DE HIPER-PERSONALIZACIÓN (SOLO PREMIUM) ---
     hc_lower = user_condition.lower()
     
     # Escenarios de Peligro (Mala, Muy Mala, Extrema)
@@ -712,8 +716,12 @@ def check_driving_status(plate_last_digit, hologram, date_str=None, contingency_
         return True, "Sin Restricción", "🟢 CIRCULA."
     except Exception: return True, "Error", "⚠️ Error al calcular."
 
-def build_hnc_pill(vehicle, contingency_phase="None"):
+def build_hnc_pill(vehicle, contingency_phase="None", is_premium=False):
     if not vehicle or not vehicle.get('active'): return ""
+    
+    # 🔒 BLOQUEO PARA USUARIOS FREE
+    if not is_premium:
+        return "\n🚗 **Tu Auto Hoy:** 🔒 Exclusivo Premium"
     
     plate = vehicle.get('plate_last_digit')
     holo = vehicle.get('hologram')
