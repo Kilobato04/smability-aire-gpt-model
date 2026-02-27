@@ -9,6 +9,7 @@ import cards
 import prompts
 import math
 import pytz
+import stripeairegpt
 from decimal import Decimal
 
 
@@ -59,46 +60,35 @@ BUSINESS_RULES = {
     "PREMIUM": {"loc_limit": 3, "alert_limit": 10, "can_contingency": True}
 }
 
-# --- GATEKEEPER: VERIFICADOR DE CUPOS (VERSIÓN DESBLOQUEADA) ---
-def check_quota_and_permissions(user_profile, action_type):
-    # 1. Identificar Plan
-    sub = user_profile.get('subscription', {})
-    status = sub.get('status', 'FREE')
-    user_id = user_profile.get('user_id', 'unknown')
+# --- GATEKEEPER: VERIFICADOR DE STRIPE Y CUPOS ---
+def check_quota_and_permissions(user_profile, action_type, user_id):
+    # 1. Pasar por el Cadenero de Stripe
+    tier, days_left = stripeairegpt.evaluate_user_tier(user_profile)
     
-    # Flags de Negocio
-    is_premium = "PREMIUM" in status.upper() or "TRIAL" in status.upper()
+    print(f"🛡️ [GATEKEEPER] User: {user_id} | Plan: {tier} | Days Left: {days_left}")
+
     LIMIT_LOC_FREE = 1
     LIMIT_LOC_PREM = 3
     
-    print(f"🛡️ [GATEKEEPER] User: {user_id} | Plan: {status} | Premium: {is_premium}")
-
-    # 2. Validar Acción: AGREGAR UBICACIÓN
+    # 2. Bloqueo Inmediato si es FREE (Trial Expirado)
+    if tier == 'FREE':
+        texto, botones = stripeairegpt.get_paywall_response(tier, days_left, action_type, str(user_id))
+        return False, texto, botones
+    
+    # 3. Lógica si es PREMIUM o está en TRIAL (Tienen los mismos permisos)
     if action_type == 'add_location':
         current_locs = len(user_profile.get('locations', {}))
-        limit = LIMIT_LOC_PREM if is_premium else LIMIT_LOC_FREE
-        
-        if current_locs >= limit:
-            if not is_premium:
-                return False, f"🛑 **Límite Alcanzado ({current_locs}/{limit})**\n\nTu plan Básico solo permite 1 ubicación.\n💎 **Hazte Premium** para guardar hasta 3."
-            else:
-                return False, f"🛑 **Espacios Llenos.** Tienes ocupados tus {limit} espacios. Borra uno para agregar otro."
+        if current_locs >= LIMIT_LOC_PREM:
+            return False, f"🛑 **Espacios Llenos.** Tienes ocupados tus {LIMIT_LOC_PREM} espacios. Borra uno para agregar otro.", None
+            
+    # 4. Si es Trial, le avisamos que es una probadita gratis, pero lo dejamos pasar
+    if tier == 'TRIAL':
+        texto_aviso, _ = stripeairegpt.get_paywall_response(tier, days_left, action_type, str(user_id))
+        # Devolvemos True para que pase, pero le adjuntamos el aviso
+        return True, texto_aviso, None
 
-    # 3. Validar Acción: CREAR ALERTA (Schedule o Threshold)
-    if action_type == 'add_alert':
-        # REGLA SIMPLE: Free = 0 alertas auto. Premium = Ilimitadas (dentro de lo lógico).
-        if not is_premium:
-             return False, (
-                "🔒 **Función Premium**\n\n"
-                "Las alertas automáticas (diarias o por contaminación) son exclusivas de Smability Premium.\n"
-                "💎 **Actívalo hoy por solo $49 MXN/mes.**"
-            )
-        
-        # Si es Premium, ¡Pase usted! 
-        # No ponemos límite numérico porque la estructura de la DB (1 por key) ya evita el abuso.
-        return True, ""
-
-    return True, ""
+    # Si es Premium puro
+    return True, "", None
 
 # --- DB HELPERS ---
 def get_user_profile(user_id):
@@ -322,8 +312,10 @@ def confirm_saved_location(user_id, tipo):
         
         # 2. Gatekeeper (Límite de ubicaciones)
         if is_new:
-            can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_location')
-            if not can_proceed: return msg_bloqueo
+            can_proceed, msg, markup = check_quota_and_permissions(user, 'add_location', user_id)
+            if not can_proceed: 
+                send_telegram(user_id, msg, markup) # Le mandamos el Paywall con los botones
+                return "🛑 Límite alcanzado o suscripción requerida." # Mensaje interno para que GPT entienda
         
         # --- FIX ÍTEM 6: INYECTAR ALERTA DEFAULT DE 100 PTS ---
         alerta_default = {'umbral': 100, 'active': True, 'consecutive_sent': 0}
@@ -393,8 +385,10 @@ def configure_ias_alert(user_id, nombre_ubicacion, umbral):
     # -----------------------------------------
 
     user = get_user_profile(user_id)
-    can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_alert')
-    if not can_proceed: return msg_bloqueo
+    can_proceed, msg, markup = check_quota_and_permissions(user, 'alertas', user_id)
+    if not can_proceed: 
+        send_telegram(user_id, msg, markup)
+        return "🛑 Suscripción requerida para usar alertas programadas."
 
     key = resolve_location_key(user_id, nombre_ubicacion)
     if not key: return f"⚠️ Primero guarda '{nombre_ubicacion}'."
@@ -462,8 +456,10 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     # -----------------------------------------------------
 
     user = get_user_profile(user_id)
-    can_proceed, msg_bloqueo = check_quota_and_permissions(user, 'add_alert')
-    if not can_proceed: return msg_bloqueo
+    can_proceed, msg, markup = check_quota_and_permissions(user, 'alertas', user_id)
+    if not can_proceed: 
+        send_telegram(user_id, msg, markup)
+        return "🛑 Suscripción requerida para usar alertas programadas."
 
     key = resolve_location_key(user_id, nombre_ubicacion)
     if not key: return f"⚠️ Primero guarda '{nombre_ubicacion}'."
@@ -1134,6 +1130,12 @@ def lambda_handler(event, context):
             # 🧱 BOTÓN: HISTORIAL SEMANAL (TETRIS)
             # ==========================================
             elif data == "GET_TETRIS":
+                # 0. 🔒 GATEKEEPER STRIPE
+                can_proceed, msg, markup = check_quota_and_permissions(user_profile, 'rutina', user_id)
+                if not can_proceed:
+                    send_telegram(chat_id, msg, markup)
+                    return {'statusCode': 200, 'body': 'OK'}
+                if msg: send_telegram(chat_id, msg)
                 # 0. 🔒 EL CANDADO (15 Minutos independientes para el Tetris)
                 last_req = user_profile.get('last_tetris_ts')
                 now_utc = datetime.utcnow()
@@ -1291,9 +1293,23 @@ def lambda_handler(event, context):
                 send_telegram(chat_id, card_resumen, markup_resumen)
                 return {'statusCode': 200, 'body': 'OK'}
             
-            # --- MENÚ AVANZADO (Placeholder) ---
+            # --- MENÚ AVANZADO / GESTIÓN DE SUSCRIPCIÓN ---
             elif data == "CONFIG_ADVANCED":
-                resp = "⚙️ **Configuración Avanzada**\n\nAquí podrás gestionar tu suscripción y métodos de pago.\n*(Próximamente)*"
+                user = get_user_profile(user_id)
+                tier, days_left = stripeairegpt.evaluate_user_tier(user)
+                
+                if tier == 'PREMIUM':
+                    resp = "💎 **Suscripción Activa**\n\nEres usuario Premium. Gracias por apoyar a AIreGPT.\n\n*(Pronto habilitaremos aquí el portal para cambiar tu método de pago o cancelar tu plan).* "
+                    send_telegram(chat_id, resp)
+                else:
+                    # Si es FREE o TRIAL, le vendemos
+                    estado = f"*(Te quedan {days_left} días de prueba)*" if tier == 'TRIAL' else "*(Prueba terminada)*"
+                    
+                    texto_venta, botones_venta = stripeairegpt.get_paywall_response("FREE", 0, "premium", str(user_id))
+                    texto_venta = texto_venta.replace("🔒 *Función Bloqueada*", f"💎 *Suscripciones* {estado}").replace("Tu periodo de prueba ha concluido. Para premium, necesitas activar", "Activa")
+                    
+                    send_telegram(chat_id, texto_venta, markup=botones_venta)
+                return {'statusCode': 200, 'body': 'OK'}
 
             elif data == "SAVE_OTHER":
                 resp = "✍️ **¿Qué nombre le ponemos?**\n\nEscribe el nombre que quieras (Ej. *'Escuela'*, *'Gym'*, *'Casa Mamá'*)."
@@ -1497,6 +1513,23 @@ def lambda_handler(event, context):
                 return {'statusCode': 200, 'body': 'OK'}
                 
             # --- FIX ROBUSTO: IAS / IMECA (Detecta la frase y variaciones) ---
+            # --- NUEVO: VÍA RÁPIDA PARA COMPRAR PREMIUM ---
+            elif text_clean in ["/premium", "premium", "pagar", "comprar", "suscribirse", "planes", "precio", "precios"]:
+                user = get_user_profile(user_id)
+                tier, days_left = stripeairegpt.evaluate_user_tier(user)
+                
+                if tier == 'PREMIUM':
+                    send_telegram(chat_id, "💎 ¡Ya eres parte de la familia **Premium**! Disfruta de todos tus superpoderes.")
+                else:
+                    # Forzamos el Paywall pasándole 'FREE' para que escupa los botones, aunque esté en Trial
+                    texto_venta, botones_venta = stripeairegpt.get_paywall_response("FREE", 0, "premium", str(user_id))
+                    
+                    # Cambiamos un poquito el texto para que suene a venta directa y no a "te bloqueé"
+                    texto_venta = texto_venta.replace("🔒 *Función Bloqueada*", "💎 *AIreGPT Premium*").replace("Tu periodo de prueba ha concluido. Para premium, necesitas activar", "Activa")
+                    
+                    send_telegram(chat_id, texto_venta, markup=botones_venta)
+                return {'statusCode': 200, 'body': 'OK'}
+                
             elif any(k in text_clean for k in ["que es el ias", "que es ias", "que significa ias", "que es el imeca", "que es imeca", "como mides el aire", "como se mide", "escala ias"]) or text_clean in ["ias", "imeca"]:
                 msg_envio = cards.CARD_IAS_INFO.format(footer=cards.BOT_FOOTER)
                 send_telegram(chat_id, msg_envio)
@@ -1817,6 +1850,14 @@ def lambda_handler(event, context):
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
                 elif fn == "calcular_exposicion_diaria":
+                    # 0. 🔒 GATEKEEPER STRIPE
+                    can_proceed, msg, markup = check_quota_and_permissions(user_profile, 'rutina', user_id)
+                    if not can_proceed:
+                        send_telegram(chat_id, msg, markup)
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Suscripción requerida."})
+                        continue
+                    if msg:
+                        send_telegram(chat_id, msg)
                     # Este es el código que el LLM ejecutará si el usuario pregunta "cuántos cigarros respiré"
                     user = get_user_profile(user_id)
                     locs = user.get('locations', {})
@@ -2068,6 +2109,14 @@ def lambda_handler(event, context):
                 elif fn == "guardar_perfil_salud":
                     # Atrapamos el argumento exacto que vimos en los logs
                     condicion_raw = args.get('tipo_padecimiento', '').lower()
+                    # 0. 🔒 GATEKEEPER STRIPE
+                    can_proceed, msg, markup = check_quota_and_permissions(user_profile, 'salud', user_id)
+                    if not can_proceed:
+                        send_telegram(chat_id, msg, markup)
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Suscripción requerida."})
+                        continue
+                    if msg: # Si es Trial, le mandamos la advertencia amistosa pero lo dejamos seguir
+                        send_telegram(chat_id, msg)
                     
                     # 1. Filtro estricto
                     palabras_clave_validas = [
