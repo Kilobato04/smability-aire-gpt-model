@@ -16,6 +16,10 @@ COPY prompts.py ${LAMBDA_TASK_ROOT}
 # --- FIX CRÍTICO: Faltaba este archivo ---
 COPY lambda_api_light.py ${LAMBDA_TASK_ROOT}
 
+# --- NUEVOS ARCHIVOS DE STRIPE ---
+COPY stripeairegpt.py ${LAMBDA_TASK_ROOT}
+COPY stripe_webhook.py ${LAMBDA_TASK_ROOT}
+
 # --- FIX BANNERS: Empaquetar la carpeta de imágenes ---
 COPY banners/ ${LAMBDA_TASK_ROOT}/banners/
 
