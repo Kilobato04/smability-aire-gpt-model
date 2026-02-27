@@ -1077,6 +1077,14 @@ def lambda_handler(event, context):
 
             # --- NUEVO: BOTÓN GENERAR GRÁFICA VISUAL (CON CANDADO) ---
             elif data == "GET_GRAPHIC":
+                # 0. 🔒 GATEKEEPER STRIPE
+                user = get_user_profile(user_id)
+                can_proceed, msg, markup = check_quota_and_permissions(user, 'rutina', user_id)
+                if not can_proceed:
+                    send_telegram(chat_id, msg, markup)
+                    return {'statusCode': 200, 'body': 'OK'}
+                if msg: send_telegram(chat_id, msg)
+                    
                 # 0. 🔒 EL CANDADO (15 Minutos)
                 last_req = user_profile.get('last_graphic_ts')
                 now_utc = datetime.utcnow()
@@ -1293,8 +1301,8 @@ def lambda_handler(event, context):
                 send_telegram(chat_id, card_resumen, markup_resumen)
                 return {'statusCode': 200, 'body': 'OK'}
             
-            # --- MENÚ AVANZADO / GESTIÓN DE SUSCRIPCIÓN ---
-            elif data == "CONFIG_ADVANCED":
+            # --- MENÚ AVANZADO / GO PREMIUM ---
+            elif data in ["CONFIG_ADVANCED", "GO_PREMIUM"]:
                 user = get_user_profile(user_id)
                 tier, days_left = stripeairegpt.evaluate_user_tier(user)
                 
@@ -1318,7 +1326,14 @@ def lambda_handler(event, context):
             # 🚬 FLUJO GAMIFICACIÓN: CIGARROS, EDAD URBANA Y ONBOARDING
             # =========================================================
             elif data == "CHECK_EXPOSURE":
+                # 0. 🔒 GATEKEEPER STRIPE
                 user = get_user_profile(user_id)
+                can_proceed, msg, markup = check_quota_and_permissions(user, 'rutina', user_id)
+                if not can_proceed:
+                    send_telegram(chat_id, msg, markup)
+                    return {'statusCode': 200, 'body': 'OK'}
+                if msg: send_telegram(chat_id, msg)
+                    
                 locs = user.get('locations', {})
                 transp = user.get('profile_transport') 
                 
