@@ -546,10 +546,14 @@ def get_summary_buttons(locations_dict, is_premium=False):
     for i in range(0, len(row_locs), 2):
         keyboard.append(row_locs[i:i+2])
     
-    # 2. Fila de Upselling (Solo si es FREE)
+    # 2. Fila de Upselling / Menú Avanzado
     if not is_premium:
-        keyboard.append([{"text": "💎 Activar Premium ($49)", "callback_data": "GO_PREMIUM"}])
-    
+        # Aquí mutamos el botón viejo al nuevo "Go Premium"
+        keyboard.append([{"text": "💎 Go Premium", "callback_data": "GO_PREMIUM"}])
+    else:
+        # Y si YA ES premium, le mostramos su portal avanzado
+        keyboard.append([{"text": "⚙️ Configuración Avanzada", "callback_data": "CONFIG_ADVANCED"}])
+        
     return {"inline_keyboard": keyboard}
 
 # --- MODIFICADO: ELIMINAMOS BOTÓN DE VOLVER ---
