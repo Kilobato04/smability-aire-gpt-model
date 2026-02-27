@@ -451,6 +451,7 @@ def process_user(user, current_hour_str, contingency_data):
                                     risk_category=cat, 
                                     risk_circle=info['emoji'], 
                                     ias_value=cur_ias,
+                                    report_time=f"{current_hour_str.split(':')[0]}:20", # <--- EL FIX ESTÁ AQUÍ 🛠️
                                     forecast_msg=tendencia_final,
                                     threshold=umbral, 
                                     pollutant=qa.get('dominante', 'N/A'), 
