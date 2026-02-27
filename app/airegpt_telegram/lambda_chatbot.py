@@ -1204,78 +1204,98 @@ def lambda_handler(event, context):
                 status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else (str(sub_data) if sub_data else 'FREE')
                 is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
                 
-                # --- 1. Alerta Contingencia ---
-                alerts_data = user.get('alerts', {})
-                if not isinstance(alerts_data, dict): alerts_data = {}
-                contingency = "✅ ACTIVA" if alerts_data.get('contingency') else "🔕 INACTIVA"
+                # --- EXTRACCIÓN CONDICIONADA AL PLAN ---
+                if is_prem:
+                    # --- 1. Alerta Contingencia ---
+                    alerts_data = user.get('alerts', {})
+                    if not isinstance(alerts_data, dict): alerts_data = {}
+                    contingency = "✅ ACTIVA" if alerts_data.get('contingency') else "🔕 INACTIVA"
 
-                # --- 2. Ubicaciones (Corregido a asterisco simple para que no truene Telegram) ---
-                locs_data = user.get('locations', {})
-                if not isinstance(locs_data, dict): locs_data = {}
-                locs_list = []
-                for k, v in locs_data.items():
-                    if isinstance(v, dict) and v.get('active'):
-                        locs_list.append(f"• *{k.capitalize()}:* {v.get('display_name', k).capitalize()}")
-                locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
+                    # --- 2. Ubicaciones (Corregido a asterisco simple para que no truene Telegram) ---
+                    locs_data = user.get('locations', {})
+                    if not isinstance(locs_data, dict): locs_data = {}
+                    locs_list = []
+                    for k, v in locs_data.items():
+                        if isinstance(v, dict) and v.get('active'):
+                            locs_list.append(f"• *{k.capitalize()}:* {v.get('display_name', k).capitalize()}")
+                    locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
 
-                # --- 3. Salud ---
-                health_data = user.get('health_profile', {})
-                condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
-                health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
+                    # --- 3. Salud ---
+                    health_data = user.get('health_profile', {})
+                    condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
+                    health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
 
-                # --- 4. Rutina / Transporte ---
-                transp = user.get('profile_transport', {})
-                if isinstance(transp, dict) and transp.get('medio'):
-                    nombres_medios = {
-                        "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
-                        "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
-                        "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
-                    }
-                    medio_raw = transp.get('medio')
-                    medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
-                    horas = transp.get('horas', 0)
-                    
-                    if medio_raw == 'home_office':
-                        transport_info = f"• Modalidad: {medio_str}\n• Tiempo: 0 hrs/día"
+                    # --- 4. Rutina / Transporte ---
+                    transp = user.get('profile_transport', {})
+                    if isinstance(transp, dict) and transp.get('medio'):
+                        nombres_medios = {
+                            "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
+                            "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
+                            "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
+                        }
+                        medio_raw = transp.get('medio')
+                        medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
+                        horas = transp.get('horas', 0)
+                        
+                        if medio_raw == 'home_office':
+                            transport_info = f"• Modalidad: {medio_str}\n• Tiempo: 0 hrs/día"
+                        else:
+                            ruta = "Casa ↔ Trabajo" if ('casa' in locs_data and 'trabajo' in locs_data) else "Ruta habitual"
+                            transport_info = f"• Ruta: {ruta}\n• Modo: {medio_str}\n• Tiempo: {horas} hrs/día"
                     else:
-                        ruta = "Casa ↔ Trabajo" if ('casa' in locs_data and 'trabajo' in locs_data) else "Ruta habitual"
-                        transport_info = f"• Ruta: {ruta}\n• Modo: {medio_str}\n• Tiempo: {horas} hrs/día"
+                        transport_info = "• No configurado."
+
+                    # --- 5. Auto e HNC en tiempo real ---
+                    veh = user.get('vehicle', {})
+                    if isinstance(veh, dict) and veh.get('active'):
+                        plate = veh.get('plate_last_digit')
+                        holo = veh.get('hologram')
+                        veh_str = f"• Placa {plate} (Holo {holo})"
+                        try:
+                            hoy_str = get_mexico_time().strftime("%Y-%m-%d")
+                            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                            fase = sys_state.get('last_contingency_phase', 'None')
+                            can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
+                            hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
+                        except:
+                            hnc_rem = "• Hoy: ⚠️ Error al calcular."
+                    else:
+                        veh_str = "• No registrado."
+                        hnc_rem = "• No configurado."
+
+                    # --- 6. Alertas por Umbral ---
+                    th_data = alerts_data.get('threshold', {})
+                    if not isinstance(th_data, dict): th_data = {}
+                    th_list = [f"• *{k.capitalize()}:* > {v.get('umbral', 100)} pts" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
+                    alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
+
+                    # --- 7. Reportes Programados ---
+                    sch_data = alerts_data.get('schedule', {})
+                    if not isinstance(sch_data, dict): sch_data = {}
+                    sch_list = []
+                    for k, v in sch_data.items():
+                        if isinstance(v, dict) and v.get('active'):
+                            dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
+                            sch_list.append(f"• *{k.capitalize()}:* {v.get('time', '00:00')} hrs ({dias_txt})")
+                    alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
                 else:
-                    transport_info = "• No configurado."
-
-                # --- 5. Auto e HNC en tiempo real ---
-                veh = user.get('vehicle', {})
-                if isinstance(veh, dict) and veh.get('active'):
-                    plate = veh.get('plate_last_digit')
-                    holo = veh.get('hologram')
-                    veh_str = f"• Placa {plate} (Holo {holo})"
-                    try:
-                        hoy_str = get_mexico_time().strftime("%Y-%m-%d")
-                        sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                        fase = sys_state.get('last_contingency_phase', 'None')
-                        can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
-                        hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
-                    except:
-                        hnc_rem = "• Hoy: ⚠️ Error al calcular."
-                else:
-                    veh_str = "• No registrado."
-                    hnc_rem = "• No configurado."
-
-                # --- 6. Alertas por Umbral ---
-                th_data = alerts_data.get('threshold', {})
-                if not isinstance(th_data, dict): th_data = {}
-                th_list = [f"• {k.capitalize()}: > {v.get('umbral', 100)} pts" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
-                alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
-
-                # --- 7. Reportes Programados ---
-                sch_data = alerts_data.get('schedule', {})
-                if not isinstance(sch_data, dict): sch_data = {}
-                sch_list = []
-                for k, v in sch_data.items():
-                    if isinstance(v, dict) and v.get('active'):
-                        dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
-                        sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
-                alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
+                    # SI ES FREE O TRIAL EXPIRADO, BLOQUEO VISUAL
+                    contingency = "🔕 INACTIVA (🔒 Premium)"
+                    
+                    locs_data = user.get('locations', {})
+                    if not isinstance(locs_data, dict): locs_data = {}
+                    locs_list = []
+                    for k, v in locs_data.items():
+                        if isinstance(v, dict) and v.get('active'):
+                            locs_list.append(f"• *{k.capitalize()}:* {v.get('display_name', k).capitalize()}")
+                    locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
+                    
+                    health_str = "• 🔒 Exclusivo Premium"
+                    transport_info = "• 🔒 Exclusivo Premium"
+                    veh_str = "• 🔒 Exclusivo Premium"
+                    hnc_rem = "• 🔒 Exclusivo Premium"
+                    alerts_th = "• 🔒 Exclusivo Premium"
+                    alerts_sch = "• 🔒 Exclusivo Premium"
 
                 # 🔥 ESCUDO ANTI-MARKDOWN
                 safe_name = str(first_name).replace("_", " ").replace("*", "")
@@ -1563,80 +1583,95 @@ def lambda_handler(event, context):
                 status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else (str(sub_data) if sub_data else 'FREE')
                 is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
                 
-                # --- 1. Alerta Contingencia ---
-                alerts_data = user.get('alerts', {})
-                if not isinstance(alerts_data, dict): alerts_data = {}
-                contingency = "✅ ACTIVA" if alerts_data.get('contingency') else "🔕 INACTIVA"
+                # --- EXTRACCIÓN CONDICIONADA AL PLAN ---
+                if is_prem:
+                    # --- 1. Alerta Contingencia ---
+                    alerts_data = user.get('alerts', {})
+                    if not isinstance(alerts_data, dict): alerts_data = {}
+                    contingency = "✅ ACTIVA" if alerts_data.get('contingency') else "🔕 INACTIVA"
 
-                # --- 2. Ubicaciones ---
-                locs_data = user.get('locations', {})
-                if not isinstance(locs_data, dict): locs_data = {}
-                locs_list = []
-                for k, v in locs_data.items():
-                    if isinstance(v, dict) and v.get('active'):
-                        locs_list.append(f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}")
-                locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
+                    # --- 2. Ubicaciones ---
+                    locs_data = user.get('locations', {})
+                    if not isinstance(locs_data, dict): locs_data = {}
+                    locs_list = []
+                    for k, v in locs_data.items():
+                        if isinstance(v, dict) and v.get('active'):
+                            locs_list.append(f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}")
+                    locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
 
-                # --- 3. Salud ---
-                health_data = user.get('health_profile', {})
-                condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
-                health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
+                    # --- 3. Salud ---
+                    health_data = user.get('health_profile', {})
+                    condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
+                    health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
 
-                # --- 4. Rutina / Transporte ---
-                transp = user.get('profile_transport', {})
-                if isinstance(transp, dict) and transp.get('medio'):
-                    nombres_medios = {
-                        "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
-                        "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
-                        "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
-                    }
-                    medio_raw = transp.get('medio')
-                    medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
-                    horas = transp.get('horas', 0)
-                    
-                    if medio_raw == 'home_office':
-                        transport_info = f"• Modalidad: {medio_str}\n• Tiempo: 0 hrs/día"
-                    else:
-                        ruta = "Casa ↔ Trabajo" if ('casa' in locs_data and 'trabajo' in locs_data) else "Ruta habitual"
-                        transport_info = f"• Ruta: {ruta}\n• Modo: {medio_str}\n• Tiempo: {horas} hrs/día"
-                else:
-                    transport_info = "• No configurado."
-
-                # --- 5. Auto e HNC en tiempo real ---
-                veh = user.get('vehicle', {})
-                if isinstance(veh, dict) and veh.get('active'):
-                    plate = veh.get('plate_last_digit')
-                    holo = veh.get('hologram')
-                    veh_str = f"• Placa {plate} (Holo {holo})"
-                    
-                    try:
-                        hoy_str = get_mexico_time().strftime("%Y-%m-%d")
-                        sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                        fase = sys_state.get('last_contingency_phase', 'None')
+                    # --- 4. Rutina / Transporte ---
+                    transp = user.get('profile_transport', {})
+                    if isinstance(transp, dict) and transp.get('medio'):
+                        nombres_medios = {
+                            "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
+                            "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
+                            "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
+                        }
+                        medio_raw = transp.get('medio')
+                        medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
+                        horas = transp.get('horas', 0)
                         
-                        can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
-                        hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
-                    except Exception:
-                        hnc_rem = "• Hoy: ⚠️ Error al calcular."
+                        if medio_raw == 'home_office':
+                            transport_info = f"• Modalidad: {medio_str}\n• Tiempo: 0 hrs/día"
+                        else:
+                            ruta = "Casa ↔ Trabajo" if ('casa' in locs_data and 'trabajo' in locs_data) else "Ruta habitual"
+                            transport_info = f"• Ruta: {ruta}\n• Modo: {medio_str}\n• Tiempo: {horas} hrs/día"
+                    else:
+                        transport_info = "• No configurado."
+
+                    # --- 5. Auto e HNC en tiempo real ---
+                    veh = user.get('vehicle', {})
+                    if isinstance(veh, dict) and veh.get('active'):
+                        plate = veh.get('plate_last_digit')
+                        holo = veh.get('hologram')
+                        veh_str = f"• Placa {plate} (Holo {holo})"
+                        
+                        try:
+                            hoy_str = get_mexico_time().strftime("%Y-%m-%d")
+                            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                            fase = sys_state.get('last_contingency_phase', 'None')
+                            
+                            can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
+                            hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
+                        except Exception:
+                            hnc_rem = "• Hoy: ⚠️ Error al calcular."
+                    else:
+                        veh_str = "• No registrado."
+                        hnc_rem = "• No configurado."
+
+                    # --- 6. Alertas por Umbral ---
+                    th_data = alerts_data.get('threshold', {})
+                    if not isinstance(th_data, dict): th_data = {}
+                    th_list = [f"• {k.capitalize()}: > {v.get('umbral', 100)} pts" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
+                    alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
+
+                    # --- 7. Reportes Programados ---
+                    sch_data = alerts_data.get('schedule', {})
+                    if not isinstance(sch_data, dict): sch_data = {}
+                    sch_list = []
+                    for k, v in sch_data.items():
+                        if isinstance(v, dict) and v.get('active'):
+                            dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
+                            sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
+                    alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
                 else:
-                    veh_str = "• No registrado."
-                    hnc_rem = "• No configurado."
-
-                # --- 6. Alertas por Umbral ---
-                th_data = alerts_data.get('threshold', {})
-                if not isinstance(th_data, dict): th_data = {}
-                th_list = [f"• {k.capitalize()}: > {v.get('umbral', 100)} pts" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
-                alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
-
-                # --- 7. Reportes Programados ---
-                sch_data = alerts_data.get('schedule', {})
-                if not isinstance(sch_data, dict): sch_data = {}
-                sch_list = []
-                for k, v in sch_data.items():
-                    if isinstance(v, dict) and v.get('active'):
-                        dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
-                        sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
-                alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
+                    # SI ES FREE O TRIAL EXPIRADO, BLOQUEO VISUAL
+                    contingency = "🔕 INACTIVA (🔒 Premium)"
+                    locs_data = user.get('locations', {})
+                    locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
+                    locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
+                    
+                    health_str = "• 🔒 Exclusivo Premium"
+                    transport_info = "• 🔒 Exclusivo Premium"
+                    veh_str = "• 🔒 Exclusivo Premium"
+                    hnc_rem = "• 🔒 Exclusivo Premium"
+                    alerts_th = "• 🔒 Exclusivo Premium"
+                    alerts_sch = "• 🔒 Exclusivo Premium"
 
                 # 🔥 ESCUDO ANTI-MARKDOWN
                 safe_name = str(first_name).replace("_", " ").replace("*", "")
@@ -1829,6 +1864,15 @@ def lambda_handler(event, context):
                     
                 # --- INICIO DE NUEVAS TOOLS (TEXTO/LLM) ---
                 elif fn == "configurar_transporte":
+                    # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
+                    user = get_user_profile(user_id)
+                    can_proceed, msg, markup = check_quota_and_permissions(user, 'premium_feature', user_id)
+                    if not can_proceed:
+                        send_telegram(chat_id, msg, markup)
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado: Dile al usuario que requiere suscripción Premium."})
+                        continue
+                    if msg: send_telegram(chat_id, msg)
+                        
                     medio = args.get('medio', 'auto_ventana')
                     horas_raw = args.get('horas_al_dia', 2)
                     
@@ -1934,11 +1978,29 @@ def lambda_handler(event, context):
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                 
                 elif fn == "configurar_alerta_ias": 
+                    # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
+                    user = get_user_profile(user_id)
+                    can_proceed, msg, markup = check_quota_and_permissions(user, 'premium_feature', user_id)
+                    if not can_proceed:
+                        send_telegram(chat_id, msg, markup)
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado: Dile al usuario que requiere suscripción Premium."})
+                        continue
+                    if msg: send_telegram(chat_id, msg)
+                        
                     r = configure_ias_alert(user_id, args['nombre_ubicacion'], args['umbral_ias'])
                     # IMPORTANTE: Avisar al LLM que ya se hizo
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
                 elif fn == "configurar_recordatorio": 
+                    # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
+                    user = get_user_profile(user_id)
+                    can_proceed, msg, markup = check_quota_and_permissions(user, 'premium_feature', user_id)
+                    if not can_proceed:
+                        send_telegram(chat_id, msg, markup)
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado: Dile al usuario que requiere suscripción Premium."})
+                        continue
+                    if msg: send_telegram(chat_id, msg)
+                        
                     # AHORA PASAMOS EL ARGUMENTO 'dias' QUE VIENE DEL LLM
                     r = configure_schedule_alert(user_id, args['nombre_ubicacion'], args['hora'], args.get('dias'))
                     # IMPORTANTE: Avisar al LLM que ya se hizo
@@ -1952,80 +2014,95 @@ def lambda_handler(event, context):
                     status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else (str(sub_data) if sub_data else 'FREE')
                     is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
                     
-                    # --- 1. Alerta Contingencia ---
-                    alerts_data = user.get('alerts', {})
-                    if not isinstance(alerts_data, dict): alerts_data = {}
-                    contingency = "✅ ACTIVA" if alerts_data.get('contingency') else "🔕 INACTIVA"
+                    # --- EXTRACCIÓN CONDICIONADA AL PLAN ---
+                    if is_prem:
+                        # --- 1. Alerta Contingencia ---
+                        alerts_data = user.get('alerts', {})
+                        if not isinstance(alerts_data, dict): alerts_data = {}
+                        contingency = "✅ ACTIVA" if alerts_data.get('contingency') else "🔕 INACTIVA"
 
-                    # --- 2. Ubicaciones ---
-                    locs_data = user.get('locations', {})
-                    if not isinstance(locs_data, dict): locs_data = {}
-                    locs_list = []
-                    for k, v in locs_data.items():
-                        if isinstance(v, dict) and v.get('active'):
-                            locs_list.append(f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}")
-                    locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
+                        # --- 2. Ubicaciones ---
+                        locs_data = user.get('locations', {})
+                        if not isinstance(locs_data, dict): locs_data = {}
+                        locs_list = []
+                        for k, v in locs_data.items():
+                            if isinstance(v, dict) and v.get('active'):
+                                locs_list.append(f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}")
+                        locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
 
-                    # --- 3. Salud ---
-                    health_data = user.get('health_profile', {})
-                    condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
-                    health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
+                        # --- 3. Salud ---
+                        health_data = user.get('health_profile', {})
+                        condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
+                        health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
 
-                    # --- 4. Rutina / Transporte ---
-                    transp = user.get('profile_transport', {})
-                    if isinstance(transp, dict) and transp.get('medio'):
-                        nombres_medios = {
-                            "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
-                            "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
-                            "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
-                        }
-                        medio_raw = transp.get('medio')
-                        medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
-                        horas = transp.get('horas', 0)
-                        
-                        if medio_raw == 'home_office':
-                            transport_info = f"• Modalidad: {medio_str}\n• Tiempo: 0 hrs/día"
-                        else:
-                            ruta = "Casa ↔ Trabajo" if ('casa' in locs_data and 'trabajo' in locs_data) else "Ruta habitual"
-                            transport_info = f"• Ruta: {ruta}\n• Modo: {medio_str}\n• Tiempo: {horas} hrs/día"
-                    else:
-                        transport_info = "• No configurado."
-
-                    # --- 5. Auto e HNC en tiempo real ---
-                    veh = user.get('vehicle', {})
-                    if isinstance(veh, dict) and veh.get('active'):
-                        plate = veh.get('plate_last_digit')
-                        holo = veh.get('hologram')
-                        veh_str = f"• Placa {plate} (Holo {holo})"
-                        
-                        try:
-                            hoy_str = get_mexico_time().strftime("%Y-%m-%d")
-                            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                            fase = sys_state.get('last_contingency_phase', 'None')
+                        # --- 4. Rutina / Transporte ---
+                        transp = user.get('profile_transport', {})
+                        if isinstance(transp, dict) and transp.get('medio'):
+                            nombres_medios = {
+                                "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
+                                "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
+                                "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
+                            }
+                            medio_raw = transp.get('medio')
+                            medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
+                            horas = transp.get('horas', 0)
                             
-                            can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
-                            hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
-                        except Exception:
-                            hnc_rem = "• Hoy: ⚠️ Error al calcular."
+                            if medio_raw == 'home_office':
+                                transport_info = f"• Modalidad: {medio_str}\n• Tiempo: 0 hrs/día"
+                            else:
+                                ruta = "Casa ↔ Trabajo" if ('casa' in locs_data and 'trabajo' in locs_data) else "Ruta habitual"
+                                transport_info = f"• Ruta: {ruta}\n• Modo: {medio_str}\n• Tiempo: {horas} hrs/día"
+                        else:
+                            transport_info = "• No configurado."
+
+                        # --- 5. Auto e HNC en tiempo real ---
+                        veh = user.get('vehicle', {})
+                        if isinstance(veh, dict) and veh.get('active'):
+                            plate = veh.get('plate_last_digit')
+                            holo = veh.get('hologram')
+                            veh_str = f"• Placa {plate} (Holo {holo})"
+                            
+                            try:
+                                hoy_str = get_mexico_time().strftime("%Y-%m-%d")
+                                sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                                fase = sys_state.get('last_contingency_phase', 'None')
+                                
+                                can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
+                                hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
+                            except Exception:
+                                hnc_rem = "• Hoy: ⚠️ Error al calcular."
+                        else:
+                            veh_str = "• No registrado."
+                            hnc_rem = "• No configurado."
+
+                        # --- 6. Alertas por Umbral ---
+                        th_data = alerts_data.get('threshold', {})
+                        if not isinstance(th_data, dict): th_data = {}
+                        th_list = [f"• {k.capitalize()}: > {v.get('umbral', 100)} pts" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
+                        alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
+
+                        # --- 7. Reportes Programados ---
+                        sch_data = alerts_data.get('schedule', {})
+                        if not isinstance(sch_data, dict): sch_data = {}
+                        sch_list = []
+                        for k, v in sch_data.items():
+                            if isinstance(v, dict) and v.get('active'):
+                                dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
+                                sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
+                        alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
                     else:
-                        veh_str = "• No registrado."
-                        hnc_rem = "• No configurado."
-
-                    # --- 6. Alertas por Umbral ---
-                    th_data = alerts_data.get('threshold', {})
-                    if not isinstance(th_data, dict): th_data = {}
-                    th_list = [f"• {k.capitalize()}: > {v.get('umbral', 100)} pts" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
-                    alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
-
-                    # --- 7. Reportes Programados ---
-                    sch_data = alerts_data.get('schedule', {})
-                    if not isinstance(sch_data, dict): sch_data = {}
-                    sch_list = []
-                    for k, v in sch_data.items():
-                        if isinstance(v, dict) and v.get('active'):
-                            dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
-                            sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
-                    alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
+                        # SI ES FREE O TRIAL EXPIRADO, BLOQUEO VISUAL
+                        contingency = "🔕 INACTIVA (🔒 Premium)"
+                        locs_data = user.get('locations', {})
+                        locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
+                        locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
+                        
+                        health_str = "• 🔒 Exclusivo Premium"
+                        transport_info = "• 🔒 Exclusivo Premium"
+                        veh_str = "• 🔒 Exclusivo Premium"
+                        hnc_rem = "• 🔒 Exclusivo Premium"
+                        alerts_th = "• 🔒 Exclusivo Premium"
+                        alerts_sch = "• 🔒 Exclusivo Premium"
 
                     # 🔥 ESCUDO ANTI-MARKDOWN
                     safe_name = str(first_name).replace("_", " ").replace("*", "")
@@ -2051,6 +2128,15 @@ def lambda_handler(event, context):
 
                 # --- NUEVOS BLOQUES HNC (PEGAR AQUÍ) ---
                 elif fn == "configurar_hora_alerta_auto":
+                    # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
+                    user = get_user_profile(user_id)
+                    can_proceed, msg, markup = check_quota_and_permissions(user, 'premium_feature', user_id)
+                    if not can_proceed:
+                        send_telegram(chat_id, msg, markup)
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado: Dile al usuario que requiere suscripción Premium."})
+                        continue
+                    if msg: send_telegram(chat_id, msg)
+                        
                     new_time = args.get('nueva_hora')
                     # Validación simple de formato HH:MM
                     if not new_time or ":" not in new_time or len(new_time) > 5:
@@ -2076,6 +2162,15 @@ def lambda_handler(event, context):
                     # para que se agregue al historial al final del bucle.
                 
                 elif fn == "configurar_auto":
+                    # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
+                    user = get_user_profile(user_id)
+                    can_proceed, msg, markup = check_quota_and_permissions(user, 'premium_feature', user_id)
+                    if not can_proceed:
+                        send_telegram(chat_id, msg, markup)
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado: Dile al usuario que requiere suscripción Premium."})
+                        continue
+                    if msg: send_telegram(chat_id, msg)
+                        
                     digit = args.get('ultimo_digito')
                     holo = args.get('hologram') or args.get('holograma')
                     
@@ -2355,6 +2450,15 @@ def lambda_handler(event, context):
                             return {'statusCode': 200, 'body': 'OK'}
 
                 elif fn == "configurar_alerta_contingencia":
+                    # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
+                    user = get_user_profile(user_id)
+                    can_proceed, msg, markup = check_quota_and_permissions(user, 'premium_feature', user_id)
+                    if not can_proceed:
+                        send_telegram(chat_id, msg, markup)
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado: Dile al usuario que requiere suscripción Premium."})
+                        continue
+                    if msg: send_telegram(chat_id, msg)
+                        
                     val = args.get('activar')
                     # Manejo robusto de booleanos que vienen como string
                     if isinstance(val, str): is_active = val.lower() == 'true'
