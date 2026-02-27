@@ -317,6 +317,7 @@ CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
 {hnc_reminder}
 
 💡 _Tip: Dile al bot 'Cambia mi transporte a...' para ajustar tu rutina._
+
 {footer}"""
 
 CARD_VERIFICATION = """🚗 *ESTATUS DE VERIFICACIÓN*
