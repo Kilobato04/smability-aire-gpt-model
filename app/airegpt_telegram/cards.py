@@ -362,6 +362,36 @@ _*Promedio de exposición {promedio_riesgo} µg/m³ eq.*_
 
 {footer}"""
 
+# --- NUEVAS TARJETAS: SUSCRIPCIONES Y PAYWALL ---
+CARD_TRIAL_ACTIVE = """💎 *Función Premium*
+        
+Estás intentando {action_text}. Como estás en tus primeros {trial_days} días, ¡puedes hacerlo gratis! Disfruta tu periodo de prueba (te quedan {days_left} días). 🚀"""
+
+CARD_PAYWALL = """🔒 *Función Bloqueada*
+        
+Tu periodo de prueba ha concluido. Para {action_text}, necesitas activar *AIreGPT Premium*.
+
+*Con Premium obtienes:*
+🚨 Alertas instantáneas de Calidad del Aire, Contingencias y recordatorios de HNC.
+😷 Cálculo diario de los "Cigarros Invisibles" que respiras.
+⏰ Reportes programados (Ej. Dime la Calidad del Aire todos los días a las 8am en mi Casa).
+📍 Soporte hasta para 3 ubicaciones.
+
+👇 *Elige tu plan para desbloquear tu cuenta inmediatamente:*"""
+
+CARD_WELCOME_PREMIUM = """🎉 *¡PAGO CONFIRMADO!* 💎
+        
+Bienvenido a *AIreGPT Premium*, {user_name}. Tu cuenta ha sido desbloqueada exitosamente.
+
+*Tus nuevos superpoderes están listos:*
+✅ Alertas automáticas reactivadas.
+✅ Cálculo de exposición diario desbloqueado.
+✅ Soporte para 3 ubicaciones y reportes programados.
+
+Toca el botón de abajo para ver tu nuevo resumen o dime qué quieres configurar ahora. 🚀
+
+{footer}"""
+
 # --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
 def get_exposure_button():
     # Usamos 💨🚬 como combo, o si prefieres solo la cajita 🚬
