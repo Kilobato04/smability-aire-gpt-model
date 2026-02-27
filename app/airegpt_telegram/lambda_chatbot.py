@@ -571,7 +571,7 @@ def get_time_greeting():
 def get_maps_url(lat, lon): return f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
 
 # --- REPORTE DIARIO CON PÍLDORA HNC Y VERIFICACIÓN INTEGRADAS ---
-def generate_report_card(user_name, location_name, lat, lon, vehicle=None, contingency_phase="None", user_profile=None):
+def generate_report_card(user_name, location_name, lat, lon, vehicle=None, contingency_phase="None", user_profile=None, is_premium=False):
     try:
         url = f"{API_LIGHT_URL}?lat={lat}&lon={lon}"
         r = requests.get(url, timeout=10)
@@ -594,7 +594,7 @@ def generate_report_card(user_name, location_name, lat, lon, vehicle=None, conti
                 user_condition = ", ".join(condiciones) # Ej: "Asma, Alergias"
 
         # Inyección HNC
-        hnc_pill = cards.build_hnc_pill(vehicle, contingency_phase)
+        hnc_pill = cards.build_hnc_pill(vehicle, contingency_phase, is_premium)
         combined_footer = f"{hnc_pill}\n\n{cards.BOT_FOOTER}" if hnc_pill else cards.BOT_FOOTER
 
         # Guardamos la tarjeta
@@ -607,7 +607,7 @@ def generate_report_card(user_name, location_name, lat, lon, vehicle=None, conti
             trend=tendencia_actual,
             forecast_block=cards.format_forecast_block(data.get('pronostico_timeline', [])),
             # --- AQUÍ INYECTAMOS LA CONDICIÓN MÉDICA ---
-            health_recommendation=cards.get_health_advice(calidad, user_condition), 
+            health_recommendation=cards.get_health_advice(calidad, user_condition, is_premium), 
             temp=meteo.get('tmp', 0), humidity=meteo.get('rh', 0), wind_speed=meteo.get('wsp', 0),
             footer=combined_footer
         )
@@ -881,6 +881,11 @@ def lambda_handler(event, context):
                 
                 # 2. Obtener datos
                 user = get_user_profile(user_id)
+                
+                # 👇 [NUEVO AJUSTE C] - Calculamos si es premium aquí mismo 👇
+                status_user = user.get('subscription', {}).get('status', 'FREE')
+                is_prem_user = "PREMIUM" in status_user.upper() or "TRIAL" in status_user.upper()
+                
                 locs = user.get('locations', {})
                 
                 # 3. Validación y Extracción
@@ -894,10 +899,13 @@ def lambda_handler(event, context):
                     sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                     current_phase = sys_state.get('last_contingency_phase', 'None')
                     
-                    # Generamos reporte
+                    # Generamos reporte - 👇 PASAMOS is_premium=is_prem_user 👇
                     report_text, calidad = generate_report_card(
                         first_name, disp_name, lat, lon, 
-                        vehicle=veh, contingency_phase=current_phase, user_profile=user
+                        vehicle=veh, 
+                        contingency_phase=current_phase, 
+                        user_profile=user,
+                        is_premium=is_prem_user  # <--- AGREGADO AQUÍ
                     )
                     
                     # Selección de Banner
@@ -1834,11 +1842,17 @@ def lambda_handler(event, context):
                         
                         # Aseguramos extraer el vehículo del perfil limpio
                         veh = user_profile.get('vehicle')
+
+                        status_tool = user_profile.get('subscription', {}).get('status', 'FREE')
+                        is_prem_tool = "PREMIUM" in status_tool.upper() or "TRIAL" in status_tool.upper()
                         
                         # 🔥 FIX 1 APLICADO: Usamos in_name, in_lat, in_lon
                         report_text, calidad = generate_report_card(
                             first_name, in_name, in_lat, in_lon, 
-                            vehicle=veh, contingency_phase=current_phase, user_profile=user_profile
+                            vehicle=veh, 
+                            contingency_phase=current_phase, 
+                            user_profile=user_profile,
+                            is_premium=is_prem_tool # <--- INYECCIÓN FINAL
                         )
                         
                         # Seleccionamos banner local
