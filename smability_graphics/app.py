@@ -1,5 +1,4 @@
 import os
-# --- FIX PARA MATPLOTLIB EN LAMBDA ---
 os.environ['MPLCONFIGDIR'] = '/tmp/matplotlib'
 import json
 import boto3
@@ -455,8 +454,9 @@ def generar_grafica_tetris(user_id):
             ias_suma[w_idx] += ias_val
             dias_con_datos[w_idx] += 1
 
-        cigarros_semana = np.ceil(cigarros_float).astype(int)
-        total_cigarros_ytd = int(np.sum(cigarros_semana))
+        # --- FIX: Mantener 1 decimal exacto sin redondear al entero ---
+        cigarros_semana = np.round(cigarros_float, 1) 
+        total_cigarros_ytd = round(np.sum(cigarros_semana), 1)
         anios_edad_urbana = round((total_cigarros_ytd * 2.0) / 365.0, 2)
 
         idx_inicio = max(0, semanas_transcurridas - 4)
@@ -523,15 +523,16 @@ def generar_grafica_tetris(user_id):
             y = i // columnas 
             
             if i < semanas_transcurridas:
-                # --- FIX 1: Si hay 0 cigarros, apagamos el bloque visualmente ---
-                if cigarros_semana[i] == 0:
+                # --- FIX 1: Evaluamos <= 0.0 por ser float ---
+                if cigarros_semana[i] <= 0.0:
                     dibujar_bloque_tetris(ax, x, y, None, is_empty=True)
                 else:
                     color = obtener_color_cigarros(cigarros_semana[i])
                     dibujar_bloque_tetris(ax, x, y, color)
                     
                     texto_color = 'white' if color == '#FF00FF' else 'black'
-                    ax.text(x+0.5, y+0.5, str(cigarros_semana[i]), color=texto_color, ha='center', va='center', fontsize=10, fontweight='black')
+                    # --- FIX 2: Formato .1f para garantizar 1 decimal visible ---
+                    ax.text(x+0.5, y+0.5, f"{cigarros_semana[i]:.1f}", color=texto_color, ha='center', va='center', fontsize=10, fontweight='black')
                 
                 # Marco punteado de semana actual
                 if i == semanas_transcurridas - 1:
