@@ -352,7 +352,7 @@ CARD_EXPOSICION = """{emoji_alerta} *Reporte de Exposición*
 Ayer *{fecha_ayer}* te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
 
 {rutina_str}
-😷 *Aire que respiraste:* {calidad_ias} ({promedio_ias} pts IAS)
+😷 *Aire que respiraste:* {calidad_ias} ({promedio_ias} pts IAS). Sin embargo...
 
 {emoji_cigarro} Respiraste el equivalente a *{cigarros} cigarros invisibles* en tu rutina.
 {emoji_edad} Esto sumó *{dias} días extra* de desgaste a tu Edad Urbana.
@@ -589,28 +589,35 @@ def format_forecast_block(timeline):
     # 2. Lógica para cruzar la medianoche
     def sort_key(item):
         try:
-            # Extraemos el número de la hora (de "22:00" sacamos 22)
             h = int(str(item.get('hora', '0')).split(':')[0])
         except ValueError:
             h = 0
-        # Si la hora del pronóstico es menor a la hora actual, es de mañana (+24)
         return h if h >= current_hour else h + 24
 
     # 3. Ordenamos cronológicamente de verdad
     sorted_timeline = sorted(timeline, key=sort_key)
     
-    # 4. Armamos el bloque visual
+    # 4. Armamos el bloque visual optimizado para móviles (Microcopy)
     block = ""
-    emoji_map = {"Bajo": "🟢", "Moderado": "🟡", "Alto": "🟠", "Muy Alto": "🔴", "Extremadamente Alto": "🟣"}
+    def get_mini_emoji(r):
+        r_lower = str(r).lower()
+        if "bajo" in r_lower: return "🟢"
+        if "moderado" in r_lower: return "🟡"
+        if "muy alto" in r_lower: return "🔴"
+        if "extrem" in r_lower: return "🟣"
+        return "🟠" # Alto
     
     # Tomamos solo las próximas 4 horas ya ordenadas
     for t in sorted_timeline[:4]:
         riesgo = t.get('riesgo', 'Bajo')
-        emoji = emoji_map.get(riesgo, "⚪")
-        # Tu tarjeta mostraba el contaminante (ej. "• PM10"), lo agregamos si existe
+        emoji = get_mini_emoji(riesgo)
+        
+        # MICROCOPY: Acortamos para que quepa en una línea de celular
+        riesgo_corto = str(riesgo).replace("Extremadamente Alto", "Extremo").replace("Moderado", "Mod")
         contam = f" • {t.get('dominante')}" if t.get('dominante') else ""
         
-        block += f"`{t.get('hora')}` | {emoji} {riesgo} ({t.get('ias')} pts){contam}\n"
+        # Formato monospace para la hora y sin la palabra 'pts' ni separador '|'
+        block += f"`{t.get('hora')}` {emoji} {riesgo_corto} ({t.get('ias')}){contam}\n"
         
     return block.strip()
 
