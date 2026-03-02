@@ -1570,13 +1570,12 @@ def lambda_handler(event, context):
                 return {'statusCode': 200, 'body': 'OK'}
                 
             # --- FIX ROBUSTO: PROMPTS (Detecta la frase aunque haya palabras extra) ---
-            trigger_words_prompts = [
+            elif any(k in text_clean for k in [
                 "que te pregunto", "que te puedo preguntar", "que me puedes responder", 
                 "como te hablo", "como hablarte", "ejemplos", "dame ejemplos", "prompts",
                 "que mas haces", "que me puedes decir", "que sabes hacer", "dame opciones",
                 "para que sirves", "como funcionas"
-            ]
-            elif any(k in text_clean for k in trigger_words_prompts):
+            ]):
                 msg_envio = cards.CARD_PROMPTS.format(footer=cards.BOT_FOOTER)
                 send_telegram(chat_id, msg_envio)
                 return {'statusCode': 200, 'body': 'OK'}
