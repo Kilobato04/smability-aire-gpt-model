@@ -2230,7 +2230,7 @@ def lambda_handler(event, context):
                     return {'statusCode': 200, 'body': 'OK'}
 
                 # --- NUEVOS BLOQUES HNC (PEGAR AQUÍ) ---
-                elif fn == "configurar_hora_alerta_auto":
+                if fn == "configurar_hora_alerta_auto":
                     # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
                     user = get_user_profile(user_id)
                     can_proceed, msg, markup = check_quota_and_permissions(user, 'premium_feature', user_id)
