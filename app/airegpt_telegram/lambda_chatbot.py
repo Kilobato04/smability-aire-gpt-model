@@ -65,6 +65,10 @@ def check_quota_and_permissions(user_profile, action_type, user_id):
     tier, days_left = stripeairegpt.evaluate_user_tier(user_profile)
     print(f"🛡️ [GATEKEEPER] User: {user_id} | Plan: {tier} | Days Left: {days_left}")
 
+    # Funciones SIEMPRE permitidas para todos (Free y Premium)
+    if action_type in ['configurar_auto', 'consultar_hoy_no_circula']:
+        return True, "", None
+
     LIMIT_LOC_FREE = 2
     LIMIT_LOC_PREM = 3
     
@@ -852,20 +856,29 @@ def lambda_handler(event, context):
             # --- GUARDADO Y CASCADA DE ONBOARDING ---
             if data == "SAVE_HOME": 
                 resp = confirm_saved_location(user_id, 'casa')
-                # Magia de Cascada: Revisamos qué le falta
                 user = get_user_profile(user_id)
+                # Evaluamos el tier para saber si le pedimos auto o cerramos el flujo
+                tier, _ = stripeairegpt.evaluate_user_tier(user)
+                
                 if 'trabajo' not in user.get('locations', {}):
                     resp += "\n\n🚀 **PASO 2:**\nAhora, envíame la ubicación de tu **TRABAJO** (o escuela) tocando el clip 📎."
-                elif not user.get('vehicle', {}).get('active'):
-                    resp += "\n\n🚗 **PASO FINAL:**\nRegistra tu auto para evitar multas. Escríbeme:\n💬 *'Mi placa termina en 5 y soy holograma 0'.*"
+                else:
+                    if tier in ['PREMIUM', 'TRIAL']:
+                        if not user.get('vehicle', {}).get('active'):
+                            resp += "\n\n🚗 **PASO FINAL:**\nRegistra tu auto para evitar multas. Escríbeme:\n💬 *'Mi placa termina en 5 y soy holograma 0'.*"
+                    else:
+                        resp += "\n\n🎉 **¡Listo! Tu perfil básico está completo.**"
 
             elif data == "SAVE_WORK": 
                 resp = confirm_saved_location(user_id, 'trabajo')
                 user = get_user_profile(user_id)
-                if not user.get('vehicle', {}).get('active'):
+                import stripeairegpt
+                tier, _ = stripeairegpt.evaluate_user_tier(user)
+                
+                if tier in ['PREMIUM', 'TRIAL'] and not user.get('vehicle', {}).get('active'):
                     resp += "\n\n🚗 **PASO FINAL:**\nPara protegerte de multas, registra tu auto. Escríbeme:\n💬 *'Mi placa termina en 5 y soy holograma 0'.*"
                 else:
-                    resp += "\n\n🎉 **¡Perfil completo!** Ya estás 100% protegido."
+                    resp += "\n\n🎉 **¡Listo! Tu perfil básico está completo.**"
 
             elif data == "RESET": 
                 resp = "🗑️ Cancelado."
@@ -1306,8 +1319,9 @@ def lambda_handler(event, context):
                             dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
                             sch_list.append(f"• *{k.capitalize()}:* {v.get('time', '00:00')} hrs ({dias_txt})")
                     alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
+      
                 else:
-                    # SI ES FREE O TRIAL EXPIRADO, BLOQUEO VISUAL
+                    # LÓGICA FREE: Leemos auto y mostramos alertas de degustación
                     contingency = "🔕 INACTIVA (🔒 Premium)"
                     
                     locs_data = user.get('locations', {})
@@ -1320,9 +1334,35 @@ def lambda_handler(event, context):
                     
                     health_str = "• 🔒 Exclusivo Premium"
                     transport_info = "• 🔒 Exclusivo Premium"
-                    veh_str = "• 🔒 Exclusivo Premium"
-                    hnc_rem = "• 🔒 Exclusivo Premium"
-                    alerts_th = "• 🔒 Exclusivo Premium"
+                    
+                    # El auto sí es gratis (FIX C)
+                    veh = user.get('vehicle', {})
+                    if isinstance(veh, dict) and veh.get('active'):
+                        plate = veh.get('plate_last_digit')
+                        holo = veh.get('hologram')
+                        veh_str = f"• Placa {plate} (Holo {holo})"
+                        
+                        try:
+                            hoy_str = get_mexico_time().strftime("%Y-%m-%d")
+                            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                            fase = sys_state.get('last_contingency_phase', 'None')
+                            
+                            can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
+                            hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
+                        except Exception:
+                            hnc_rem = "• Hoy: ⚠️ Error al calcular."
+                    else:
+                        veh_str = "• No registrado."
+                        hnc_rem = "• No configurado."
+                    
+                    # Leemos sus alertas de prueba (FIX C)
+                    alerts_data = user.get('alerts', {}) if isinstance(user.get('alerts'), dict) else {}
+                    th_data = alerts_data.get('threshold', {}) if isinstance(alerts_data.get('threshold'), dict) else {}
+                    free_sent = int(user.get('free_alerts_sent', 0))
+                    
+                    th_list = [f"• *{k.capitalize()}:* > {v.get('umbral', 100)} pts (Prueba: {free_sent}/3 usadas)" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
+                    alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
+                    
                     alerts_sch = "• 🔒 Exclusivo Premium"
 
                 # 🔥 ESCUDO ANTI-MARKDOWN
