@@ -441,7 +441,10 @@ def generar_grafica_tetris(user_id):
         dias_con_datos = np.zeros(semanas_totales)
 
         for log in all_logs:
-            fecha_str = log.get('fecha')
+            # 1. Identificar si es un registro diario o un resumen histórico
+            es_historico = 'fecha_cierre' in log
+            fecha_str = log.get('fecha_cierre') if es_historico else log.get('fecha')
+            
             if not fecha_str: continue
             
             dt = datetime.strptime(fecha_str, "%Y-%m-%d")
@@ -450,13 +453,18 @@ def generar_grafica_tetris(user_id):
             w_idx = dt.isocalendar()[1] - 1 # Índice de array (0 a 51)
             if w_idx < 0 or w_idx >= 52: continue
             
-            cigarros_float[w_idx] += float(log.get('cigarros', 0))
-            
-            pm25 = float(log.get('promedio_pm25', 0))
-            ias_val = float(log.get('promedio_ias', pm25 * 4)) 
-            
-            ias_suma[w_idx] += ias_val
-            dias_con_datos[w_idx] += 1
+            # 2. Sumar cigarros dependiendo del tipo de registro
+            if es_historico:
+                cigarros_float[w_idx] += float(log.get('cigarros_totales', 0))
+                # (El IAS histórico no lo necesitamos sumar aquí, la tarjeta mensual ya se congeló)
+            else:
+                cigarros_float[w_idx] += float(log.get('cigarros', 0))
+                
+                # El IAS solo lo promediamos de los días activos (current_week)
+                pm25 = float(log.get('promedio_pm25', 0))
+                ias_val = float(log.get('promedio_ias', pm25 * 4)) 
+                ias_suma[w_idx] += ias_val
+                dias_con_datos[w_idx] += 1
 
         # --- FIX: Mantener 1 decimal exacto sin redondear al entero ---
         cigarros_semana = np.round(cigarros_float, 1) 
