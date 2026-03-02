@@ -2155,7 +2155,7 @@ def lambda_handler(event, context):
                         else:
                             transport_info = "• No configurado."
 
-                        # --- 5. Auto e HNC en tiempo real ---
+                    # --- 5. Auto e HNC en tiempo real ---
                     veh = user.get('vehicle', {})
                     if isinstance(veh, dict) and veh.get('active'):
                         plate = veh.get('plate_last_digit')
@@ -2174,7 +2174,7 @@ def lambda_handler(event, context):
                             hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
                         except Exception:
                             hnc_rem = "• Hoy: ⚠️ Error al calcular."
-                    else:
+                    else: # <-- ESTE ELSE DEBE ESTAR ALINEADO CON EL 'if isinstance'
                         veh_str = "• No registrado."
                         hnc_rem = "• No configurado."
 
