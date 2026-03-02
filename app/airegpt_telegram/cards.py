@@ -3,7 +3,7 @@ import urllib.parse
 BOT_VERSION = "v6.0"
 
 # --- NUEVO FOOTER LIMPIO ---
-BOT_FOOTER = """_Nota: Sugerencias preventivas basadas en modelos ambientales. No sustituyen evaluación médica._
+BOT_FOOTER = """_*Nota:* Sugerencias preventivas basadas en modelos ambientales. No sustituyen evaluación médica._
 
 [AIreGPT](https://airegpt.ai) | [Canal](https://t.me/smability) | [IG](https://instagram.com/airegpt.ai) | [TikTok](https://tiktok.com/@airegpt)"""
 
