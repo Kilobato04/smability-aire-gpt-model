@@ -258,5 +258,30 @@ TOOLS_SCHEMA = [
             "description": "Calcula los cigarros respirados y la 'Edad Urbana'.",
             "parameters": {"type": "object", "properties": {}}
         }
+    },
+    #---
+    {
+        "type": "function",
+        "function": {
+            "name": "eliminar_auto",
+            "description": "Elimina el vehículo registrado del perfil del usuario.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "eliminar_rutina",
+            "description": "Elimina la rutina de transporte del usuario.",
+            "parameters": {"type": "object", "properties": {}}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "eliminar_perfil_salud",
+            "description": "Elimina todas las condiciones médicas registradas por el usuario.",
+            "parameters": {"type": "object", "properties": {}}
+        }
     }
 ]
