@@ -3,10 +3,11 @@ import os
 import time
 import requests
 import boto3
-from datetime import datetime, timedelta
-# Asegúrate de que estos módulos existen en tu entorno o están en layers
+import stripeairegpt
 import cards
 import re
+from datetime import datetime, timedelta
+
 
 # --- CONFIGURACIÓN ---
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
@@ -407,89 +408,88 @@ def process_user(user, current_hour_str, contingency_data):
                         
                         # [LOG 5] EL MOMENTO DE LA VERDAD
                         print(f"   ⚖️ [COMPARE] {loc_name}: ¿Actual {cur_ias} > Umbral {umbral}?")
-                        
+                        #-----
                         if cur_ias >= umbral:
                             count = int(config.get('consecutive_sent', 0))
                             print(f"   🚨 [TRIGGER] CONDICIÓN CUMPLIDA. Consecutive sent: {count}")
 
-                            if count < 3:
-                                f_short = interpret_timeline_short(cur_ias, data.get('pronostico_timeline', []))
-                                # 🔥 FIX: Lógica Matemática Unificada de IAS a Color (CDMX)
-                                cur_ias = qa.get('ias', 0)
-                                if cur_ias <= 50:
-                                    cat = "Buena"
-                                elif cur_ias <= 100:
-                                    cat = "Regular"
-                                elif cur_ias <= 150:
-                                    cat = "Mala"
-                                elif cur_ias <= 200:
-                                    cat = "Muy Mala"
-                                else:
-                                    cat = "Extremadamente Mala"
-                                    
-                                info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Regular'])
-                                
-                                print(f"   📤 [SENDING] Enviando mensaje a Telegram...")
-                                
-                                # Generar Píldora HNC
-                                db_item = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                                sys_phase = db_item.get('last_contingency_phase', 'None')
-                                hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase)
-                                
-                                # Armar footer combinado
-                                combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
-
-                                # --- NUEVO: Extraer tendencia de la API ---
-                                tendencia_actual = qa.get('tendencia', 'Estable 📊')
-                                # A la tarjeta de alerta IAS le pasamos la tendencia corta si f_short existe, o la de la API
-                                tendencia_final = f_short if f_short != "Estable" else tendencia_actual
-
-                                card = cards.CARD_ALERT_IAS.format(
-                                    user_name=first_name, 
-                                    location_name=loc_data.get('display_name', loc_name),
-                                    maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
-                                    risk_category=cat, 
-                                    risk_circle=info['emoji'], 
-                                    ias_value=cur_ias,
-                                    report_time=f"{current_hour_str.split(':')[0]}:20", # <--- EL FIX ESTÁ AQUÍ 🛠️
-                                    forecast_msg=tendencia_final,
-                                    threshold=umbral, 
-                                    pollutant=qa.get('dominante', 'N/A'), 
-                                    health_recommendation=cards.get_health_advice(cat, h_str),
-                                    footer=combined_footer
-                                )
-                                
-                                # --- FIX BANNERS: Seleccionar y enviar foto ---
-                                import os
-                                directorio_actual = os.path.dirname(os.path.abspath(__file__))
-                                mapa_archivos = {
-                                    "Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png",
-                                    "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"
-                                }
-                                calidad_clean = cat.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
-                                nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
-                                ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
-                                
-                                # Botón exclusivo para alerta de emergencia
-                                markup_umbral = {
-                                    "inline_keyboard": [[{"text": "📊 Mi Resumen", "callback_data": "ver_resumen"}]]
-                                }
-                                send_telegram_photo_local(user_id, ruta_imagen, card, markup=markup_umbral)
-                                # ---------------------------------------------
-                                
-                                # Actualizar contador
-                                try:
-                                    table.update_item(
-                                        Key={'user_id': user_id},
-                                        UpdateExpression=f"SET alerts.threshold.#{loc_name}.consecutive_sent = :inc",
-                                        ExpressionAttributeNames={f"#{loc_name}": loc_name},
-                                        ExpressionAttributeValues={':inc': count + 1}
-                                    )
-                                    print("   ✅ [DB] Contador actualizado.")
-                                except Exception as e:
-                                    print(f"   ❌ [DB ERROR] No se pudo actualizar contador: {e}")
+                            # --- FIX NIVEL 4: CICLO DE ALERTAS FREE Y PREMIUM ---
+                            tier = user.get('subscription', {}).get('status', 'FREE')
+                            
+                            should_send = False
+                            is_paywall = False
+                            
+                            if "PREMIUM" in tier or "TRIAL" in tier:
+                                if count < 3: should_send = True # Premium no recibe spam (max 3 seguidas)
                             else:
-                                print(f"   🛑 [MUTE] Alerta silenciada por spam (consecutive >= 3)")
+                                # LÓGICA FREE: 3 alertas de vida
+                                free_alerts_sent = int(user.get('free_alerts_sent', 0))
+                                if free_alerts_sent < 3:
+                                    should_send = True
+                                    try:
+                                        # Le sumamos 1 a su contador histórico
+                                        table.update_item(Key={'user_id': user_id}, UpdateExpression="SET free_alerts_sent = :val", ExpressionAttributeValues={':val': free_alerts_sent + 1})
+                                    except: pass
+                                else:
+                                    # Se le acabaron las de prueba
+                                    is_paywall = True
+                                    should_send = True 
+                            
+                            if should_send:
+                                if is_paywall:
+                                    print(f"   💸 [PAYWALL] Lanzando muro a {first_name}")
+                                    import stripeairegpt
+                                    texto_venta, botones = stripeairegpt.get_paywall_response(tier, 0, "alertas", str(user_id))
+                                    paywall_msg = "🚨 **El aire ha superado tu límite de peligro.**\n\nHas agotado tus 3 alertas automáticas de prueba.\n\nPara seguir recibiendo estos avisos en tiempo real, activa tu plan:\n\n" + texto_venta
+                                    send_telegram_push(user_id, paywall_msg, markup=botones)
+                                    try:
+                                        # Apagamos su alerta para que no se le lance el paywall cada hora
+                                        table.update_item(Key={'user_id': user_id}, UpdateExpression=f"SET alerts.threshold.#{loc_name}.active = :false", ExpressionAttributeNames={f"#{loc_name}": loc_name}, ExpressionAttributeValues={':false': False})
+                                    except: pass
+                                else:
+                                    # ENVÍO NORMAL DE ALERTA
+                                    f_short = interpret_timeline_short(cur_ias, data.get('pronostico_timeline', []))
+                                    cur_ias_val = qa.get('ias', 0)
+                                    
+                                    if cur_ias_val <= 50: cat = "Buena"
+                                    elif cur_ias_val <= 100: cat = "Regular"
+                                    elif cur_ias_val <= 150: cat = "Mala"
+                                    elif cur_ias_val <= 200: cat = "Muy Mala"
+                                    else: cat = "Extremadamente Mala"
+                                    
+                                    info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Regular'])
+                                    db_item = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                                    sys_phase = db_item.get('last_contingency_phase', 'None')
+                                    hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase)
+                                    combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
+
+                                    tendencia_actual = qa.get('tendencia', 'Estable 📊')
+                                    tendencia_final = f_short if f_short != "Estable" else tendencia_actual
+
+                                    card = cards.CARD_ALERT_IAS.format(
+                                        user_name=first_name, location_name=loc_data.get('display_name', loc_name), maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
+                                        risk_category=cat, risk_circle=info['emoji'], ias_value=cur_ias_val,
+                                        report_time=f"{current_hour_str.split(':')[0]}:20", forecast_msg=tendencia_final,
+                                        threshold=umbral, pollutant=qa.get('dominante', 'N/A'), health_recommendation=cards.get_health_advice(cat, h_str),
+                                        footer=combined_footer
+                                    )
+                                    
+                                    import os
+                                    directorio_actual = os.path.dirname(os.path.abspath(__file__))
+                                    mapa_archivos = {"Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png", "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"}
+                                    calidad_clean = cat.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
+                                    ruta_imagen = os.path.join(directorio_actual, "banners", mapa_archivos.get(calidad_clean, "banner_regular.png"))
+                                    
+                                    markup_umbral = {"inline_keyboard": [[{"text": "📊 Mi Resumen", "callback_data": "ver_resumen"}]]}
+                                    send_telegram_photo_local(user_id, ruta_imagen, card, markup=markup_umbral)
+                                    
+                                    try:
+                                        # Anti-Spam de la hora actual
+                                        table.update_item(Key={'user_id': user_id}, UpdateExpression=f"SET alerts.threshold.#{loc_name}.consecutive_sent = :inc", ExpressionAttributeNames={f"#{loc_name}": loc_name}, ExpressionAttributeValues={':inc': count + 1})
+                                    except: pass
+                            else:
+                                print(f"   🛑 [MUTE] Alerta silenciada (Premium hizo spam o algo falló).")
+                            # --- FIN DEL FIX ---
 
                         elif config.get('consecutive_sent', 0) > 0:
                             # Resetear contador si bajó el nivel
