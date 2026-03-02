@@ -3,7 +3,7 @@ import urllib.parse
 BOT_VERSION = "v6.0"
 
 # --- NUEVO FOOTER LIMPIO ---
-BOT_FOOTER = "\n\n🌐 [airegpt.ai](https://airegpt.ai) | 🚨 [Canal de Alertas](https://t.me/smability)\nSíguenos: 📸 [IG](https://instagram.com/airegpt.ai) • 🎵 [TikTok](https://tiktok.com/@airegpt)"
+BOT_FOOTER = "\n\n🌐 [AIreGPT](https://airegpt.ai) | 🚨 [Canal](https://t.me/smability)\nSíguenos: 📸 [IG](https://instagram.com/airegpt.ai) • 🎵 [TikTok](https://tiktok.com/@airegpt)"
 
 IAS_INFO = {
     "Buena": {"msg": "Aire limpio.", "rec": "¡Disfruta el exterior!", "emoji": "🟢"},
