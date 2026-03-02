@@ -1889,7 +1889,13 @@ def lambda_handler(event, context):
         if ai_msg.tool_calls:
             print(f"🛠️ [TOOL] GPT wants to call: {len(ai_msg.tool_calls)} tools")
             gpt_msgs.append(ai_msg)
-            user = user_profile
+            
+            # --- 💉 INYECCIÓN QUIRÚRGICA MAESTRA (Cura el Error status_str) ---
+            user = user_profile 
+            status_str = user.get('subscription', {}).get('status', 'FREE')
+            is_prem = any(x in status_str.upper() for x in ["PREMIUM", "TRIAL"])
+            # -----------------------------------------------------------------
+
             for tc in ai_msg.tool_calls:
                 fn = tc.function.name
                 args = json.loads(tc.function.arguments)
