@@ -1889,6 +1889,7 @@ def lambda_handler(event, context):
         if ai_msg.tool_calls:
             print(f"🛠️ [TOOL] GPT wants to call: {len(ai_msg.tool_calls)} tools")
             gpt_msgs.append(ai_msg)
+            user = user_profile
             for tc in ai_msg.tool_calls:
                 fn = tc.function.name
                 args = json.loads(tc.function.arguments)
