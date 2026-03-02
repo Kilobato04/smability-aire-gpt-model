@@ -2251,15 +2251,16 @@ def lambda_handler(event, context):
                     # para que se agregue al historial al final del bucle.
                 
                 elif fn == "configurar_auto":
-                    # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
+                    # 0. 🔒 GATEKEEPER (Ahora permite pasar a todos para el registro base)
                     user = get_user_profile(user_id)
-                    can_proceed, msg, markup = check_quota_and_permissions(user, 'premium_feature', user_id)
+                    can_proceed, msg, markup = check_quota_and_permissions(user, 'configurar_auto', user_id)
+                    
                     if not can_proceed:
                         send_telegram(chat_id, msg, markup)
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado: Dile al usuario que requiere suscripción Premium."})
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado."})
                         continue
-                    if msg: send_telegram(chat_id, msg)
-                        
+
+                    # 1. Procesar argumentos
                     digit = args.get('ultimo_digito')
                     holo = args.get('hologram') or args.get('holograma')
                     
@@ -2267,41 +2268,41 @@ def lambda_handler(event, context):
                         r = "⚠️ Faltan datos. Necesito último dígito y holograma."
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                     else:
-                        # 1. GUARDAR (Acción Silenciosa)
+                        # 2. GUARDAR en DynamoDB
                         save_resp = save_vehicle_profile(user_id, digit, holo)
                         
-                        # 2. GENERAR REPORTE MENSUAL (Acción Visible)
-                        now = datetime.now()
-                        lista_dias = get_monthly_prohibited_dates(digit, holo, now.year, now.month)
-                        txt_sem, txt_sab = get_restriction_summary(digit, holo)
+                        # 3. DIFERENCIACIÓN DE EXPERIENCIA (FREE vs PREMIUM)
+                        tier, _ = stripeairegpt.evaluate_user_tier(user)
                         
-                        # Colores y Multas
-                        colors = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
-                        
-                        # --- CÁLCULO DEL MES (Hacerlo ANTES del format) ---
-                        meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
-                        nombre_mes_actual = meses_es[now.month]
-                        verif_txt = cards.get_verification_period(digit, holo) # <--- FIX APLICADO
-
-                        # Formatear Tarjeta
-                        card = cards.CARD_HNC_DETAILED.format(
-                            mes_nombre=nombre_mes_actual,
-                            plate=digit,
-                            color=cards.ENGOMADOS.get(int(digit), "Desconocido"), # <--- FIX LIMPIO Y SEGURO
-                            holo=str(holo).upper(),
-                            verificacion_txt=verif_txt, # <--- NUEVO CAMPO
-                            dias_semana_txt=txt_sem,
-                            sabados_txt=txt_sab,
-                            lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
-                            multa_cdmx=f"${MULTA_CDMX_MIN:,.0f} - ${MULTA_CDMX_MAX:,.0f}",
-                            multa_edomex=f"${MULTA_EDOMEX:,.0f}",
-                            footer=cards.BOT_FOOTER
-                        )
-                        
-                        # 3. ENVIAR Y CORTAR
-                        send_telegram(chat_id, f"✅ **Datos guardados.** Aquí tienes tu proyección del mes:\n\n{save_resp}") # Confirmación texto breve
-                        send_telegram(chat_id, card) # Tarjeta detallada
-                        return {'statusCode': 200, 'body': 'OK'}
+                        if tier == 'FREE':
+                            # Confirmación simple para el usuario gratuito
+                            r = f"✅ Auto registrado: Placa {digit}, Holo {holo.upper()}."
+                            send_telegram(chat_id, f"{r}\n\nYa puedes preguntarme: *'¿Circulo hoy?'* para verificar tu estatus diario.")
+                            # Importante: Cortamos aquí para que no mande la tarjeta detallada
+                            return {'statusCode': 200, 'body': 'OK'}
+                        else:
+                            # Reporte completo de Calendario Mensual para PREMIUM/TRIAL
+                            now = datetime.now()
+                            lista_dias = get_monthly_prohibited_dates(digit, holo, now.year, now.month)
+                            txt_sem, txt_sab = get_restriction_summary(digit, holo)
+                            meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
+                            
+                            card = cards.CARD_HNC_DETAILED.format(
+                                mes_nombre=meses_es[now.month],
+                                plate=digit,
+                                color=cards.ENGOMADOS.get(int(digit), "Desconocido"),
+                                holo=str(holo).upper(),
+                                verificacion_txt=cards.get_verification_period(digit, holo),
+                                dias_semana_txt=txt_sem,
+                                sabados_txt=txt_sab,
+                                lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
+                                multa_cdmx=f"$2,171 - $3,257",
+                                multa_edomex=f"$2,171",
+                                footer=cards.BOT_FOOTER
+                            )
+                            send_telegram(chat_id, f"✅ **Auto guardado.**\n{save_resp}")
+                            send_telegram(chat_id, card, markup=cards.get_hnc_buttons())
+                            return {'statusCode': 200, 'body': 'OK'}
 
                 # --- TOOL DE SALUD (CON GATEKEEPER) ---
                 # 🔥 FIX: Renombrado a como lo llama GPT realmente en el JSON
