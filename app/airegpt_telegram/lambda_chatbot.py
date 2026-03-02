@@ -67,7 +67,7 @@ def check_quota_and_permissions(user_profile, action_type, user_id):
     
     print(f"🛡️ [GATEKEEPER] User: {user_id} | Plan: {tier} | Days Left: {days_left}")
 
-    LIMIT_LOC_FREE = 1
+    LIMIT_LOC_FREE = 2
     LIMIT_LOC_PREM = 3
     
     # 2. Bloqueo Inmediato si es FREE (Trial Expirado)
@@ -1550,7 +1550,13 @@ def lambda_handler(event, context):
                 return {'statusCode': 200, 'body': 'OK'}
                 
             # --- FIX ROBUSTO: PROMPTS (Detecta la frase aunque haya palabras extra) ---
-            elif any(k in text_clean for k in ["que te pregunto", "que te puedo preguntar", "que me puedes responder", "como te hablo", "como hablarte", "ejemplos", "dame ejemplos", "prompts"]):
+            trigger_words_prompts = [
+                "que te pregunto", "que te puedo preguntar", "que me puedes responder", 
+                "como te hablo", "como hablarte", "ejemplos", "dame ejemplos", "prompts",
+                "que mas haces", "que me puedes decir", "que sabes hacer", "dame opciones",
+                "para que sirves", "como funcionas"
+            ]
+            elif any(k in text_clean for k in trigger_words_prompts):
                 msg_envio = cards.CARD_PROMPTS.format(footer=cards.BOT_FOOTER)
                 send_telegram(chat_id, msg_envio)
                 return {'statusCode': 200, 'body': 'OK'}
