@@ -857,7 +857,8 @@ def lambda_handler(event, context):
             if data == "SAVE_HOME": 
                 resp = confirm_saved_location(user_id, 'casa')
                 user = get_user_profile(user_id)
-                # Eliminamos el import local, ya usamos el global del inicio
+                
+                # FIX: Usamos la referencia global de stripeairegpt (ya importado al inicio)
                 tier, _ = stripeairegpt.evaluate_user_tier(user)
                 
                 if 'trabajo' not in user.get('locations', {}):
@@ -872,7 +873,6 @@ def lambda_handler(event, context):
             elif data == "SAVE_WORK": 
                 resp = confirm_saved_location(user_id, 'trabajo')
                 user = get_user_profile(user_id)
-                # Eliminamos el import local aquí también
                 tier, _ = stripeairegpt.evaluate_user_tier(user)
                 
                 if tier in ['PREMIUM', 'TRIAL'] and not user.get('vehicle', {}).get('active'):
