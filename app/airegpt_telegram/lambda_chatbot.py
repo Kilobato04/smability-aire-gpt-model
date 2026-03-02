@@ -346,9 +346,13 @@ def confirm_saved_location(user_id, tipo):
         user = get_user_profile(user_id)
         count = len(user.get('locations', {}))
         
-        # Le avisamos al usuario que su alerta ya está activa
         msg = f"✅ **{display_name} guardada.**\n🚨 *Alerta de emergencia activada (>100 pts).*"
         
+        # --- FIX TAREA 12: AVISO DE "PRUEBA DE VALOR" ---
+        tier, _ = stripeairegpt.evaluate_user_tier(user)
+        if tier == 'FREE':
+            msg += "\n\n🎁 *Bonus:* Recibirás hasta **3 alertas automáticas gratis** para probar el servicio."
+            
         if count >= 2: msg += f"\n\n🎉 **Tienes {count} lugares guardados.**"
         
         return msg
@@ -973,6 +977,17 @@ def lambda_handler(event, context):
             # --- CANCELAR ---
             elif data == "CANCEL_DELETE":
                 resp = "✅ Operación cancelada. Tu ubicación sigue segura."
+            # --- FIX TAREA 9 (NUEVO): EJECUTOR DE BORRADO TOTAL ---
+            elif data == "CONFIRM_RESET_ALL":
+                try:
+                    table.update_item(
+                        Key={'user_id': str(user_id)},
+                        UpdateExpression="REMOVE locations, alerts, vehicle, health_profile, profile_transport, draft_location, last_graphic_ts, last_tetris_ts"
+                    )
+                    send_telegram(chat_id, "💥 **Tus datos han sido eliminados correctamente.**\n\nEstás en blanco como el primer día. Si deseas volver a configurarme, escribe /start.", markup={"inline_keyboard": [[{"text": "🚀 Volver a empezar", "callback_data": "SET_LOC_casa"}]]})
+                except Exception as e:
+                    send_telegram(chat_id, f"❌ Error limpiando perfil: {e}")
+                return {'statusCode': 200, 'body': 'OK'}
 
             # --- RESPUESTAS DEL ONBOARDING TRANSPORTE ---
             elif data.startswith("SET_TRANS_"):
@@ -1566,7 +1581,17 @@ def lambda_handler(event, context):
                 send_telegram(chat_id, msg_envio)
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            # --- FIX ROBUSTO: IAS / IMECA (Detecta la frase y variaciones) ---
+            # --- FIX TAREA 9 (NUEVO): COMANDO DE PRIVACIDAD / BORRADO TOTAL ---
+            elif text_clean in ["/borrar_mis_datos", "borrar mis datos", "borrar todo", "/reset_perfil", "reset_perfil"]:
+                markup_borrado = {
+                    "inline_keyboard": [
+                        [{"text": "⚠️ Sí, borrar todos mis datos", "callback_data": "CONFIRM_RESET_ALL"}],
+                        [{"text": "❌ Cancelar", "callback_data": "RESET"}]
+                    ]
+                }
+                send_telegram(chat_id, "⚠️ **¿Estás seguro?**\n\nEsto eliminará permanentemente de nuestra base de datos tus:\n• Ubicaciones\n• Vehículos\n• Perfil de Salud\n• Rutinas de Transporte\n\n*(Si tienes una suscripción activa, tus pagos y estatus Premium se mantendrán intactos).* ", markup=markup_borrado)
+                return {'statusCode': 200, 'body': 'OK'}
+                
             # --- NUEVO: VÍA RÁPIDA PARA COMPRAR PREMIUM ---
             elif text_clean in ["/premium", "premium", "pagar", "comprar", "suscribirse", "planes", "precio", "precios"]:
                 user = get_user_profile(user_id)
@@ -2267,32 +2292,22 @@ def lambda_handler(event, context):
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                         continue 
                     
-                    # 2. Guardar en BD (Con el FIX Anti-Crash de DynamoDB)
+                    # 2. Guardar en BD (TAREAS 10 y 11 APLICADAS)
                     try:
                         if condicion_raw == "ninguno":
-                            # Si el usuario dice que ya no tiene nada, limpiamos su perfil
+                            # Tarea 10: Usamos REMOVE en lugar de SET nulo
                             table.update_item(
-                                Key={'user_id': str(user_id)},
-                                UpdateExpression="SET health_profile = :empty",
-                                ExpressionAttributeValues={':empty': {}}
+                                Key={'user_id': str(user_id)}, 
+                                UpdateExpression="REMOVE health_profile"
                             )
                             r = "✅ Perfil de salud restablecido a 'Ninguno'."
                         else:
                             cond_id = condicion_raw.strip().replace(" ", "_")
-                            
-                            # PASO A: Crear la 'carpeta' health_profile si el usuario es nuevo y no la tiene
+                            # Tarea 11: Reemplaza el objeto completo en vez de añadir (elimina Paso A y Paso B)
                             table.update_item(
                                 Key={'user_id': str(user_id)},
-                                UpdateExpression="SET health_profile = if_not_exists(health_profile, :empty)",
-                                ExpressionAttributeValues={':empty': {}}
-                            )
-                            
-                            # PASO B: Guardar el padecimiento como un diccionario válido y estructurado
-                            table.update_item(
-                                Key={'user_id': str(user_id)},
-                                UpdateExpression="SET health_profile.#c = :val",
-                                ExpressionAttributeNames={'#c': cond_id},
-                                ExpressionAttributeValues={':val': {'condition': condicion_raw.capitalize(), 'active': True}}
+                                UpdateExpression="SET health_profile = :val",
+                                ExpressionAttributeValues={':val': {cond_id: {'condition': condicion_raw.capitalize(), 'active': True}}}
                             )
                             r = f"✅ Condición '{condicion_raw.capitalize()}' guardada exitosamente."
                     except Exception as e:
@@ -2300,7 +2315,23 @@ def lambda_handler(event, context):
                         r = "Hubo un error al guardar la condición."
                     
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
-                        
+
+                # --- NUEVAS TOOLS DE BORRADO (PARTE DE LA TAREA 10) ---
+                elif fn == "eliminar_auto":
+                    table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE vehicle")
+                    r = "✅ Vehículo eliminado de tu perfil."
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
+                elif fn == "eliminar_rutina":
+                    table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE profile_transport")
+                    r = "✅ Rutina de transporte eliminada."
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
+                elif fn == "eliminar_perfil_salud":
+                    table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE health_profile")
+                    r = "✅ Perfil de salud eliminado."
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                #--------------------        
                 elif fn == "consultar_hoy_no_circula":
                     user = get_user_profile(user_id)
                     veh = user.get('vehicle')
