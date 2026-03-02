@@ -1291,14 +1291,19 @@ def lambda_handler(event, context):
                     if isinstance(veh, dict) and veh.get('active'):
                         plate = veh.get('plate_last_digit')
                         holo = veh.get('hologram')
-                        veh_str = f"• Placa {plate} (Holo {holo})"
+                        # Mostramos placa y holograma para dar confianza
+                        veh_str = f"• Placa {plate} (Holo {holo}) 🔒" 
+                        
                         try:
                             hoy_str = get_mexico_time().strftime("%Y-%m-%d")
                             sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                             fase = sys_state.get('last_contingency_phase', 'None')
+                            
                             can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
-                            hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
-                        except:
+                            # Mostramos estatus de HOY, pero bloqueamos calendario mensual
+                            h_emoji = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
+                            hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
+                        except Exception:
                             hnc_rem = "• Hoy: ⚠️ Error al calcular."
                     else:
                         veh_str = "• No registrado."
@@ -1340,7 +1345,8 @@ def lambda_handler(event, context):
                     if isinstance(veh, dict) and veh.get('active'):
                         plate = veh.get('plate_last_digit')
                         holo = veh.get('hologram')
-                        veh_str = f"• Placa {plate} (Holo {holo})"
+                        # Mostramos placa y holograma para dar confianza
+                        veh_str = f"• Placa {plate} (Holo {holo}) 🔒" 
                         
                         try:
                             hoy_str = get_mexico_time().strftime("%Y-%m-%d")
@@ -1348,7 +1354,9 @@ def lambda_handler(event, context):
                             fase = sys_state.get('last_contingency_phase', 'None')
                             
                             can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
-                            hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
+                            # Mostramos estatus de HOY, pero bloqueamos calendario mensual
+                            h_emoji = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
+                            hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
                         except Exception:
                             hnc_rem = "• Hoy: ⚠️ Error al calcular."
                     else:
@@ -1712,7 +1720,8 @@ def lambda_handler(event, context):
                     if isinstance(veh, dict) and veh.get('active'):
                         plate = veh.get('plate_last_digit')
                         holo = veh.get('hologram')
-                        veh_str = f"• Placa {plate} (Holo {holo})"
+                        # Mostramos placa y holograma para dar confianza
+                        veh_str = f"• Placa {plate} (Holo {holo}) 🔒" 
                         
                         try:
                             hoy_str = get_mexico_time().strftime("%Y-%m-%d")
@@ -1720,7 +1729,9 @@ def lambda_handler(event, context):
                             fase = sys_state.get('last_contingency_phase', 'None')
                             
                             can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
-                            hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
+                            # Mostramos estatus de HOY, pero bloqueamos calendario mensual
+                            h_emoji = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
+                            hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
                         except Exception:
                             hnc_rem = "• Hoy: ⚠️ Error al calcular."
                     else:
@@ -2145,24 +2156,27 @@ def lambda_handler(event, context):
                             transport_info = "• No configurado."
 
                         # --- 5. Auto e HNC en tiempo real ---
-                        veh = user.get('vehicle', {})
-                        if isinstance(veh, dict) and veh.get('active'):
-                            plate = veh.get('plate_last_digit')
-                            holo = veh.get('hologram')
-                            veh_str = f"• Placa {plate} (Holo {holo})"
+                    veh = user.get('vehicle', {})
+                    if isinstance(veh, dict) and veh.get('active'):
+                        plate = veh.get('plate_last_digit')
+                        holo = veh.get('hologram')
+                        # Mostramos placa y holograma para dar confianza
+                        veh_str = f"• Placa {plate} (Holo {holo}) 🔒" 
+                        
+                        try:
+                            hoy_str = get_mexico_time().strftime("%Y-%m-%d")
+                            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                            fase = sys_state.get('last_contingency_phase', 'None')
                             
-                            try:
-                                hoy_str = get_mexico_time().strftime("%Y-%m-%d")
-                                sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                                fase = sys_state.get('last_contingency_phase', 'None')
-                                
-                                can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
-                                hnc_rem = "• Hoy: 🟢 CIRCULA (Día Permitido)" if can_drive else "• Hoy: 🔴 NO CIRCULA"
-                            except Exception:
-                                hnc_rem = "• Hoy: ⚠️ Error al calcular."
-                        else:
-                            veh_str = "• No registrado."
-                            hnc_rem = "• No configurado."
+                            can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
+                            # Mostramos estatus de HOY, pero bloqueamos calendario mensual
+                            h_emoji = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
+                            hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
+                        except Exception:
+                            hnc_rem = "• Hoy: ⚠️ Error al calcular."
+                    else:
+                        veh_str = "• No registrado."
+                        hnc_rem = "• No configurado."
 
                         # --- 6. Alertas por Umbral ---
                         th_data = alerts_data.get('threshold', {})
@@ -2375,43 +2389,45 @@ def lambda_handler(event, context):
                 elif fn == "consultar_hoy_no_circula":
                     user = get_user_profile(user_id)
                     veh = user.get('vehicle')
+                    tier, _ = stripeairegpt.evaluate_user_tier(user)
                     
                     if not veh or not veh.get('active'):
-                        r = "⚠️ No tienes auto configurado. Dime algo como: *'Mi auto es placas 555 y holograma 0'*."
+                        r = "⚠️ No tienes auto configurado. Dime algo como: *'Mi auto es placas 5 y holograma 0'*."
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                     else:
+                        fecha_consulta = args.get('fecha_referencia', get_mexico_time().strftime("%Y-%m-%d"))
+                        hoy_str = get_mexico_time().strftime("%Y-%m-%d")
+                        
+                        # --- CORTESÍA PARA FREE: SOLO HOY ---
+                        if tier == 'FREE' and fecha_consulta != hoy_str:
+                            texto_paywall, botones = stripeairegpt.get_paywall_response(tier, 0, "hnc_futuro", str(user_id))
+                            send_telegram(chat_id, f"📅 **Consulta de Mañana/Futuro**\n\nSaber si circulas mañana o en fechas próximas es una función Premium.\n\n{texto_paywall}", markup=botones)
+                            return {'statusCode': 200, 'body': 'OK'}
+                        
+                        # Lógica de cálculo normal
                         plate = veh.get('plate_last_digit')
                         holo = veh.get('hologram')
-                        fecha = args.get('fecha_referencia', get_mexico_time().strftime("%Y-%m-%d"))
-                        
-                        # 1. Extraer fase para contingencia
                         sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                         current_phase = sys_state.get('last_contingency_phase', 'None')
                         
-                        # 2. Extraer 3 valores del nuevo motor
-                        can_drive, r_short, r_detail = cards.check_driving_status(plate, holo, fecha, current_phase)
+                        can_drive, r_short, r_detail = cards.check_driving_status(plate, holo, fecha_consulta, current_phase)
                         
-                        # Visuales
-                        dt_obj = datetime.strptime(fecha, "%Y-%m-%d")
+                        # Formatear respuesta visual
+                        dt_obj = datetime.strptime(fecha_consulta, "%Y-%m-%d")
                         dias_map = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
-                        status_emoji = "✅" if can_drive else "⛔"
-                        status_title = "PUEDES CIRCULAR" if can_drive else "NO CIRCULAS"
-                        status_msg = "¡Vámonos! Tu auto está libre." if can_drive else "Evita multas, déjalo en casa."
                         
                         card = cards.CARD_HNC_RESULT.format(
-                            fecha_str=fecha,
+                            fecha_str=fecha_consulta,
                             dia_semana=dias_map[dt_obj.weekday()],
                             plate_info=f"Terminación {plate}",
                             hologram=holo,
-                            status_emoji=status_emoji,
-                            status_title=status_title,
-                            status_message=status_msg,
-                            reason=r_detail, # <--- Usamos el Detalle Visual
+                            status_emoji="✅" if can_drive else "⛔",
+                            status_title="PUEDES CIRCULAR" if can_drive else "NO CIRCULAS",
+                            status_message="¡Vámonos! Tu auto está libre." if can_drive else "Evita multas, déjalo en casa.",
+                            reason=r_detail,
                             footer=cards.BOT_FOOTER
                         )
-                        # --- FIX: Inyectar botón interactivo ---
-                        markup = cards.get_hnc_buttons()
-                        send_telegram(chat_id, card, markup)
+                        send_telegram(chat_id, card, markup=cards.get_hnc_buttons())
                         return {'statusCode': 200, 'body': 'OK'}
                 
                 # --- NUEVA TOOL: CALENDARIO MENSUAL (READ ONLY) ---
