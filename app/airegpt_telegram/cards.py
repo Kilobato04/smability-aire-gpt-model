@@ -3,7 +3,7 @@ import urllib.parse
 BOT_VERSION = "v6.0"
 
 # --- NUEVO FOOTER LIMPIO ---
-BOT_FOOTER = "🤖 *AIreGPT* | [Smability.io](https://smability.io)"
+BOT_FOOTER = "\n\n🌐 [airegpt.ai](https://airegpt.ai) | 🚨 [Canal de Alertas](https://t.me/smability)\nSíguenos: 📸 [IG](https://instagram.com/airegpt.ai) • 🎵 [TikTok](https://tiktok.com/@airegpt)"
 
 IAS_INFO = {
     "Buena": {"msg": "Aire limpio.", "rec": "¡Disfruta el exterior!", "emoji": "🟢"},
@@ -15,7 +15,6 @@ IAS_INFO = {
 
 # --- NUEVO HELPER (Requerido por v0.6.0) ---
 def get_emoji_for_quality(calidad):
-    """Extrae el emoji de forma segura para el chatbot"""
     return IAS_INFO.get(calidad, {}).get("emoji", "⚪")
 
 def get_health_advice(calidad, user_condition=None, is_premium=False):
@@ -139,6 +138,8 @@ Soy *AIreGPT*, tu asistente inteligente de salud urbana. Aquí tienes todo lo qu
 ⏰ *Alertas Inteligentes:* Programa un reporte diario a la hora que sales o alertas automáticas si la contaminación supera tu límite.
 📊 *Tu Resumen:* Escribe *"Dame mi resumen"* para ver toda tu configuración y estatus.
 
+🤖 *Tip AIreGPT:* Próximamente también estaré disponible en *WhatsApp* 🟢 (Guarda este número: +52 55 1956 6483).
+
 💡 _*Tip: Háblame de forma natural. Ej: "Avísame a las 8 am cómo está el aire en casa".*_
 
 {footer}"""
@@ -150,6 +151,8 @@ Conmigo podrás:
 🚬 Calcular cuántos "cigarros invisibles" respiras en el tráfico.
 🚨 Recibir alertas de calidad del aire, Contingencia, Hoy No Circula y Multas.
 ⏰ Programar notificaciones si el aire se vuelve tóxico.
+
+🤖 *Tip AIreGPT:* Próximamente también estaré disponible en *WhatsApp* 🟢 (Guarda este número para el futuro: +52 55 1956 6483).
 
 Para protegerte, necesito saber dónde te mueves. 
 
