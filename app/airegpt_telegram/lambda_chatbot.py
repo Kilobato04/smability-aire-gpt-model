@@ -1325,77 +1325,56 @@ def lambda_handler(event, context):
                             sch_list.append(f"• *{k.capitalize()}:* {v.get('time', '00:00')} hrs ({dias_txt})")
                     alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
       
+                #----
                 else:
-                    # LÓGICA FREE: Leemos auto y mostramos alertas de degustación
+                    # LÓGICA FREE: Resumen transparente (Placa + Hoy + Alertas Prueba)
                     contingency = "🔕 INACTIVA (🔒 Premium)"
-                    
                     locs_data = user.get('locations', {})
                     if not isinstance(locs_data, dict): locs_data = {}
-                    locs_list = []
-                    for k, v in locs_data.items():
-                        if isinstance(v, dict) and v.get('active'):
-                            locs_list.append(f"• *{k.capitalize()}:* {v.get('display_name', k).capitalize()}")
+                    locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
                     locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
                     
                     health_str = "• 🔒 Exclusivo Premium"
                     transport_info = "• 🔒 Exclusivo Premium"
                     
-                    # El auto sí es gratis (FIX C)
+                    # --- 5. Auto e HNC (FREE: Datos visibles + Hoy) ---
                     veh = user.get('vehicle', {})
                     if isinstance(veh, dict) and veh.get('active'):
-                        plate = veh.get('plate_last_digit')
-                        holo = veh.get('hologram')
-                        # Mostramos placa y holograma para dar confianza
-                        veh_str = f"• Placa {plate} (Holo {holo}) 🔒" 
-                        
+                        p, h = veh.get('plate_last_digit'), veh.get('hologram')
+                        veh_str = f"• Placa {p} (Holo {h}) 🔒"
                         try:
                             hoy_str = get_mexico_time().strftime("%Y-%m-%d")
                             sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                             fase = sys_state.get('last_contingency_phase', 'None')
-                            
-                            can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
-                            # Mostramos estatus de HOY, pero bloqueamos calendario mensual
+                            can_drive, _, _ = cards.check_driving_status(p, h, hoy_str, fase)
                             h_emoji = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
                             hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
-                        except Exception:
+                        except:
                             hnc_rem = "• Hoy: ⚠️ Error al calcular."
                     else:
-                        veh_str = "• No registrado."
-                        hnc_rem = "• No configurado."
-                    
-                    # Leemos sus alertas de prueba (FIX C)
+                        veh_str, hnc_rem = "• No registrado.", "• No configurado."
+
+                    # --- 6. Alertas (FREE: Mostrar contador de degustación) ---
                     alerts_data = user.get('alerts', {}) if isinstance(user.get('alerts'), dict) else {}
-                    th_data = alerts_data.get('threshold', {}) if isinstance(alerts_data.get('threshold'), dict) else {}
+                    th_data = alerts_data.get('threshold', {})
                     free_sent = int(user.get('free_alerts_sent', 0))
-                    
-                    th_list = [f"• *{k.capitalize()}:* > {v.get('umbral', 100)} pts (Prueba: {free_sent}/3 usadas)" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
+                    th_list = [f"• {k.capitalize()}: > {v.get('umbral', 100)} pts (Prueba: {free_sent}/3 usadas)" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
                     alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
-                    
                     alerts_sch = "• 🔒 Exclusivo Premium"
 
-                # 🔥 ESCUDO ANTI-MARKDOWN
-                safe_name = str(first_name).replace("_", " ").replace("*", "")
-                
-                # 🔥 FORMATEO FINAL
-                card_resumen = cards.CARD_SUMMARY.format(
-                    user_name=safe_name,
-                    plan_status=status_str.upper(),
-                    contingency_status=contingency,
-                    locations_list=locs_str.replace("_", " "),
-                    health_display=health_str.replace("_", " "),
-                    transport_info=transport_info.replace("_", " "),
-                    vehicle_info=veh_str.replace("_", " "),
-                    alerts_threshold=alerts_th.replace("_", " "),
-                    alerts_schedule=alerts_sch.replace("_", " "),
-                    hnc_reminder=hnc_rem.replace("_", " "),
-                    footer=cards.BOT_FOOTER
-                )
-                
-                markup_resumen = cards.get_summary_buttons(locs_data, is_prem)
-                
-                # Enviar y responder
-                send_telegram(chat_id, card_resumen, markup_resumen)
-                return {'statusCode': 200, 'body': 'OK'}
+                    # --- FORMATEO FINAL ---
+                    safe_name = str(first_name).replace("_", " ").replace("*", "")
+                    card_resumen = cards.CARD_SUMMARY.format(
+                        user_name=safe_name, plan_status=status_str.upper(),
+                        contingency_status=contingency, locations_list=locs_str.replace("_", " "),
+                        health_display=health_str.replace("_", " "), transport_info=transport_info.replace("_", " "),
+                        vehicle_info=veh_str.replace("_", " "), alerts_threshold=alerts_th.replace("_", " "),
+                        alerts_schedule=alerts_sch.replace("_", " "), hnc_reminder=hnc_rem.replace("_", " "),
+                        footer=cards.BOT_FOOTER
+                    )
+                    
+                    send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs_data, is_prem))
+                    return {'statusCode': 200, 'body': 'OK'}
             
             # --- MENÚ AVANZADO / GO PREMIUM ---
             elif data in ["CONFIG_ADVANCED", "GO_PREMIUM"]:
@@ -1753,42 +1732,56 @@ def lambda_handler(event, context):
                             dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
                             sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
                     alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
+                #---
                 else:
-                    # SI ES FREE O TRIAL EXPIRADO, BLOQUEO VISUAL
+                    # LÓGICA FREE: Resumen transparente (Placa + Hoy + Alertas Prueba)
                     contingency = "🔕 INACTIVA (🔒 Premium)"
                     locs_data = user.get('locations', {})
+                    if not isinstance(locs_data, dict): locs_data = {}
                     locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
                     locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
                     
                     health_str = "• 🔒 Exclusivo Premium"
                     transport_info = "• 🔒 Exclusivo Premium"
-                    veh_str = "• 🔒 Exclusivo Premium"
-                    hnc_rem = "• 🔒 Exclusivo Premium"
-                    alerts_th = "• 🔒 Exclusivo Premium"
+                    
+                    # --- 5. Auto e HNC (FREE: Datos visibles + Hoy) ---
+                    veh = user.get('vehicle', {})
+                    if isinstance(veh, dict) and veh.get('active'):
+                        p, h = veh.get('plate_last_digit'), veh.get('hologram')
+                        veh_str = f"• Placa {p} (Holo {h}) 🔒"
+                        try:
+                            hoy_str = get_mexico_time().strftime("%Y-%m-%d")
+                            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                            fase = sys_state.get('last_contingency_phase', 'None')
+                            can_drive, _, _ = cards.check_driving_status(p, h, hoy_str, fase)
+                            h_emoji = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
+                            hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
+                        except:
+                            hnc_rem = "• Hoy: ⚠️ Error al calcular."
+                    else:
+                        veh_str, hnc_rem = "• No registrado.", "• No configurado."
+
+                    # --- 6. Alertas (FREE: Mostrar contador de degustación) ---
+                    alerts_data = user.get('alerts', {}) if isinstance(user.get('alerts'), dict) else {}
+                    th_data = alerts_data.get('threshold', {})
+                    free_sent = int(user.get('free_alerts_sent', 0))
+                    th_list = [f"• {k.capitalize()}: > {v.get('umbral', 100)} pts (Prueba: {free_sent}/3 usadas)" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
+                    alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
                     alerts_sch = "• 🔒 Exclusivo Premium"
 
-                # 🔥 ESCUDO ANTI-MARKDOWN
-                safe_name = str(first_name).replace("_", " ").replace("*", "")
-                
-                # 🔥 FORMATEO FINAL USANDO cards.py
-                msg_envio = cards.CARD_SUMMARY.format(
-                    user_name=safe_name,
-                    plan_status=status_str.upper(),
-                    contingency_status=contingency,
-                    locations_list=locs_str.replace("_", " "),
-                    health_display=health_str.replace("_", " "),
-                    transport_info=transport_info.replace("_", " "),
-                    vehicle_info=veh_str.replace("_", " "),
-                    alerts_threshold=alerts_th.replace("_", " "),
-                    alerts_schedule=alerts_sch.replace("_", " "),
-                    hnc_reminder=hnc_rem.replace("_", " "),
-                    footer=cards.BOT_FOOTER
-                )
-                
-                # Pasamos los botones interactivos
-                markup = cards.get_summary_buttons(locs_data, is_prem)
-                send_telegram(chat_id, msg_envio, markup)
-                return {'statusCode': 200, 'body': 'OK'}
+                    # --- FORMATEO FINAL ---
+                    safe_name = str(first_name).replace("_", " ").replace("*", "")
+                    card_resumen = cards.CARD_SUMMARY.format(
+                        user_name=safe_name, plan_status=status_str.upper(),
+                        contingency_status=contingency, locations_list=locs_str.replace("_", " "),
+                        health_display=health_str.replace("_", " "), transport_info=transport_info.replace("_", " "),
+                        vehicle_info=veh_str.replace("_", " "), alerts_threshold=alerts_th.replace("_", " "),
+                        alerts_schedule=alerts_sch.replace("_", " "), hnc_reminder=hnc_rem.replace("_", " "),
+                        footer=cards.BOT_FOOTER
+                    )
+                    
+                    send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs_data, is_prem))
+                    return {'statusCode': 200, 'body': 'OK'}
             # =========================================================
 
         print(f"📨 [MSG] User: {user_id} | Content: {user_content}") # LOG CRITICO
@@ -2193,40 +2186,47 @@ def lambda_handler(event, context):
                                 dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
                                 sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
                         alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
+                #----
+                else:
+                    # LÓGICA FREE: Resumen transparente (Placa + Hoy + Alertas Prueba)
+                    contingency = "🔕 INACTIVA (🔒 Premium)"
+                    locs_data = user.get('locations', {})
+                    locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
+                    locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
+                    health_str, transport_info = "• 🔒 Exclusivo Premium", "• 🔒 Exclusivo Premium"
+                    
+                    # --- 5. Auto e HNC (FREE: Visible Hoy) ---
+                    veh = user.get('vehicle', {})
+                    if isinstance(veh, dict) and veh.get('active'):
+                        p, h = veh.get('plate_last_digit'), veh.get('hologram')
+                        veh_str = f"• Placa {p} (Holo {h}) 🔒"
+                        try:
+                            hoy = get_mexico_time().strftime("%Y-%m-%d")
+                            can, _, _ = cards.check_driving_status(p, h, hoy)
+                            h_emoji = "🟢 CIRCULA" if can else "🔴 NO CIRCULA"
+                            hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
+                        except: hnc_rem = "• Hoy: ⚠️ Error"
                     else:
-                        # SI ES FREE O TRIAL EXPIRADO, BLOQUEO VISUAL
-                        contingency = "🔕 INACTIVA (🔒 Premium)"
-                        locs_data = user.get('locations', {})
-                        locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
-                        locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
-                        
-                        health_str = "• 🔒 Exclusivo Premium"
-                        transport_info = "• 🔒 Exclusivo Premium"
-                        veh_str = "• 🔒 Exclusivo Premium"
-                        hnc_rem = "• 🔒 Exclusivo Premium"
-                        alerts_th = "• 🔒 Exclusivo Premium"
-                        alerts_sch = "• 🔒 Exclusivo Premium"
+                        veh_str, hnc_rem = "• No registrado.", "• No configurado."
 
-                    # 🔥 ESCUDO ANTI-MARKDOWN
+                    # --- 6. Alertas Umbral (FREE: Degustación 3 Alertas) ---
+                    used = int(user.get('free_alerts_sent', 0))
+                    th_data = user.get('alerts', {}).get('threshold', {}) if isinstance(user.get('alerts'), dict) else {}
+                    th_list = [f"• {k.capitalize()}: > {v.get('umbral', 100)} pts (Prueba: {used}/3 usadas)" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
+                    alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
+                    alerts_sch = "• 🔒 Exclusivo Premium"
+
+                    # 🔥 ENVÍO Y CIERRE (Evita el error de sintaxis y el pasmo)
                     safe_name = str(first_name).replace("_", " ").replace("*", "")
-                    
-                    # 🔥 FORMATEO FINAL USANDO cards.py
-                    r = cards.CARD_SUMMARY.format(
-                        user_name=safe_name,
-                        plan_status=status_str.upper(),
-                        contingency_status=contingency,
-                        locations_list=locs_str.replace("_", " "),
-                        health_display=health_str.replace("_", " "),
-                        transport_info=transport_info.replace("_", " "),
-                        vehicle_info=veh_str.replace("_", " "),
-                        alerts_threshold=alerts_th.replace("_", " "),
-                        alerts_schedule=alerts_sch.replace("_", " "),
-                        hnc_reminder=hnc_rem.replace("_", " "),
-                        footer=cards.BOT_FOOTER 
+                    card_resumen = cards.CARD_SUMMARY.format(
+                        user_name=safe_name, plan_status=status_str.upper(),
+                        contingency_status=contingency, locations_list=locs_str,
+                        health_display=health_str, transport_info=transport_info,
+                        vehicle_info=veh_str, alerts_threshold=alerts_th,
+                        alerts_schedule=alerts_sch, hnc_reminder=hnc_rem,
+                        footer=cards.BOT_FOOTER
                     )
-                    
-                    markup = cards.get_summary_buttons(locs_data, is_prem)
-                    send_telegram(chat_id, r, markup)
+                    send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs_data, is_prem))
                     return {'statusCode': 200, 'body': 'OK'}
 
                 # --- NUEVOS BLOQUES HNC (PEGAR AQUÍ) ---
@@ -2289,30 +2289,21 @@ def lambda_handler(event, context):
                         tier, _ = stripeairegpt.evaluate_user_tier(user)
                         
                         if tier == 'FREE':
-                            # Confirmación simple para el usuario gratuito
                             r = f"✅ Auto registrado: Placa {digit}, Holo {holo.upper()}."
-                            send_telegram(chat_id, f"{r}\n\nYa puedes preguntarme: *'¿Circulo hoy?'* para verificar tu estatus diario.")
-                            # Importante: Cortamos aquí para que no mande la tarjeta detallada
+                            send_telegram(chat_id, f"{r}\n\nEscribe *'¿Circulo hoy?'* para verificar tu estatus.")
                             return {'statusCode': 200, 'body': 'OK'}
                         else:
-                            # Reporte completo de Calendario Mensual para PREMIUM/TRIAL
-                            now = datetime.now()
+                            # 💎 PREMIUM: Generar Calendario Visual
+                            now = get_mexico_time()
                             lista_dias = get_monthly_prohibited_dates(digit, holo, now.year, now.month)
                             txt_sem, txt_sab = get_restriction_summary(digit, holo)
                             meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
-                            
                             card = cards.CARD_HNC_DETAILED.format(
-                                mes_nombre=meses_es[now.month],
-                                plate=digit,
-                                color=cards.ENGOMADOS.get(int(digit), "Desconocido"),
-                                holo=str(holo).upper(),
-                                verificacion_txt=cards.get_verification_period(digit, holo),
-                                dias_semana_txt=txt_sem,
-                                sabados_txt=txt_sab,
+                                mes_nombre=meses_es[now.month], plate=digit, color=cards.ENGOMADOS.get(int(digit), "Desconocido"),
+                                holo=str(holo).upper(), verificacion_txt=cards.get_verification_period(digit, holo),
+                                dias_semana_txt=txt_sem, sabados_txt=txt_sab,
                                 lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
-                                multa_cdmx=f"$2,171 - $3,257",
-                                multa_edomex=f"$2,171",
-                                footer=cards.BOT_FOOTER
+                                multa_cdmx="$2,171 - $3,257", multa_edomex="$2,171", footer=cards.BOT_FOOTER
                             )
                             send_telegram(chat_id, f"✅ **Auto guardado.**\n{save_resp}")
                             send_telegram(chat_id, card, markup=cards.get_hnc_buttons())
@@ -2398,10 +2389,18 @@ def lambda_handler(event, context):
                         fecha_consulta = args.get('fecha_referencia', get_mexico_time().strftime("%Y-%m-%d"))
                         hoy_str = get_mexico_time().strftime("%Y-%m-%d")
                         
+                        if not is_prem and fecha_consulta != hoy_str:
+                            t, b = stripeairegpt.get_paywall_response("FREE", 0, "hnc_futuro", str(user_id))
+                            send_telegram(chat_id, f"📅 **Consulta Futura**\n\nSaber si circulas mañana es una función Premium.\n\n{t}", b)
+                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Bloqueado por ser Free."})
+                            continue # O return si es la única tool
+                        
                         # --- CORTESÍA PARA FREE: SOLO HOY ---
                         if tier == 'FREE' and fecha_consulta != hoy_str:
-                            texto_paywall, botones = stripeairegpt.get_paywall_response(tier, 0, "hnc_futuro", str(user_id))
-                            send_telegram(chat_id, f"📅 **Consulta de Mañana/Futuro**\n\nSaber si circulas mañana o en fechas próximas es una función Premium.\n\n{texto_paywall}", markup=botones)
+                            t_pay, b_pay = stripeairegpt.get_paywall_response(tier, 0, "hnc_futuro", str(user_id))
+                            send_telegram(chat_id, f"📅 **Consulta Futura**\n\nSaber si circulas mañana es una función Premium.\n\n{t_pay}", markup=b_pay)
+                            # Respondemos a la tool para que GPT no se quede esperando
+                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Bloqueado: Usuario Free consultó futuro."})
                             return {'statusCode': 200, 'body': 'OK'}
                         
                         # Lógica de cálculo normal
