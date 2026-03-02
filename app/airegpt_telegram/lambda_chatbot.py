@@ -62,32 +62,37 @@ BUSINESS_RULES = {
 
 # --- GATEKEEPER: VERIFICADOR DE STRIPE Y CUPOS ---
 def check_quota_and_permissions(user_profile, action_type, user_id):
-    # 1. Pasar por el Cadenero de Stripe
     tier, days_left = stripeairegpt.evaluate_user_tier(user_profile)
-    
     print(f"🛡️ [GATEKEEPER] User: {user_id} | Plan: {tier} | Days Left: {days_left}")
 
     LIMIT_LOC_FREE = 2
     LIMIT_LOC_PREM = 3
     
-    # 2. Bloqueo Inmediato si es FREE (Trial Expirado)
+    # 1. Lógica EXCLUSIVA para agregar ubicaciones (Aquí dejamos pasar a los Free)
+    if action_type == 'add_location':
+        current_locs = len(user_profile.get('locations', {}))
+        if tier == 'FREE':
+            if current_locs >= LIMIT_LOC_FREE:
+                texto, botones = stripeairegpt.get_paywall_response(tier, days_left, action_type, str(user_id))
+                return False, f"🛑 **Límite Básico Alcanzado.** Tienes ocupados tus {LIMIT_LOC_FREE} espacios gratuitos.\n\n" + texto, botones
+            return True, "", None # Pasa libremente si tiene menos de 2
+        else: # PREMIUM / TRIAL
+            if current_locs >= LIMIT_LOC_PREM:
+                return False, f"🛑 **Espacios Llenos.** Tienes ocupados tus {LIMIT_LOC_PREM} espacios. Borra uno para agregar otro.", None
+            if tier == 'TRIAL':
+                texto_aviso, _ = stripeairegpt.get_paywall_response(tier, days_left, action_type, str(user_id))
+                return True, texto_aviso, None
+            return True, "", None
+
+    # 2. Lógica para el RESTO de acciones (alertas, salud, rutina, gráficas)
     if tier == 'FREE':
         texto, botones = stripeairegpt.get_paywall_response(tier, days_left, action_type, str(user_id))
         return False, texto, botones
-    
-    # 3. Lógica si es PREMIUM o está en TRIAL (Tienen los mismos permisos)
-    if action_type == 'add_location':
-        current_locs = len(user_profile.get('locations', {}))
-        if current_locs >= LIMIT_LOC_PREM:
-            return False, f"🛑 **Espacios Llenos.** Tienes ocupados tus {LIMIT_LOC_PREM} espacios. Borra uno para agregar otro.", None
-            
-    # 4. Si es Trial, le avisamos que es una probadita gratis, pero lo dejamos pasar
+        
     if tier == 'TRIAL':
         texto_aviso, _ = stripeairegpt.get_paywall_response(tier, days_left, action_type, str(user_id))
-        # Devolvemos True para que pase, pero le adjuntamos el aviso
         return True, texto_aviso, None
 
-    # Si es Premium puro
     return True, "", None
 
 # --- DB HELPERS ---
