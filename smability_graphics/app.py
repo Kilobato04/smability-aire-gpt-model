@@ -398,8 +398,8 @@ def generar_grafica_serpiente(user_id):
     qr_ax.imshow(qr_img)
     qr_ax.axis('off')
     # --- NUEVO: MARCAS DE AGUA REDES SOCIALES (Badge Inferior Izquierdo) ---
-    fig1.text(0.04, 0.02, "IG: @airegpt.ai | TikTok: @airegpt", 
-              color='#aaaaaa', fontsize=9, ha='left', va='center', fontname='monospace', fontweight='bold',
+    fig1.text(0.04, 0.055, "IG: @airegpt.ai | TikTok: @airegpt", 
+              color='#aaaaaa', fontsize=10, ha='left', va='center', fontname='monospace', fontweight='bold',
               bbox=dict(facecolor='#1c1c28', edgecolor='#08F7FE', boxstyle='round,pad=0.5', alpha=0.9, lw=1.5))
     fig1.text(0.5, 0.02, f"{fecha_str} | AIreGPT | Smability.io", color='#888888', fontsize=11, ha='center', va='center')
 
@@ -588,8 +588,8 @@ def generar_grafica_tetris(user_id):
 
         footer_text = "AIreGPT | Smability.io\nNota: Esto es un estimado algorítmico y no representa un diagnóstico de salud oficial.\nEl número en el bloque representa la suma de cigarros equivalentes de esa semana."
         # --- NUEVO: MARCAS DE AGUA REDES SOCIALES (Badge Inferior Izquierdo) ---
-        fig.text(0.04, 0.02, "IG: @airegpt.ai | TikTok: @airegpt", 
-                 color='#aaaaaa', fontsize=9, ha='left', va='center', fontname='monospace', fontweight='bold',
+        fig.text(0.04, 0.06, "IG: @airegpt.ai\nTikTok: @airegpt", 
+                 color='#aaaaaa', fontsize=10, ha='left', va='center', fontname='monospace', fontweight='bold',
                  bbox=dict(facecolor='#1c1c28', edgecolor='#08F7FE', boxstyle='round,pad=0.5', alpha=0.9, lw=1.5))
         fig.text(0.5, 0.015, footer_text, color='#666666', fontsize=10, ha='center', linespacing=1.6)
 
