@@ -259,7 +259,6 @@ TOOLS_SCHEMA = [
             "parameters": {"type": "object", "properties": {}}
         }
     },
-    #---
     {
         "type": "function",
         "function": {
