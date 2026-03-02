@@ -2264,48 +2264,50 @@ def lambda_handler(event, context):
                     # Recordatorio: Aquí usamos la lógica 'should_append_result = True' (default)
                     # para que se agregue al historial al final del bucle.
                 
+                #---
                 elif fn == "configurar_auto":
-                    # 0. 🔒 GATEKEEPER (Ahora permite pasar a todos para el registro base)
-                    user = get_user_profile(user_id)
-                    can_proceed, msg, markup = check_quota_and_permissions(user, 'configurar_auto', user_id)
+                    # 1. 🛡️ ASIGNACIÓN INICIAL (Evita el fallo de variable local)
+                    user = user_profile 
                     
-                    if not can_proceed:
-                        send_telegram(chat_id, msg, markup)
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado."})
-                        continue
-
-                    # 1. Procesar argumentos
+                    # 2. 🔍 PROCESAR ARGUMENTOS
                     digit = args.get('ultimo_digito')
+                    # Aceptamos ambas variantes de nombre por seguridad
                     holo = args.get('hologram') or args.get('holograma')
                     
                     if digit is None or holo is None:
                         r = "⚠️ Faltan datos. Necesito último dígito y holograma."
                         gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                     else:
-                        # 2. GUARDAR en DynamoDB
-                        save_resp = save_vehicle_profile(user_id, digit, holo)
+                        # 3. 💾 GUARDADO EN BASE DE DATOS
+                        save_vehicle_profile(user_id, digit, holo)
                         
-                        # 3. DIFERENCIACIÓN DE EXPERIENCIA (FREE vs PREMIUM)
+                        # 4. 🎭 DIFERENCIACIÓN FREE vs PREMIUM
                         tier, _ = stripeairegpt.evaluate_user_tier(user)
                         
                         if tier == 'FREE':
-                            r = f"✅ Auto registrado: Placa {digit}, Holo {holo.upper()}."
-                            send_telegram(chat_id, f"{r}\n\nEscribe *'¿Circulo hoy?'* para verificar tu estatus.")
+                            # Confirmación simple para usuarios gratuitos (Sin Paywall)
+                            r_free = f"✅ **Auto registrado:** Placa {digit}, Holo {str(holo).upper()}."
+                            send_telegram(chat_id, f"{r_free}\n\nYa puedes preguntarme: *'¿Circulo hoy?'* para verificar tu estatus diario.")
+                            # Cerramos la Tool para GPT
+                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Auto guardado. Usuario notificado."})
                             return {'statusCode': 200, 'body': 'OK'}
                         else:
-                            # 💎 PREMIUM: Generar Calendario Visual
+                            # 💎 EXPERIENCIA PREMIUM: Tarjeta Detallada con Calendario
                             now = get_mexico_time()
                             lista_dias = get_monthly_prohibited_dates(digit, holo, now.year, now.month)
                             txt_sem, txt_sab = get_restriction_summary(digit, holo)
                             meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
+                            
                             card = cards.CARD_HNC_DETAILED.format(
-                                mes_nombre=meses_es[now.month], plate=digit, color=cards.ENGOMADOS.get(int(digit), "Desconocido"),
+                                mes_nombre=meses_es[now.month], plate=digit,
+                                color=cards.ENGOMADOS.get(int(digit), "Desconocido"),
                                 holo=str(holo).upper(), verificacion_txt=cards.get_verification_period(digit, holo),
                                 dias_semana_txt=txt_sem, sabados_txt=txt_sab,
                                 lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
-                                multa_cdmx="$2,171 - $3,257", multa_edomex="$2,171", footer=cards.BOT_FOOTER
+                                multa_cdmx="$2,171 - $3,257", multa_edomex="$2,171",
+                                footer=cards.BOT_FOOTER
                             )
-                            send_telegram(chat_id, f"✅ **Auto guardado.**\n{save_resp}")
+                            send_telegram(chat_id, f"✅ **Auto guardado.**\nAquí tienes tu calendario:")
                             send_telegram(chat_id, card, markup=cards.get_hnc_buttons())
                             return {'statusCode': 200, 'body': 'OK'}
 
@@ -2378,7 +2380,8 @@ def lambda_handler(event, context):
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                 #--------------------        
                 elif fn == "consultar_hoy_no_circula":
-                    user = get_user_profile(user_id)
+                    # 1. 🛡️ ASIGNACIÓN INICIAL (Evita el "cannot access local variable 'user'")
+                    user = user_profile 
                     veh = user.get('vehicle')
                     tier, _ = stripeairegpt.evaluate_user_tier(user)
                     
@@ -2389,21 +2392,14 @@ def lambda_handler(event, context):
                         fecha_consulta = args.get('fecha_referencia', get_mexico_time().strftime("%Y-%m-%d"))
                         hoy_str = get_mexico_time().strftime("%Y-%m-%d")
                         
+                        # 2. 🔒 CANDADO ÚNICO PARA FREE (Bloqueo de futuro)
                         if not is_prem and fecha_consulta != hoy_str:
                             t, b = stripeairegpt.get_paywall_response("FREE", 0, "hnc_futuro", str(user_id))
-                            send_telegram(chat_id, f"📅 **Consulta Futura**\n\nSaber si circulas mañana es una función Premium.\n\n{t}", b)
-                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Bloqueado por ser Free."})
-                            continue # O return si es la única tool
-                        
-                        # --- CORTESÍA PARA FREE: SOLO HOY ---
-                        if tier == 'FREE' and fecha_consulta != hoy_str:
-                            t_pay, b_pay = stripeairegpt.get_paywall_response(tier, 0, "hnc_futuro", str(user_id))
-                            send_telegram(chat_id, f"📅 **Consulta Futura**\n\nSaber si circulas mañana es una función Premium.\n\n{t_pay}", markup=b_pay)
-                            # Respondemos a la tool para que GPT no se quede esperando
-                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Bloqueado: Usuario Free consultó futuro."})
+                            send_telegram(chat_id, f"📅 **Consulta de Mañana/Futuro**\n\nSaber si circulas mañana es una función Premium.\n\n{t}", markup=b)
+                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado: Solo Premium puede ver fechas futuras."})
                             return {'statusCode': 200, 'body': 'OK'}
                         
-                        # Lógica de cálculo normal
+                        # 3. ✅ LÓGICA DE CÁLCULO (Si es hoy o el usuario es Premium)
                         plate = veh.get('plate_last_digit')
                         holo = veh.get('hologram')
                         sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
