@@ -2279,13 +2279,6 @@ def lambda_handler(event, context):
                             print(f"❌ Error update time: {e}")
                             r = "Error al guardar la hora en la base de datos."
                     
-                    # ⚠️ FIX: AGREGAR ESTA LÍNEA (FALTABA)
-                    
-                    
-                    # Recordatorio: Aquí usamos la lógica 'should_append_result = True' (default)
-                    # para que se agregue al historial al final del bucle.
-                
-                #---
                 elif fn == "configurar_auto":
                     # 1. 🛡️ ASIGNACIÓN INICIAL (Evita el fallo de variable local)
                     user = user_profile 
