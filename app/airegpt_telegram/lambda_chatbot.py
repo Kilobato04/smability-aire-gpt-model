@@ -1304,147 +1304,6 @@ def lambda_handler(event, context):
                 send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs_data, is_prem))
                 return {'statusCode': 200, 'body': 'OK'}
                 
-                # --- Plan ---
-                sub_data = user.get('subscription', {})
-                status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else (str(sub_data) if sub_data else 'FREE')
-                is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
-                
-                # --- EXTRACCIÓN CONDICIONADA AL PLAN ---
-                if is_prem:
-                    # --- 1. Alerta Contingencia ---
-                    alerts_data = user.get('alerts', {})
-                    if not isinstance(alerts_data, dict): alerts_data = {}
-                    contingency = "✅ ACTIVA" if alerts_data.get('contingency') else "🔕 INACTIVA"
-
-                    # --- 2. Ubicaciones (Corregido a asterisco simple para que no truene Telegram) ---
-                    locs_data = user.get('locations', {})
-                    if not isinstance(locs_data, dict): locs_data = {}
-                    locs_list = []
-                    for k, v in locs_data.items():
-                        if isinstance(v, dict) and v.get('active'):
-                            locs_list.append(f"• *{k.capitalize()}:* {v.get('display_name', k).capitalize()}")
-                    locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
-
-                    # --- 3. Salud ---
-                    health_data = user.get('health_profile', {})
-                    condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
-                    health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
-
-                    # --- 4. Rutina / Transporte ---
-                    transp = user.get('profile_transport', {})
-                    if isinstance(transp, dict) and transp.get('medio'):
-                        nombres_medios = {
-                            "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
-                            "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
-                            "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
-                        }
-                        medio_raw = transp.get('medio')
-                        medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
-                        horas = transp.get('horas', 0)
-                        
-                        if medio_raw == 'home_office':
-                            transport_info = f"• Modalidad: {medio_str}\n• Tiempo: 0 hrs/día"
-                        else:
-                            ruta = "Casa ↔ Trabajo" if ('casa' in locs_data and 'trabajo' in locs_data) else "Ruta habitual"
-                            transport_info = f"• Ruta: {ruta}\n• Modo: {medio_str}\n• Tiempo: {horas} hrs/día"
-                    else:
-                        transport_info = "• No configurado."
-
-                    # --- 5. Auto e HNC en tiempo real (PREMIUM FIX) ---
-                    veh = user.get('vehicle', {})
-                    if isinstance(veh, dict) and veh.get('active'):
-                        plate = veh.get('plate_last_digit')
-                        holo = veh.get('hologram')
-                        # Mantenemos los datos técnicos en una línea
-                        veh_str = f"• Placa {plate} (Holo {holo}) | {veh.get('engomado', 'N/A')}"
-                        
-                        try:
-                            # 1. Obtenemos fecha y fase actual
-                            hoy_str = get_mexico_time().strftime("%Y-%m-%d")
-                            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                            fase = sys_state.get('last_contingency_phase', 'None')
-                            
-                            # 2. Calculamos el estatus real
-                            can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
-                            
-                            # 3. Formateamos el veredicto visual
-                            h_emoji = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
-                            hnc_rem = f"• Hoy: **{h_emoji}**\n• Calendario Mensual: ✅ Disponible"
-                        except Exception as e:
-                            print(f"❌ Error calculando HNC en resumen: {e}")
-                            hnc_rem = "• Hoy: ⚠️ Error al calcular."
-                    else:
-                        veh_str = "• No registrado."
-                        hnc_rem = "• No configurado."
-
-                    # --- 6. Alertas por Umbral ---
-                    th_data = alerts_data.get('threshold', {})
-                    if not isinstance(th_data, dict): th_data = {}
-                    th_list = [f"• *{k.capitalize()}:* > {v.get('umbral', 100)} pts" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
-                    alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
-
-                    # --- 7. Reportes Programados ---
-                    sch_data = alerts_data.get('schedule', {})
-                    if not isinstance(sch_data, dict): sch_data = {}
-                    sch_list = []
-                    for k, v in sch_data.items():
-                        if isinstance(v, dict) and v.get('active'):
-                            dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
-                            sch_list.append(f"• *{k.capitalize()}:* {v.get('time', '00:00')} hrs ({dias_txt})")
-                    alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
-      
-                #----
-                else:
-                    # LÓGICA FREE: Resumen transparente (Placa + Hoy + Alertas Prueba)
-                    contingency = "🔕 INACTIVA (🔒 Premium)"
-                    locs_data = user.get('locations', {})
-                    if not isinstance(locs_data, dict): locs_data = {}
-                    locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
-                    locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
-                    
-                    health_str = "• 🔒 Exclusivo Premium"
-                    transport_info = "• 🔒 Exclusivo Premium"
-                    
-                    # --- 5. Auto e HNC (FREE: Datos visibles + Hoy) ---
-                    veh = user.get('vehicle', {})
-                    if isinstance(veh, dict) and veh.get('active'):
-                        p, h = veh.get('plate_last_digit'), veh.get('hologram')
-                        veh_str = f"• Placa {p} (Holo {h}) 🔒"
-                        try:
-                            hoy_str = get_mexico_time().strftime("%Y-%m-%d")
-                            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                            fase = sys_state.get('last_contingency_phase', 'None')
-                            can_drive, _, _ = cards.check_driving_status(p, h, hoy_str, fase)
-                            h_emoji = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
-                            hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
-                        except:
-                            hnc_rem = "• Hoy: ⚠️ Error al calcular."
-                    else:
-                        veh_str, hnc_rem = "• No registrado.", "• No configurado."
-
-                    # --- 6. Alertas (FREE: Mostrar contador de degustación) ---
-                    alerts_data = user.get('alerts', {}) if isinstance(user.get('alerts'), dict) else {}
-                    th_data = alerts_data.get('threshold', {})
-                    free_sent = int(user.get('free_alerts_sent', 0))
-                    th_list = [f"• {k.capitalize()}: > {v.get('umbral', 100)} pts (Prueba: {free_sent}/3 usadas)" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
-                    alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
-                    alerts_sch = "• 🔒 Exclusivo Premium"
-
-                    # --- FORMATEO FINAL ---
-                    safe_name = str(first_name).replace("_", " ").replace("*", "")
-                    card_resumen = cards.CARD_SUMMARY.format(
-                        user_name=safe_name, plan_status=status_str.upper(),
-                        contingency_status=contingency, locations_list=locs_str.replace("_", " "),
-                        health_display=health_str.replace("_", " "), transport_info=transport_info.replace("_", " "),
-                        vehicle_info=veh_str.replace("_", " "), alerts_threshold=alerts_th.replace("_", " "),
-                        alerts_schedule=alerts_sch.replace("_", " "), hnc_reminder=hnc_rem.replace("_", " "),
-                        footer=cards.BOT_FOOTER
-                    )
-                    
-                    send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs_data, is_prem))
-                    return {'statusCode': 200, 'body': 'OK'}
-            
-            # --- MENÚ AVANZADO / GO PREMIUM ---
             elif data in ["CONFIG_ADVANCED", "GO_PREMIUM"]:
                 user = get_user_profile(user_id)
                 tier, days_left = stripeairegpt.evaluate_user_tier(user)
@@ -2699,13 +2558,27 @@ def lambda_handler(event, context):
             # Si GPT no usó herramientas, usamos su respuesta directa
             final_text = ai_msg.content
 
-        # --- 📤 SALIDA ÚNICA A TELEGRAM ---
+        # =========================================================
+        # 📤 SALIDA ÚNICA A TELEGRAM (CON FIX DE SILENCIO)
+        # =========================================================
+        # 1. Detectamos si alguna herramienta ya envió un reporte visual
+        # En tu código, las tools que envían tarjeta retornan con un 200 directo.
+        # Si llegamos aquí, revisamos si el texto es solo una confirmación interna.
+        
+        prohibidos = ["Reporte visual de calidad del aire enviado", "Tarjeta visual HNC enviada", "Interfaz visual enviada"]
+        if any(p in str(gpt_msgs[-1].get('content', '')) for p in prohibidos):
+            print("🤫 Silenciando respuesta redundante del LLM (Tarjeta ya enviada).")
+            return {'statusCode': 200, 'body': 'OK'}
+
         markup_out = None
         if forced_tag:
             markup_out = get_inline_markup(forced_tag)
             final_text = "📍 **Ubicación recibida.**\n\n👇 Confirma para guardar:"
         
-        send_telegram(chat_id, final_text, markup_out)
+        # Solo enviamos texto si no es un "Ok" vacío del LLM tras una tool
+        if final_text and final_text.strip():
+            send_telegram(chat_id, final_text, markup_out)
+            
         return {'statusCode': 200, 'body': 'OK'}
 
     except Exception as e:
