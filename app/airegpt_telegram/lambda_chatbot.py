@@ -2185,8 +2185,8 @@ def lambda_handler(event, context):
                         )
                         send_telegram(chat_id, card_prem, markup=cards.get_summary_buttons(locs_data, True))
                         return {'statusCode': 200, 'body': 'OK'}
-                #----
-                    else:
+
+                    if not is_prem:
                         # LÓGICA FREE: Resumen transparente (Placa + Hoy + Alertas Prueba)
                         contingency = "🔕 INACTIVA (🔒 Premium)"
                         locs_data = user.get('locations', {})
