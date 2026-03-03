@@ -77,6 +77,7 @@ def get_checkout_buttons(user_id):
 def get_paywall_response(tier, days_left, attempted_action, user_id):
     """
     Construye la respuesta usando las plantillas de cards.py
+    Añadido: Manejo de estatus PREMIUM para evitar Paywalls redundantes.
     """
     action_text = {
         "salud": "añadir tu perfil de salud",
@@ -85,14 +86,23 @@ def get_paywall_response(tier, days_left, attempted_action, user_id):
         "alertas": "programar alertas y contingencias automáticas"
     }.get(attempted_action, "usar funciones avanzadas")
 
-    if tier == 'TRIAL':
+    # 💎 CASO PREMIUM: El usuario ya pagó, no le pedimos más.
+    if tier == 'PREMIUM':
+        texto = ("💎 **Estatus: PREMIUM ACTIVO**\n\n"
+                 "Ya tienes acceso total a esta función. Pídeme ver **'mi resumen'** "
+                 "para ver tus datos actualizados o configurar más opciones. 🚀")
+        return texto, None
+
+    # 🎁 CASO TRIAL: Periodo de gracia.
+    elif tier == 'TRIAL':
         texto = cards.CARD_TRIAL_ACTIVE.format(
             action_text=action_text,
             trial_days=TRIAL_DAYS,
             days_left=days_left
         )
-        return texto, None # Sin botones de pago
+        return texto, None
 
+    # 💳 CASO FREE: Muro de pago (Checkout).
     else:
         texto = cards.CARD_PAYWALL.format(action_text=action_text)
         botones = get_checkout_buttons(user_id)
