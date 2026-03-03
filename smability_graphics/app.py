@@ -594,12 +594,14 @@ def generar_grafica_tetris(user_id):
         fig.text(0.35, 0.94, texto_viral, fontsize=14, color='white', ha='center', va='center', fontweight='bold', bbox=dict(facecolor='#2b002b', edgecolor='#FF00FF', boxstyle='round,pad=0.8', alpha=0.9, lw=2.5), rotation=3, fontname='monospace')
         generar_qr_eje(fig)
 
-        footer_text = "AIreGPT | Smability.io\nNota: Esto es un estimado algorítmico y no representa un diagnóstico de salud oficial.\nEl número en el bloque representa la suma de cigarros equivalentes de esa semana."
-        # --- NUEVO: MARCAS DE AGUA REDES SOCIALES (Badge Inferior Izquierdo) ---
-        fig.text(0.04, 0.06, "IG: @airegpt.ai\nTikTok: @airegpt", 
-                 color='#aaaaaa', fontsize=10, ha='left', va='center', fontname='monospace', fontweight='bold',
-                 bbox=dict(facecolor='#1c1c28', edgecolor='#08F7FE', boxstyle='round,pad=0.5', alpha=0.9, lw=1.5))
-        fig.text(0.5, 0.015, footer_text, color='#666666', fontsize=10, ha='center', linespacing=1.6)
+        # --- FIX PUNTO 6: REDES SOCIALES CENTRADAS ---
+        fig.text(0.5, 0.58, "IG: @airegpt.ai  |  TikTok: @airegpt", 
+                 color='#08F7FE', fontsize=11, ha='center', va='center', 
+                 fontname='monospace', fontweight='bold',
+                 bbox=dict(facecolor='#1c1c28', edgecolor='#FF00FF', boxstyle='round,pad=0.4', alpha=0.9, lw=1.5))
+
+        footer_text = "AIreGPT | Smability.io\nNota: Esto es un estimado algorítmico y no representa un diagnóstico médico oficial.\nEl número en el bloque representa la suma de cigarros equivalentes de esa semana."
+        fig.text(0.5, 0.015, footer_text, color='#666666', fontsize=9, ha='center', linespacing=1.6)
 
         # ==========================================
         # 5. EXPORTAR Y SUBIR A S3
