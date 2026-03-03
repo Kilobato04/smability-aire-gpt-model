@@ -92,6 +92,7 @@ Riesgo extremo. Peligro sanitario. Cierra ventanas y no salgas de casa.
 {footer}"""
 
 CARD_RULES = """⚙️ *REGLAS DE OPERACIÓN Y ALCANCE*
+
 Para mantener a AIreGPT rápido, preciso y sin hacer spam, opero bajo estas reglas:
 
 🌃 *Horario de Descanso:* Solo envío alertas entre las 6:00 AM y las 11:00 PM. Las "Alertas" se envía 20 min después de cada hora.
@@ -131,6 +132,7 @@ Puedes hablarme de forma natural. Aquí tienes los ejemplos más útiles para sa
 {footer}"""
 
 CARD_MENU = """🛠️ *MENÚ DE CAPACIDADES*
+
 Soy *AIreGPT*, tu asistente inteligente de salud urbana. Aquí tienes todo lo que podemos hacer juntos:
 
 🚨 *Contingencias en Tiempo Real:* *(¡Nuestra especialidad!)* Te enviaré una alerta inmediata en el segundo exacto en que se *active o suspenda* una Contingencia Ambiental.
@@ -139,7 +141,7 @@ Soy *AIreGPT*, tu asistente inteligente de salud urbana. Aquí tienes todo lo qu
 🚗 *Auto y Movilidad:* Registra tu placa y holograma. Te diré si circulas hoy y los meses que te toca **verificar**.
 ⏰ *Alertas Inteligentes:* Programa un reporte diario a la hora que sales o alertas automáticas si la contaminación supera tu límite.
 📊 *Tu Resumen:* Escribe *"Dame mi resumen"* para ver toda tu configuración y estatus.
-"📩 Contacto: Si tienes dudas o sugerencias, escríbenos a info@smability.io"
+📩 *Contacto:* Si tienes dudas o sugerencias, escríbenos a info@smability.io.
 
 🤖 *Tip AIreGPT:* Próximamente también estaré disponible en *WhatsApp* 🟢 (Guarda este número: +52 55 1956 6483).
 
