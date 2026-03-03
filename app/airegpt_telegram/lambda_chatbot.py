@@ -1244,106 +1244,79 @@ def lambda_handler(event, context):
             elif data == "ver_resumen":
                 send_telegram_action(chat_id, "typing") 
                 user = user_profile 
-                
+                print(f"🕵️‍♂️ [DEBUG BOTON-IN] Profile: {json.dumps(user, default=str)}")
+
                 def clean_md(text):
                     return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
 
-                # 1. Estatus y Plan
+                # 1. Estatus
                 sub_data = user.get('subscription', {})
-                if not isinstance(sub_data, dict): sub_data = {}
-                status_str = sub_data.get('status', 'FREE').upper()
+                status_str = sub_data.get('status', 'FREE').upper() if isinstance(sub_data, dict) else str(sub_data).upper()
                 is_prem = any(x in status_str for x in ["PREMIUM", "TRIAL"])
 
                 # 2. Ubicaciones
-                locs_map = user.get('locations', {})
-                locs_list = [f"• {k.capitalize()}: {v.get('display_name', k)}" for k, v in locs_map.items()]
+                locs_data = user.get('locations', {})
+                if not isinstance(locs_data, dict): locs_data = {}
+                locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
                 locs_display = "\n".join(locs_list) if locs_list else "• No configuradas"
 
-                # 3. Salud (EL FIX)
+                # 3. Salud
                 h_profile = user.get('health_profile', {})
                 if not isinstance(h_profile, dict): h_profile = {}
-                condiciones = [clean_md(v.get('condition', '')) for k, v in h_profile.items() if isinstance(v, dict) and v.get('active')]
+                condiciones = [info.get('condition', '') for k, info in h_profile.items() if isinstance(info, dict) and info.get('active')]
                 health_display_final = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
 
-                # --- 4. Rutina (FIX: Mapeo correcto de llaves) ---
+                # 4. Rutina (FIX HOMOLOGADO)
                 tr = user.get('profile_transport', {})
-                if not isinstance(tr, dict): tr = {}
+                print(f"🕵️‍♂️ [DEBUG BOTON-RUTINA] tr: {json.dumps(tr, default=str)}")
                 m_t = clean_md(tr.get('medio', 'No definido')).lower().replace("auto ventana", "🚗 Auto").replace("metrobus", "🚌 Metrobús").capitalize()
-                h_t = str(tr.get('tiempo_traslado_horas', '0'))
+                h_t = str(tr.get('tiempo_traslado_horas', tr.get('horas', '0')))
                 
-                if h_t != '0' and h_t != 'None':
-                    ruta_v = "Casa ↔ Trabajo" if 'trabajo' in locs_map else "Local"
+                if h_t != '0' and h_t != 'None' and m_t != 'No definido':
+                    ruta_v = "Casa ↔ Trabajo" if 'trabajo' in locs_data else "Local"
                     transp_str = f"• Ruta: {ruta_v}\n• Modo: {m_t}\n• Tiempo: {h_t} hrs/día"
                 else:
                     transp_str = "• No configurada"
 
-                # --- 5. Alertas Umbral (FIX: Acceso a thresholds) ---
+                # 5. Alertas Umbral
                 th = user.get('thresholds', user.get('threshold', {}))
-                al_th_list = []
-                if isinstance(th, dict):
-                    for k, v in th.items():
-                        # Si el valor es un diccionario (como lo guarda el bot a veces), extraemos 'umbral'
-                        val = v.get('umbral') if isinstance(v, dict) else v
-                        if val:
-                            nombre_loc = locs_map.get(k, {}).get('display_name', k).capitalize()
-                            al_th_list.append(f"• {nombre_loc}: > {val} pts")
+                al_th_list = [f"• {locs_data.get(k, {}).get('display_name', k).capitalize()}: > {v.get('umbral') if isinstance(v, dict) else v} pts" for k, v in th.items() if (isinstance(v, dict) and v.get('active')) or isinstance(v, (int, float))]
                 al_th = "\n".join(al_th_list) if al_th_list else "• No configuradas"
                 
-                # --- 6. Reportes Programados (FIX: Formato ca:sa -> 08:00) ---
-                al_root = user.get('alerts', {})
-                sch_data = al_root.get('schedule', {})
-                active_sch = []
+                # 6. Reportes Programados (FIX DÍAS)
+                sch_data = user.get('alerts', {}).get('schedule', {})
+                sch_list = []
+                from cards import format_days_text 
                 if isinstance(sch_data, dict):
-                    for loc_k, config in sch_data.items():
-                        # Verificamos si está activo
-                        is_active = config.get('active') if isinstance(config, dict) else False
-                        if is_active:
-                            # Sacamos la hora real (no la llave loc_k)
-                            hora_raw = str(config.get('time', '00:00'))
-                            nombre_loc = locs_map.get(loc_k, {}).get('display_name', loc_k).capitalize()
-                            active_sch.append(f"• {nombre_loc}: {hora_raw} hrs (Diario)")
-                al_sch = "\n".join(active_sch) if active_sch else "• Sin reportes"
+                    for l_k, conf in sch_data.items():
+                        if isinstance(conf, dict) and conf.get('active'):
+                            n_disp = locs_data.get(l_k, {}).get('display_name', l_k).capitalize()
+                            d_label = format_days_text(conf.get('days', []))
+                            sch_list.append(f"• {n_disp}: {conf.get('time')} hrs ({d_label})")
+                al_sch = "\n".join(sch_list) if sch_list else "• Sin reportes"
 
-                # --- 7. Vehículo e HNC (Añadimos el Color/Engomado) ---
+                # 7. Vehículo e HNC
                 veh = user.get('vehicle', {})
                 v_str, h_rem = "• No registrado", "• No configurado"
                 if isinstance(veh, dict) and veh.get('active'):
-                    v_p = veh.get('plate_last_digit')
-                    v_h = veh.get('hologram')
-                    v_color = veh.get('engomado', '')
-                    v_str = f"• Placa {v_p} (Holo {v_h})" + (f" | {v_color}" if v_color else "")
+                    v_p, v_h = veh.get('plate_last_digit'), veh.get('hologram')
+                    v_str = f"• Placa {v_p} (Holo {v_h}) | {veh.get('engomado', 'N/A')}"
                     try:
                         hoy = get_mexico_time().strftime("%Y-%m-%d")
-                        fase = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {}).get('last_contingency_phase', 'None')
-                        can_d, _, _ = cards.check_driving_status(v_p, v_h, hoy, fase)
-                        h_rem = "✅ **HOY circula normal**" if can_d else "🔴 **HOY no circula**"
+                        sys = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                        can, _, _ = cards.check_driving_status(v_p, v_h, hoy, sys.get('last_contingency_phase', 'None'))
+                        h_rem = "✅ **HOY circula normal**" if can else "🔴 **HOY no circula**"
                     except: h_rem = "⚠️ Error al calcular"
 
-                # 8. Contingencia (Safe Boolean)
-                cont_root = al_root.get('contingency', {})
-                if isinstance(cont_root, bool):
-                    cont_status = "✅ ACTIVA" if cont_root else "🔕 INACTIVA"
-                elif isinstance(cont_root, dict):
-                    cont_status = "✅ ACTIVA" if cont_root.get('enabled') else "🔕 INACTIVA"
-                else:
-                    cont_status = "🔕 INACTIVA"
-
-                # 9. RENDER FINAL
+                # 8. Render Final
                 card_resumen = cards.CARD_SUMMARY.format(
-                    user_name=clean_md(first_name), 
-                    plan_status=status_str,
-                    contingency_status=cont_status,
-                    locations_list=locs_display,
-                    health_display=health_display_final,
-                    transport_info=transp_str,
-                    vehicle_info=v_str, 
-                    alerts_threshold=al_th,
-                    alerts_schedule=al_sch, 
-                    hnc_reminder=h_rem, 
-                    footer=cards.BOT_FOOTER
+                    user_name=clean_md(first_name), plan_status=status_str,
+                    contingency_status="✅ ACTIVA" if user.get('alerts', {}).get('contingency') else "🔕 INACTIVA",
+                    locations_list=locs_display, health_display=health_display_final, transport_info=transp_str,
+                    vehicle_info=v_str, alerts_threshold=al_th, alerts_schedule=al_sch, 
+                    hnc_reminder=h_rem, footer=cards.BOT_FOOTER
                 )
-                
-                send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs_map, is_prem))
+                send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs_data, is_prem))
                 return {'statusCode': 200, 'body': 'OK'}
                 
             elif data in ["CONFIG_ADVANCED", "GO_PREMIUM"]:
@@ -2083,111 +2056,85 @@ def lambda_handler(event, context):
                     # IMPORTANTE: Avisar al LLM que ya se hizo
                     
 
+                #-----
                 elif fn == "consultar_resumen_configuracion":
                     user = user_profile 
+                    print(f"🕵️‍♂️ [DEBUG GPT-IN] Profile: {json.dumps(user, default=str)}")
                     
-                    # --- Plan ---
                     sub_data = user.get('subscription', {})
-                    status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else (str(sub_data) if sub_data else 'FREE')
-                    is_prem = "PREMIUM" in status_str.upper() or "TRIAL" in status_str.upper()
+                    status_str = sub_data.get('status', 'FREE').upper() if isinstance(sub_data, dict) else str(sub_data).upper()
+                    is_prem = any(x in status_str for x in ["PREMIUM", "TRIAL"])
+
+                    def clean_md(text):
+                        return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
+
+                    # --- Datos base ---
+                    locs_data = user.get('locations', {})
+                    if not isinstance(locs_data, dict): locs_data = {}
                     
-                    # --- EXTRACCIÓN CONDICIONADA AL PLAN ---
-                    if is_prem:
-                        # --- 1. Alerta Contingencia ---
-                        alerts_data = user.get('alerts', {})
-                        if not isinstance(alerts_data, dict): alerts_data = {}
-                        contingency = "✅ ACTIVA" if alerts_data.get('contingency') else "🔕 INACTIVA"
+                    # 1. Ubicaciones
+                    locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
+                    locs_str = "\n".join(locs_list) if locs_list else "• No configuradas"
 
-                        # --- 2. Ubicaciones ---
-                        locs_data = user.get('locations', {})
-                        if not isinstance(locs_data, dict): locs_data = {}
-                        locs_list = []
-                        for k, v in locs_data.items():
-                            if isinstance(v, dict) and v.get('active'):
-                                locs_list.append(f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}")
-                        locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
+                    # 2. Salud
+                    h_profile = user.get('health_profile', {})
+                    if not isinstance(h_profile, dict): h_profile = {}
+                    condiciones = [info.get('condition', '') for k, info in h_profile.items() if isinstance(info, dict) and info.get('active')]
+                    health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
 
-                        # --- 3. Salud ---
-                        health_data = user.get('health_profile', {})
-                        condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
-                        health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
+                    # 3. Rutina (FIX HOMOLOGADO)
+                    tr = user.get('profile_transport', {})
+                    print(f"🕵️‍♂️ [DEBUG GPT-RUTINA] tr: {json.dumps(tr, default=str)}")
+                    m_t = clean_md(tr.get('medio', 'No definido')).lower().replace("auto ventana", "🚗 Auto").replace("metrobus", "🚌 Metrobús").capitalize()
+                    h_t = str(tr.get('tiempo_traslado_horas', tr.get('horas', '0')))
+                    
+                    if h_t != '0' and h_t != 'None' and m_t != 'No definido':
+                        ruta_v = "Casa ↔ Trabajo" if 'trabajo' in locs_data else "Local"
+                        transp_str = f"• Ruta: {ruta_v}\n• Modo: {m_t}\n• Tiempo: {h_t} hrs/día"
+                    else:
+                        transp_str = "• No configurada"
 
-                        # --- 4. Rutina / Transporte (PREMIUM) ---
-                        transp = user.get('profile_transport', {})
-                        if isinstance(transp, dict) and transp.get('medio'):
-                            nombres_medios = {
-                                "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
-                                "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
-                                "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
-                            }
-                            medio_raw = transp.get('medio')
-                            medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
-                            horas = transp.get('tiempo_traslado_horas', transp.get('horas', 0))
-                            ruta = "Casa ↔ Trabajo" if ('casa' in locs_data and 'trabajo' in locs_data) else "Ruta habitual"
-                            transport_info = f"• Ruta: {ruta}\n• Modo: {medio_str}\n• Tiempo: {horas} hrs/día"
-                        else:
-                            transport_info = "• No configurado."
+                    # 4. Alertas Umbral
+                    th = user.get('thresholds', user.get('threshold', {}))
+                    al_th_list = [f"• {locs_data.get(k, {}).get('display_name', k).capitalize()}: > {v.get('umbral') if isinstance(v, dict) else v} pts" for k, v in th.items() if (isinstance(v, dict) and v.get('active')) or isinstance(v, (int, float))]
+                    alerts_th = "\n".join(al_th_list) if al_th_list else "• No configuradas"
 
-                        # --- 5. Auto e HNC (PREMIUM: Info Técnica Completa) ---
-                        veh_obj = user.get('vehicle', {})
-                        if isinstance(veh_obj, dict) and veh_obj.get('active'):
-                            v_p = veh_obj.get('plate_last_digit')
-                            v_h = veh_obj.get('hologram')
-                            v_c = veh_obj.get('engomado', 'N/A')
-                            
-                            # Info técnica para la parte de arriba
-                            veh_str = f"• Placa {v_p} (Holo {v_h}) | {v_c}"
-                            
-                            try:
-                                # Llamamos a la lógica real de Hoy No Circula
-                                hoy_str = get_mexico_time().strftime("%Y-%m-%d")
-                                sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                                fase = sys_state.get('last_contingency_phase', 'None')
-                                
-                                can_drive, _, _ = cards.check_driving_status(v_p, v_h, hoy_str, fase)
-                                
-                                # 🔥 EL FIX: Texto directo y humano
-                                if can_drive:
-                                    hnc_rem = "✅ **HOY Circula Normal**"
-                                else:
-                                    hnc_rem = "🔴 **HOY No Circula**"
-                                    
-                            except Exception as e:
-                                print(f"❌ Error HNC Resumen: {e}")
-                                hnc_rem = "⚠️ Error al calcular estatus"
-                        else:
-                            veh_str, hnc_rem = "• No registrado.", "• No configurado."
-                            
-                        # --- 6 y 7. Alertas y Recordatorios (PREMIUM: UX Frecuencia) ---
-                        al_data = user.get('alerts', {})
-                        # Alertas por Umbral
-                        th_list = [f"• {k.capitalize()}: > {v.get('umbral')} pts" for k, v in al_data.get('threshold', {}).items() if isinstance(v, dict) and v.get('active')]
-                        alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
-                        
-                        # Recordatorios Programados con (Frecuencia)
-                        sch_list = []
-                        from cards import format_days_text # Helper vital para la UX
-                        for k, v in al_data.get('schedule', {}).items():
-                            if isinstance(v, dict) and v.get('active'):
-                                d_list = v.get('days', [])
-                                dias_label = format_days_text(d_list)
-                                sch_list.append(f"• {k.capitalize()}: {v.get('time')} hrs ({dias_label})")
-                        alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
+                    # 5. Reportes Programados (FIX DÍAS)
+                    sch_data = user.get('alerts', {}).get('schedule', {})
+                    sch_list = []
+                    from cards import format_days_text 
+                    if isinstance(sch_data, dict):
+                        for l_k, conf in sch_data.items():
+                            if isinstance(conf, dict) and conf.get('active'):
+                                n_disp = locs_data.get(l_k, {}).get('display_name', l_k).capitalize()
+                                d_label = format_days_text(conf.get('days', []))
+                                sch_list.append(f"• {n_disp}: {conf.get('time')} hrs ({d_label})")
+                    alerts_sch = "\n".join(sch_list) if sch_list else "• Sin reportes"
 
-                        # 🖼️ ENVÍO FINAL PREMIUM
-                        safe_name = str(first_name).replace("_", " ")
-                        card_prem = cards.CARD_SUMMARY.format(
-                            user_name=safe_name, plan_status=status_str.upper(),
-                            contingency_status=contingency, locations_list=locs_str,
-                            health_display=health_str, transport_info=transport_info,
-                            vehicle_info=veh_str, 
-                            alerts_threshold=alerts_th,
-                            alerts_schedule=alerts_sch,
-                            hnc_reminder=hnc_rem,
-                            footer=cards.BOT_FOOTER
-                        )
-                        send_telegram(chat_id, card_prem, markup=cards.get_summary_buttons(locs_data, True))
-                        return {'statusCode': 200, 'body': 'OK'}
+                    # 6. Auto e HNC
+                    veh = user.get('vehicle', {})
+                    v_str, h_rem = "• No registrado", "• No configurado"
+                    if isinstance(veh, dict) and veh.get('active'):
+                        v_p, v_h = veh.get('plate_last_digit'), veh.get('hologram')
+                        v_str = f"• Placa {v_p} (Holo {v_h}) | {veh.get('engomado', 'N/A')}"
+                        try:
+                            hoy = get_mexico_time().strftime("%Y-%m-%d")
+                            sys = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                            can, _, _ = cards.check_driving_status(v_p, v_h, hoy, sys.get('last_contingency_phase', 'None'))
+                            h_rem = "✅ **HOY circula normal**" if can else "🔴 **HOY no circula**"
+                        except: h_rem = "⚠️ Error al calcular"
+
+                    # Enviar Interfaz Visual
+                    card_visual = cards.CARD_SUMMARY.format(
+                        user_name=clean_md(first_name), plan_status=status_str,
+                        contingency_status="✅ ACTIVA" if user.get('alerts', {}).get('contingency') else "🔕 INACTIVA",
+                        locations_list=locs_str, health_display=health_str, transport_info=transp_str,
+                        vehicle_info=v_str, alerts_threshold=alerts_th, alerts_schedule=alerts_sch,
+                        hnc_reminder=h_rem, footer=cards.BOT_FOOTER
+                    )
+                    send_telegram(chat_id, card_visual, markup=cards.get_summary_buttons(locs_data, is_prem))
+                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Resumen visual enviado."})
+                    return {'statusCode': 200, 'body': 'OK'}
 
                     if not is_prem:
                         # LÓGICA FREE: Resumen transparente (Placa + Hoy + Alertas Prueba)
