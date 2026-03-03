@@ -1245,49 +1245,38 @@ def lambda_handler(event, context):
                 send_telegram_action(chat_id, "typing") 
                 user = user_profile 
                 
-                # 1. Definir función de limpieza
+                # FUNCIÓN DE LIMPIEZA ANTI-ERROR 400
                 def clean_md(text):
                     return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
-                
-                # --- FIX: DEFINIR LOCS_STR (Lo que faltaba) ---
-                locs_data = user.get('locations', {})
-                locs_list = []
-                for k, v in locs_data.items():
-                    if isinstance(v, dict) and v.get('active'):
-                        locs_list.append(f"• {clean_md(k.capitalize())}: {clean_md(v.get('display_name', k).capitalize())}")
-                locs_str = "\n".join(locs_list) if locs_list else "• Sin ubicaciones"
-                # ----------------------------------------------
-                
-                # 2. Identificar PLAN (Aquí definimos status_str para evitar el error)
-                sub_data = user.get('subscription', {})
-                status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else 'FREE'
-                is_prem = any(x in status_str.upper() for x in ["PREMIUM", "TRIAL"])
 
-                # 3. Extracción de Salud
-                h_data = user.get('health_profile', {})
-                conds = [clean_md(v.get('condition', '')) for k, v in h_data.items() if isinstance(v, dict) and v.get('active')]
-                health_str = "• " + ", ".join(conds) if conds else "• Ninguna"
-
-                # 4. Extracción de Rutina
+                # --- 1. RUTINA (MODO Y TIEMPO) ---
                 tr = user.get('profile_transport', {})
-                m_t = clean_md(tr.get('medio', 'No definido')).replace("auto ventana", "Auto").capitalize()
+                m_t = clean_md(tr.get('medio', 'No definido')).replace("auto ventana", "🚗 Auto").replace("metrobus", "🚌 Metrobús").capitalize()
                 h_t = tr.get('tiempo_traslado_horas', '0')
-                transp_str = f"• {m_t} ({h_t} hrs/día)" if h_t != '0' else "• No configurada"
+                # Si hay trabajo, mostramos la ruta
+                ruta_str = "Casa ↔ Trabajo" if 'trabajo' in user.get('locations', {}) else "Local"
+                transp_str = f"• Ruta: {ruta_str}\n• Modo: {m_t}\n• Tiempo: {h_t} hrs/día" if h_t != '0' else "• No configurada"
 
-                # 5. Extracción de Alertas
+                # --- 2. ALERTAS UMBRAL ---
                 th = user.get('thresholds', {})
-                al_th = "• " + ", ".join([f"{k.capitalize()}>{v}" for k, v in th.items()]) if th else "• No configuradas"
+                locs = user.get('locations', {})
+                al_th_list = []
+                for k, v in th.items():
+                    name = locs.get(k, {}).get('display_name', k).capitalize()
+                    al_th_list.append(f"• {name}: > {v} pts")
+                al_th = "\n".join(al_th_list) if al_th_list else "• No configuradas"
                 
+                # --- 3. REPORTES PROGRAMADOS ---
                 sch_data = user.get('alerts', {}).get('schedule', {})
-                active_sch = [k for k, v in sch_data.items() if v is True]
-                al_sch = "• " + ", ".join([f"{s[:2]}:{s[2:]}" for s in active_sch]) if active_sch else "• Sin reportes"
+                active_sch = [f"• {k[:2]}:{k[2:]} hrs (Diario)" for k, v in sch_data.items() if v is True]
+                al_sch = "\n".join(active_sch) if active_sch else "• Sin reportes"
 
-                # 6. Vehículo e HNC
+                # --- 4. VEHÍCULO E HNC ---
                 veh = user.get('vehicle', {})
                 v_str, h_rem = "• No registrado", "• No configurado"
                 if isinstance(veh, dict) and veh.get('active'):
                     v_p, v_h = veh.get('plate_last_digit'), veh.get('hologram')
-                    v_str = f"• Placa {v_p} (Holo {v_h})"
+                    v_str = f"• Placa {v_p} (Holo {v_h}) | {veh.get('engomado', 'N/A')}"
                     try:
                         hoy = get_mexico_time().strftime("%Y-%m-%d")
                         fase = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {}).get('last_contingency_phase', 'None')
@@ -1295,7 +1284,7 @@ def lambda_handler(event, context):
                         h_rem = "✅ **HOY circula normal**" if can_d else "🔴 **HOY no circula**"
                     except: h_rem = "⚠️ Error al calcular"
 
-                # 7. CONSTRUCCIÓN (Ya con status_str asegurado)
+                # --- CONSTRUCCIÓN ---
                 card_resumen = cards.CARD_SUMMARY.format(
                     user_name=clean_md(first_name), 
                     plan_status=status_str.upper(),
@@ -1310,7 +1299,7 @@ def lambda_handler(event, context):
                     footer=cards.BOT_FOOTER
                 )
                 
-                send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs_data, is_prem))
+                send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs, is_prem))
                 return {'statusCode': 200, 'body': 'OK'}
                 
             elif data in ["CONFIG_ADVANCED", "GO_PREMIUM"]:
@@ -2573,32 +2562,34 @@ def lambda_handler(event, context):
             final_text = ai_msg.content
 
         # =========================================================
-        # 📤 SALIDA ÚNICA A TELEGRAM (SILENCIO BLINDADO)
+        # 📤 SALIDA ÚNICA A TELEGRAM (SILENCIO BLINDADO + ANTI-ERROR 400)
         # =========================================================
-        # 1. Analizamos todo el historial de herramientas de esta ejecución
-        # Convertimos gpt_msgs a string para buscar nuestras palabras clave de "envío visual"
+        # 1. Analizamos historial para silenciar eco de IA
         historial_ejecucion = str(gpt_msgs)
-        frases_control = ["Reporte visual", "Tarjeta visual", "Interfaz visual", "enviado correctamente"]
+        frases_control = ["Reporte visual", "Tarjeta visual", "Interfaz visual", "enviado correctamente", "IAS"]
         
-        # Si alguna herramienta ya mandó algo visual, matamos la respuesta de texto
-        se_envio_tarjeta = any(f in historial_ejecucion for f in frases_control)
+        # Si hubo una herramienta técnica, matamos el texto redundante
+        se_envio_tarjeta = any(f in historial_ejecucion for f in frases_control) or (final_text and "IAS" in final_text)
 
         if se_envio_tarjeta:
-            print("🤫 SILENCIO: Tarjeta técnica detectada en el flujo. Cancelando texto de la IA.")
+            print("🤫 SILENCIO: Tarjeta técnica detectada. Cancelando texto redundante.")
             return {'statusCode': 200, 'body': 'OK'}
 
-        # 2. Si no hubo tarjeta, manejamos el flujo normal (Onboarding o Respuesta IA)
+        # 2. Manejo de Flujo Normal (Onboarding o Respuesta IA)
         markup_out = None
         if forced_tag:
             markup_out = get_inline_markup(forced_tag)
             final_text = "📍 **Ubicación recibida.**\n\n👇 Confirma para guardar:"
-        
-        # Solo enviamos si hay texto real y no es un residuo de la tool
+
+        # --- FIX ERROR 400: LIMPIEZA FINAL ---
         if final_text and final_text.strip():
-            send_telegram(chat_id, final_text, markup_out)
+            # Limpiamos caracteres que suelen dejar entidades de Markdown abiertas
+            safe_final_text = final_text.replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
+            
+            # Si el texto es el de "Ubicación recibida", dejamos las negritas controladas
+            if "Ubicación recibida" in final_text:
+                safe_final_text = final_text # Aquí no limpiamos porque es un texto seguro del sistema
+            
+            send_telegram(chat_id, safe_final_text, markup_out)
             
         return {'statusCode': 200, 'body': 'OK'}
-
-    except Exception as e:
-        print(f"🔥 [CRITICAL FAIL]: {e}")
-        return {'statusCode': 500, 'body': str(e)}
