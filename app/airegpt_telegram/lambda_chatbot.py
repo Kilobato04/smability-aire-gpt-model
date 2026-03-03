@@ -1949,19 +1949,42 @@ def lambda_handler(event, context):
                         calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
                         nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
                         
+                        #----
                         import os
                         directorio_actual = os.path.dirname(os.path.abspath(__file__))
                         ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
                         
+                        # Enviamos la imagen pero NO hacemos return para no matar el proceso
                         send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
-                        return {'statusCode': 200, 'body': 'OK'}
+                        r = f"Éxito: Reporte visual de calidad del aire enviado para {in_name}."
                         
                     else:
                         # ❌ FALLO: No hay coordenadas.
                         r = f"⚠️ No encontré coordenadas para '{in_name}'. Pide al usuario que guarde la ubicación o envíe su ubicación actual."
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
-                        # Aquí NO hacemos return, dejamos que el flujo baje para que GPT explique el error en texto.
-                    
+
+                # --- 🚩 FIN DE HERRAMIENTAS: REGISTRO Y CIERRE ---
+                # Esta línea debe estar DENTRO del bucle 'for tc in ai_msg.tool_calls:'
+                gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+
+            # --- 🔥 FUERA DEL BUCLE FOR (Alineado con el 'for') ---
+            # Llamada única final para procesar todos los resultados recolectados
+            final_res = client.chat.completions.create(
+                model="gpt-4o-mini", 
+                messages=gpt_msgs, 
+                temperature=0.3
+            )
+            final_text = final_res.choices[0].message.content
+            
+        else:
+            # Si no hubo tools, usamos el mensaje directo
+            final_text = ai_msg.content
+
+        # Envío de la confirmación final de texto
+        if final_text:
+            send_telegram(chat_id, final_text)
+
+        return {'statusCode': 200, 'body': 'OK'}
+        
                 # --- INICIO DE NUEVAS TOOLS (TEXTO/LLM) ---
                 elif fn == "configurar_transporte":
                     # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
@@ -2151,32 +2174,42 @@ def lambda_handler(event, context):
                         else:
                             transport_info = "• No configurado."
 
-                        # --- 5. Auto e HNC (PREMIUM: Sin candados) ---
+                        # --- 5. Auto e HNC (PREMIUM: Info Técnica Completa) ---
                         veh_obj = user.get('vehicle', {})
                         if isinstance(veh_obj, dict) and veh_obj.get('active'):
                             v_p = veh_obj.get('plate_last_digit')
                             v_h = veh_obj.get('hologram')
-                            veh_str = f"• Placa {v_p} (Holo {v_h}) ✅"
-                            hnc_rem = "• Calendario Mensual Completo ✅"
+                            v_c = veh_obj.get('engomado', 'N/A')
+                            # Restauramos el tag técnico: Placa X (Holo X) | Color
+                            veh_str = f"• Placa {v_p} (Holo {v_h}) | {v_c}"
+                            # El status de hoy usa los datos del auto guardado
+                            h_rem_base = f"Terminación {v_p}, Holo {v_h}, Engomado {v_c}"
+                            hnc_rem = f"• Estatus: {h_rem_base}"
                         else:
                             veh_str, hnc_rem = "• No registrado.", "• No configurado."
 
-                        # --- 6 y 7. Alertas y Recordatorios (PREMIUM) ---
+                        # --- 6 y 7. Alertas y Recordatorios (PREMIUM: UX Frecuencia) ---
                         al_data = user.get('alerts', {})
+                        # Alertas por Umbral
                         th_list = [f"• {k.capitalize()}: > {v.get('umbral')} pts" for k, v in al_data.get('threshold', {}).items() if isinstance(v, dict) and v.get('active')]
                         alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
                         
-                        sch_list = [f"• {k.capitalize()}: {v.get('time')} hrs" for k, v in al_data.get('schedule', {}).items() if isinstance(v, dict) and v.get('active')]
+                        # Recordatorios Programados con (Frecuencia)
+                        sch_list = []
+                        from cards import format_days_text # Helper vital para la UX
+                        for k, v in al_data.get('schedule', {}).items():
+                            if isinstance(v, dict) and v.get('active'):
+                                d_list = v.get('days', [])
+                                dias_label = format_days_text(d_list)
+                                sch_list.append(f"• {k.capitalize()}: {v.get('time')} hrs ({dias_label})")
                         alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
 
                         # 🖼️ ENVÍO FINAL PREMIUM
                         safe_name = str(first_name).replace("_", " ")
                         card_prem = cards.CARD_SUMMARY.format(
                             user_name=safe_name, plan_status=status_str.upper(),
-                            contingency_status=contingency, 
-                            locations_list=locs_str,
-                            health_display=health_str, 
-                            transport_info=transport_info,
+                            contingency_status=contingency, locations_list=locs_str,
+                            health_display=health_str, transport_info=transport_info,
                             vehicle_info=veh_str, 
                             alerts_threshold=alerts_th,
                             alerts_schedule=alerts_sch,
@@ -2443,6 +2476,13 @@ def lambda_handler(event, context):
                 # --- NUEVA TOOL: CALENDARIO MENSUAL (READ ONLY) ---
                 elif fn == "obtener_calendario_mensual":
                     user = get_user_profile(user_id)
+                    
+                    tier, _ = stripeairegpt.evaluate_user_tier(user)
+                    if tier == 'FREE':
+                        texto, botones = stripeairegpt.get_paywall_response(tier, 0, "hnc_calendario", str(user_id))
+                        send_telegram(chat_id, f"📅 **Calendario Mensual**\n\n{texto}", botones)
+                        return {'statusCode': 200, 'body': 'OK'}
+                   
                     veh = user.get('vehicle')
                     
                     if not veh or not veh.get('active'):
