@@ -100,8 +100,8 @@ Para mantener a AIreGPT rápido, preciso y sin hacer spam, opero bajo estas regl
 🗺️ *Cobertura:* Alertas de *Contingencia* y *Hoy No Circula* exclusivas para CDMX y ZMVM.
 🧠 *Motor de IA:* Funciono con *GPT-4o-mini*. Por favor, verifica la información crítica.
 🔬 *Ciencia de Exposición:* El cálculo de "cigarros invisibles" usa algoritmos que miden tu exposición al exterior (según tu transporte y tiempo) y asume que pasas el resto del día en interiores, donde se filtra el 60% de las partículas.
-📡 *Fuente de Verdad:* Mis datos provienen del modelo científico: [Monitoreo de Calidad del Aire y Gemelo Digital en Tiempo Real 🚦🌎](https://airmodelcdmx.netlify.app/)
-🏢 *Desarrollo:* Producto desarrollado por *Smability.io*.
+📡 *Fuente de Verdad:* Mis datos provienen del modelo científico: [Monitoreo de Calidad del Aire y Gemelo Digital en Tiempo Real 🚦🌎](https://airmodelcdmx.netlify.app/).
+🏢 *Desarrollo:* Producto desarrollado por *Smability.io*. Comentarios dudas o sugerencias, escríbenos a info@smability.io.
 
 {footer}"""
 
@@ -139,6 +139,7 @@ Soy *AIreGPT*, tu asistente inteligente de salud urbana. Aquí tienes todo lo qu
 🚗 *Auto y Movilidad:* Registra tu placa y holograma. Te diré si circulas hoy y los meses que te toca **verificar**.
 ⏰ *Alertas Inteligentes:* Programa un reporte diario a la hora que sales o alertas automáticas si la contaminación supera tu límite.
 📊 *Tu Resumen:* Escribe *"Dame mi resumen"* para ver toda tu configuración y estatus.
+"📩 Contacto: Si tienes dudas o sugerencias, escríbenos a info@smability.io"
 
 🤖 *Tip AIreGPT:* Próximamente también estaré disponible en *WhatsApp* 🟢 (Guarda este número: +52 55 1956 6483).
 
