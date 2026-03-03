@@ -235,6 +235,9 @@ def process_user(user, current_hour_str, contingency_data):
 
     # 🛑 GATEKEEPER: Revisar Permisos antes de procesar
     can_alerts, can_contingency = get_user_permissions(user)
+    # Detectar si el usuario es Premium/Trial para el HNC
+    sub_status = user.get('subscription', {}).get('status', 'FREE').upper()
+    is_vip = any(x in sub_status for x in ["PREMIUM", "TRIAL"])
     
     if not can_alerts and not can_contingency:
         return 
@@ -304,10 +307,12 @@ def process_user(user, current_hour_str, contingency_data):
                             
                             print(f"⏰ [NOTIFY] Enviando Reporte Diario a {first_name}")
                             
-                            # Generar Píldora HNC
+                            # Generar Píldora HNC (Veredicto real para VIPs, candado para FREE)
                             db_item = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                             sys_phase = db_item.get('last_contingency_phase', 'None')
-                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase)
+                            
+                            # IMPORTANTE: Pasamos 'is_vip' a la función
+                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_vip)
                             
                             # Armar footer combinado
                             combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
