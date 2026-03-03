@@ -1241,51 +1241,54 @@ def lambda_handler(event, context):
                 return {'statusCode': 200, 'body': 'OK'}
                 
             # --- NUEVO: BOTÓN "MI RESUMEN" DESDE ALERTAS (PUNTO 2) ---
-            elif data == "ver_resumen":
+elif data == "ver_resumen":
                 send_telegram_action(chat_id, "typing") 
-                user = user_profile  # Usamos el perfil sanitizado del inicio del handler
+                user = user_profile 
                 
-                # 1. Identificar Plan
-                sub_data = user.get('subscription', {})
-                status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else 'FREE'
-                is_prem = any(x in status_str.upper() for x in ["PREMIUM", "TRIAL"])
-                
-                # 2. Extraer Variables (Lógica unificada con /perfil)
-                locs_data = user.get('locations', {})
-                locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
-                locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
+                # --- FIX 4: FUNCIÓN DE LIMPIEZA ANTI-ERROR 400 ---
+                def clean_md(text):
+                    return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
 
-                # Salud
-                health_data = user.get('health_profile', {})
-                condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
-                health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
+                # --- FIX 1: EXTRACCIÓN REAL DE DATOS (HOMOLOGACIÓN) ---
+                # 1. Salud
+                h_data = user.get('health_profile', {})
+                conds = [clean_md(v.get('condition', '')) for k, v in h_data.items() if isinstance(v, dict) and v.get('active')]
+                health_str = "• " + ", ".join(conds) if conds else "• Ninguna"
 
-                # Auto e HNC (Veredicto Directo)
-                veh_obj = user.get('vehicle', {})
-                veh_str, hnc_rem = "• No registrado", "• No configurado"
-                
-                if isinstance(veh_obj, dict) and veh_obj.get('active'):
-                    v_p, v_h = veh_obj.get('plate_last_digit'), veh_obj.get('hologram')
-                    veh_str = f"• Placa {v_p} (Holo {v_h}) | {veh_obj.get('engomado', 'N/A')}"
+                # 2. Rutina/Transporte
+                tr = user.get('profile_transport', {})
+                m_t = clean_md(tr.get('medio', 'No definido')).replace("auto ventana", "Auto").capitalize()
+                h_t = tr.get('tiempo_traslado_horas', '0')
+                transp_str = f"• {m_t} ({h_t} hrs/día)" if h_t != '0' else "• No configurada"
+
+                # 3. Alertas Umbral
+                th = user.get('thresholds', {})
+                al_th = "• " + ", ".join([f"{k.capitalize()}>{v}" for k, v in th.items()]) if th else "• No configuradas"
+
+                # 4. Vehículo e HNC (Usando el fix de anoche)
+                veh = user.get('vehicle', {})
+                v_str, h_rem = "• No registrado", "• No configurado"
+                if isinstance(veh, dict) and veh.get('active'):
+                    v_str = f"• Placa {veh.get('plate_last_digit')} (Holo {veh.get('hologram')})"
                     try:
-                        hoy_str = get_mexico_time().strftime("%Y-%m-%d")
+                        hoy = get_mexico_time().strftime("%Y-%m-%d")
                         fase = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {}).get('last_contingency_phase', 'None')
-                        can_drive, _, _ = cards.check_driving_status(v_p, v_h, hoy_str, fase)
-                        hnc_rem = "✅ **HOY circula normal**" if can_drive else "🔴 **HOY no circula**"
-                    except: hnc_rem = "⚠️ Error al calcular"
+                        can_d, _, _ = cards.check_driving_status(veh.get('plate_last_digit'), veh.get('hologram'), hoy, fase)
+                        h_rem = "✅ **HOY circula normal**" if can_d else "🔴 **HOY no circula**"
+                    except: h_rem = "⚠️ Error al calcular"
 
-                # 3. Construir y Enviar Tarjeta
+                # --- CONSTRUCCIÓN FINAL ---
                 card_resumen = cards.CARD_SUMMARY.format(
-                    user_name=str(first_name).replace("_", " "),
+                    user_name=clean_md(first_name), 
                     plan_status=status_str.upper(),
                     contingency_status="✅ ACTIVA" if user.get('alerts', {}).get('contingency') else "🔕 INACTIVA",
                     locations_list=locs_str,
-                    health_display=health_str,
-                    transport_info="• Ver detalle en /perfil",
-                    vehicle_info=veh_str,
-                    alerts_threshold="• Ver detalle en /perfil",
-                    alerts_schedule="• Ver detalle en /perfil",
-                    hnc_reminder=hnc_rem,
+                    health_display=health_str, 
+                    transport_info=transp_str,
+                    vehicle_info=v_str, 
+                    alerts_threshold=al_th,
+                    alerts_schedule=al_sch,
+                    hnc_reminder=h_rem, 
                     footer=cards.BOT_FOOTER
                 )
                 
