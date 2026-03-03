@@ -643,7 +643,15 @@ def get_inline_markup(tag):
 
 def send_telegram(chat_id, text, markup=None):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+    
+    # 🛡️ FIX 3: Inyectamos link_preview_options para limpiar el footer
+    payload = {
+        "chat_id": chat_id, 
+        "text": text, 
+        "parse_mode": "Markdown",
+        "link_preview_options": {"is_disabled": True}
+    }
+    
     if markup: payload["reply_markup"] = markup
     try: 
         r = requests.post(url, json=payload)
@@ -1217,7 +1225,7 @@ def lambda_handler(event, context):
                     if resp.get("status") == "success":
                         photo_url = resp["url"]
                         requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto", 
-                                      json={"chat_id": chat_id, "photo": photo_url, "caption": "¡Aquí está tu mapa de exposición! 🧱🏙️\n_Cada bloque es una semana. Mantente en colores claros._", "parse_mode": "Markdown"})
+                                      json={"chat_id": chat_id, "photo": photo_url, "caption": "¡Aquí está tu Tetris de exposición! 🧱🏙️\n_Cada bloque es una semana. Mantente en colores claros._", "parse_mode": "Markdown"})
                     else:
                         table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE last_tetris_ts")
                         send_telegram(chat_id, "Aún no tengo suficientes datos tuyos para generar el historial. Intenta mañana 😔")
@@ -1498,11 +1506,11 @@ def lambda_handler(event, context):
                         # --- INYECCIÓN DEL BOTÓN DE GRÁFICA (REEMPLAZA ESTE BLOQUE) ---
                         if markup_viral and "inline_keyboard" in markup_viral:
                             markup_viral["inline_keyboard"].insert(0, [{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}])
-                            markup_viral["inline_keyboard"].insert(1, [{"text": "🧱 Ver Historial Semanal", "callback_data": "GET_TETRIS"}])
+                            markup_viral["inline_keyboard"].insert(1, [{"text": "🧱 Ver mi Tetris semanal", "callback_data": "GET_TETRIS"}])
                         else:
                             markup_viral = {"inline_keyboard": [
                                 [{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}],
-                                [{"text": "🧱 Ver Historial Semanal", "callback_data": "GET_TETRIS"}]
+                                [{"text": "🧱 Ver mi Tetris semanal", "callback_data": "GET_TETRIS"}]
                             ]}
                         # --------------------------------------
                         
