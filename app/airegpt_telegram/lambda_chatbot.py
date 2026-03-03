@@ -1241,7 +1241,7 @@ def lambda_handler(event, context):
                 return {'statusCode': 200, 'body': 'OK'}
                 
             # --- NUEVO: BOTÓN "MI RESUMEN" DESDE ALERTAS (PUNTO 2) ---
-elif data == "ver_resumen":
+            elif data == "ver_resumen":
                 send_telegram_action(chat_id, "typing") 
                 user = user_profile 
                 
