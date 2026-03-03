@@ -731,17 +731,27 @@ def build_hnc_pill(vehicle, contingency_phase="None", is_premium=False):
     if not is_premium:
         return "\n🚗 **Tu Auto Hoy:** 🔒 Exclusivo Premium"
     
-    plate = vehicle.get('plate_last_digit')
-    holo = vehicle.get('hologram')
-    color_auto = ENGOMADOS.get(int(plate), "Desconocido")
+    # 💎 LÓGICA PARA USUARIOS PREMIUM
+    plate = str(vehicle.get('plate_last_digit', '0')) # Aseguramos string
+    holo = str(vehicle.get('hologram', '0'))
     
+    # Convertimos a int solo para el diccionario de colores
+    try:
+        color_auto = ENGOMADOS.get(int(plate), "Desconocido")
+    except:
+        color_auto = "Desconocido"
+    
+    # Calculamos veredicto
     can_drive, r_short, _ = check_driving_status(plate, holo, "hoy", contingency_phase)
     hnc_status = "🟢 CIRCULA" if can_drive else f"⛔ NO CIRCULA ({r_short})"
     
     pill = f"\n🚗 **Tu Auto Hoy:** {hnc_status} \n*(Placa term. {plate} | Holo {holo} | Eng. {color_auto})*"
 
+    # Verificación
     periodo_verif = get_verification_period(plate, holo)
-    mes_actual_txt = {1:"Ene", 2:"Feb", 3:"Mar", 4:"Abr", 5:"May", 6:"Jun", 7:"Jul", 8:"Ago", 9:"Sep", 10:"Oct", 11:"Nov", 12:"Dic"}[(datetime.utcnow() - timedelta(hours=6)).month]
+    mex_now = datetime.utcnow() - timedelta(hours=6)
+    mes_actual_txt = {1:"Ene", 2:"Feb", 3:"Mar", 4:"Abr", 5:"May", 6:"Jun", 7:"Jul", 8:"Ago", 9:"Sep", 10:"Oct", 11:"Nov", 12:"Dic"}[mex_now.month]
+    
     if mes_actual_txt in periodo_verif and "EXENTO" not in periodo_verif.upper():
         pill += f"\n⚠️ **RECORDATORIO:** Estás en periodo de Verificación ({periodo_verif})."
         
