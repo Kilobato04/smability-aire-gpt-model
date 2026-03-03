@@ -1265,26 +1265,53 @@ def lambda_handler(event, context):
                 condiciones = [clean_md(v.get('condition', '')) for k, v in h_profile.items() if isinstance(v, dict) and v.get('active')]
                 health_display_final = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
 
-                # 4. Rutina
+                # --- 4. Rutina (HOMOLOGADO Y BLINDADO) ---
                 tr = user.get('profile_transport', {})
                 if not isinstance(tr, dict): tr = {}
-                m_t = clean_md(tr.get('medio', 'No definido')).replace("auto ventana", "🚗 Auto").replace("metrobus", "🚌 Metrobús").capitalize()
-                h_t = tr.get('tiempo_traslado_horas', '0')
+                
+                # Extraemos y limpiamos el medio
+                raw_medio = tr.get('medio', 'No definido')
+                m_t = clean_md(raw_medio).lower().replace("auto ventana", "🚗 Auto").replace("metrobus", "🚌 Metrobús").capitalize()
+                
+                # Extraemos tiempo (manejamos si es int o str)
+                h_t = str(tr.get('tiempo_traslado_horas', '0'))
+                
+                # Definimos la ruta visual basándonos en si existe 'trabajo' en sus locaciones
                 ruta_str = "Casa ↔ Trabajo" if 'trabajo' in locs_map else "Local"
-                transp_str = f"• Ruta: {ruta_str}\n• Modo: {m_t}\n• Tiempo: {h_t} hrs/día" if h_t != '0' else "• No configurada"
+                
+                if h_t != '0' and h_t != 'None' and raw_medio != 'No definido':
+                    transp_str = f"• Ruta: {ruta_str}\n• Modo: {m_t}\n• Tiempo: {h_t} hrs/día"
+                else:
+                    transp_str = "• No configurada"
 
-                # 5. Alertas Umbral
-                th = user.get('thresholds', {})
+                # --- 5. Alertas Umbral (HOMOLOGADO) ---
+                # Intentamos leer de 'thresholds' o 'threshold' por si acaso
+                th = user.get('thresholds', user.get('threshold', {}))
                 if not isinstance(th, dict): th = {}
-                al_th_list = [f"• {locs_map.get(k, {}).get('display_name', k).capitalize()}: > {v} pts" for k, v in th.items()]
+                
+                locs_map = user.get('locations', {})
+                al_th_list = []
+                for k, v in th.items():
+                    if isinstance(v, (int, float, str)):
+                        nombre_loc = locs_map.get(k, {}).get('display_name', k).capitalize()
+                        al_th_list.append(f"• {nombre_loc}: > {v} pts")
+                
                 al_th = "\n".join(al_th_list) if al_th_list else "• No configuradas"
                 
-                # 6. Reportes Programados
+                # --- 6. Reportes Programados (HOMOLOGADO) ---
                 al_root = user.get('alerts', {})
                 if not isinstance(al_root, dict): al_root = {}
                 sch_data = al_root.get('schedule', {})
                 if not isinstance(sch_data, dict): sch_data = {}
-                active_sch = [f"• {k[:2]}:{k[2:]} hrs (Diario)" for k, v in sch_data.items() if v is True]
+                
+                active_sch = []
+                for k, v in sch_data.items():
+                    # Si v es un dict con 'active': True o si v es directamente True
+                    is_active = v.get('active') if isinstance(v, dict) else v is True
+                    if is_active:
+                        hora_formateada = f"{k[:2]}:{k[2:]}" if len(k) == 4 else k
+                        active_sch.append(f"• {hora_formateada} hrs (Diario)")
+                
                 al_sch = "\n".join(active_sch) if active_sch else "• Sin reportes"
 
                 # 7. Vehículo e HNC
