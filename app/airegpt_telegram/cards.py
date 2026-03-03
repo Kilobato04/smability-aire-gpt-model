@@ -5,7 +5,7 @@ BOT_VERSION = "v6.0"
 # --- NUEVO FOOTER LIMPIO ---
 BOT_FOOTER = """_Nota: Sugerencias de salud preventivas basadas en modelos ambientales. No sustituyen evaluación médica._
 
-[AIreGPT](https://airegpt.ai) | [Canal](https://t.me/smability) | [IG](https://instagram.com/airegpt.ai) | [TikTok](https://tiktok.com/@airegpt)"""
+[AIreGPT](https://www.smability.io/aire/gpt.html) | [Canal](https://t.me/smability) | [IG](https://instagram.com/airegpt.ai) | [TikTok](https://tiktok.com/@airegpt)"""
 
 IAS_INFO = {
     "Buena": {"msg": "Aire limpio.", "rec": "¡Disfruta el exterior!", "emoji": "🟢"},
