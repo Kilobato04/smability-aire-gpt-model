@@ -398,9 +398,9 @@ Bienvenido a *AIreGPT Premium*, {user_name}. Tu cuenta ha sido desbloqueada exit
 ✅ Cálculo de exposición diario desbloqueado.
 ✅ Soporte para 3 ubicaciones y reportes programados.
 
-Toca el botón de abajo para ver tu nuevo resumen o dime qué quieres configurar ahora. 🚀
+Pideme *ver mi resumen* o dime qué quieres configurar ahora. 🚀
 
-{footer}"""
+💎 *¡Gracias por apoyar AIreGPT!* Tu cuenta Premium ya está activa."""
 
 # --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
 def get_exposure_button():
