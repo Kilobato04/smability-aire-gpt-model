@@ -1248,7 +1248,16 @@ def lambda_handler(event, context):
                 # 1. Definir función de limpieza
                 def clean_md(text):
                     return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
-
+                
+                # --- FIX: DEFINIR LOCS_STR (Lo que faltaba) ---
+                locs_data = user.get('locations', {})
+                locs_list = []
+                for k, v in locs_data.items():
+                    if isinstance(v, dict) and v.get('active'):
+                        locs_list.append(f"• {clean_md(k.capitalize())}: {clean_md(v.get('display_name', k).capitalize())}")
+                locs_str = "\n".join(locs_list) if locs_list else "• Sin ubicaciones"
+                # ----------------------------------------------
+                
                 # 2. Identificar PLAN (Aquí definimos status_str para evitar el error)
                 sub_data = user.get('subscription', {})
                 status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else 'FREE'
@@ -2167,29 +2176,34 @@ def lambda_handler(event, context):
                     alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
                     alerts_sch = "• 🔒 Exclusivo Premium"
 
-                    # 🔥 ENVÍO Y CIERRE (Evita el error de sintaxis y el pasmo)
+                    # 🔥 ENVÍO Y CIERRE (Blindado contra Error 400)
                     # --- 💉 INYECCIÓN QUIRÚRGICA: FORMATEO Y ENVÍO REAL ---
-                    safe_name = str(first_name).replace("_", " ").replace("*", "")
                     
-                    # Forzamos el uso de la tarjeta predefinida en cards.py
+                    # Definimos la función de limpieza localmente para esta tool
+                    def clean_md(text):
+                        return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
+
+                    safe_name = clean_md(first_name)
+                    
+                    # Forzamos el uso de la tarjeta con TODAS las variables sanitizadas
                     card_visual = cards.CARD_SUMMARY.format(
                         user_name=safe_name, 
-                        plan_status=status_str.upper(),
-                        contingency_status=contingency, 
-                        locations_list=locs_str,
-                        health_display=health_str, 
-                        transport_info=transport_info,
-                        vehicle_info=veh_str, 
-                        alerts_threshold=alerts_th,
-                        alerts_schedule=alerts_sch,
-                        hnc_reminder=hnc_rem,
+                        plan_status=clean_md(status_str.upper()),
+                        contingency_status=clean_md(contingency), 
+                        locations_list=clean_md(locs_str),
+                        health_display=clean_md(health_str), 
+                        transport_info=clean_md(transport_info),
+                        vehicle_info=clean_md(veh_str), 
+                        alerts_threshold=clean_md(alerts_th),
+                        alerts_schedule=clean_md(alerts_sch),
+                        hnc_reminder=clean_md(hnc_rem),
                         footer=cards.BOT_FOOTER
                     )
                     
                     # Envío directo a Telegram con sus botones de gestión
                     send_telegram(chat_id, card_visual, markup=cards.get_summary_buttons(locs_data, is_prem))
                     
-                    # Cortamos ejecución para que GPT no intente "explicar" el resumen en texto
+                    # Cortamos ejecución con un mensaje claro para el historial de GPT
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Interfaz visual enviada correctamente."})
                     return {'statusCode': 200, 'body': 'OK'}
 
@@ -2559,23 +2573,27 @@ def lambda_handler(event, context):
             final_text = ai_msg.content
 
         # =========================================================
-        # 📤 SALIDA ÚNICA A TELEGRAM (CON FIX DE SILENCIO)
+        # 📤 SALIDA ÚNICA A TELEGRAM (SILENCIO BLINDADO)
         # =========================================================
-        # 1. Detectamos si alguna herramienta ya envió un reporte visual
-        # En tu código, las tools que envían tarjeta retornan con un 200 directo.
-        # Si llegamos aquí, revisamos si el texto es solo una confirmación interna.
+        # 1. Analizamos todo el historial de herramientas de esta ejecución
+        # Convertimos gpt_msgs a string para buscar nuestras palabras clave de "envío visual"
+        historial_ejecucion = str(gpt_msgs)
+        frases_control = ["Reporte visual", "Tarjeta visual", "Interfaz visual", "enviado correctamente"]
         
-        prohibidos = ["Reporte visual de calidad del aire enviado", "Tarjeta visual HNC enviada", "Interfaz visual enviada"]
-        if any(p in str(gpt_msgs[-1].get('content', '')) for p in prohibidos):
-            print("🤫 Silenciando respuesta redundante del LLM (Tarjeta ya enviada).")
+        # Si alguna herramienta ya mandó algo visual, matamos la respuesta de texto
+        se_envio_tarjeta = any(f in historial_ejecucion for f in frases_control)
+
+        if se_envio_tarjeta:
+            print("🤫 SILENCIO: Tarjeta técnica detectada en el flujo. Cancelando texto de la IA.")
             return {'statusCode': 200, 'body': 'OK'}
 
+        # 2. Si no hubo tarjeta, manejamos el flujo normal (Onboarding o Respuesta IA)
         markup_out = None
         if forced_tag:
             markup_out = get_inline_markup(forced_tag)
             final_text = "📍 **Ubicación recibida.**\n\n👇 Confirma para guardar:"
         
-        # Solo enviamos texto si no es un "Ok" vacío del LLM tras una tool
+        # Solo enviamos si hay texto real y no es un residuo de la tool
         if final_text and final_text.strip():
             send_telegram(chat_id, final_text, markup_out)
             
