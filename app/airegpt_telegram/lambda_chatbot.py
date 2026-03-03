@@ -1245,39 +1245,48 @@ def lambda_handler(event, context):
                 send_telegram_action(chat_id, "typing") 
                 user = user_profile 
                 
-                # --- FIX 4: FUNCIÓN DE LIMPIEZA ANTI-ERROR 400 ---
+                # 1. Definir función de limpieza
                 def clean_md(text):
                     return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
 
-                # --- FIX 1: EXTRACCIÓN REAL DE DATOS (HOMOLOGACIÓN) ---
-                # 1. Salud
+                # 2. Identificar PLAN (Aquí definimos status_str para evitar el error)
+                sub_data = user.get('subscription', {})
+                status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else 'FREE'
+                is_prem = any(x in status_str.upper() for x in ["PREMIUM", "TRIAL"])
+
+                # 3. Extracción de Salud
                 h_data = user.get('health_profile', {})
                 conds = [clean_md(v.get('condition', '')) for k, v in h_data.items() if isinstance(v, dict) and v.get('active')]
                 health_str = "• " + ", ".join(conds) if conds else "• Ninguna"
 
-                # 2. Rutina/Transporte
+                # 4. Extracción de Rutina
                 tr = user.get('profile_transport', {})
                 m_t = clean_md(tr.get('medio', 'No definido')).replace("auto ventana", "Auto").capitalize()
                 h_t = tr.get('tiempo_traslado_horas', '0')
                 transp_str = f"• {m_t} ({h_t} hrs/día)" if h_t != '0' else "• No configurada"
 
-                # 3. Alertas Umbral
+                # 5. Extracción de Alertas
                 th = user.get('thresholds', {})
                 al_th = "• " + ", ".join([f"{k.capitalize()}>{v}" for k, v in th.items()]) if th else "• No configuradas"
+                
+                sch_data = user.get('alerts', {}).get('schedule', {})
+                active_sch = [k for k, v in sch_data.items() if v is True]
+                al_sch = "• " + ", ".join([f"{s[:2]}:{s[2:]}" for s in active_sch]) if active_sch else "• Sin reportes"
 
-                # 4. Vehículo e HNC (Usando el fix de anoche)
+                # 6. Vehículo e HNC
                 veh = user.get('vehicle', {})
                 v_str, h_rem = "• No registrado", "• No configurado"
                 if isinstance(veh, dict) and veh.get('active'):
-                    v_str = f"• Placa {veh.get('plate_last_digit')} (Holo {veh.get('hologram')})"
+                    v_p, v_h = veh.get('plate_last_digit'), veh.get('hologram')
+                    v_str = f"• Placa {v_p} (Holo {v_h})"
                     try:
                         hoy = get_mexico_time().strftime("%Y-%m-%d")
                         fase = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {}).get('last_contingency_phase', 'None')
-                        can_d, _, _ = cards.check_driving_status(veh.get('plate_last_digit'), veh.get('hologram'), hoy, fase)
+                        can_d, _, _ = cards.check_driving_status(v_p, v_h, hoy, fase)
                         h_rem = "✅ **HOY circula normal**" if can_d else "🔴 **HOY no circula**"
                     except: h_rem = "⚠️ Error al calcular"
 
-                # --- CONSTRUCCIÓN FINAL ---
+                # 7. CONSTRUCCIÓN (Ya con status_str asegurado)
                 card_resumen = cards.CARD_SUMMARY.format(
                     user_name=clean_md(first_name), 
                     plan_status=status_str.upper(),
@@ -1287,7 +1296,7 @@ def lambda_handler(event, context):
                     transport_info=transp_str,
                     vehicle_info=v_str, 
                     alerts_threshold=al_th,
-                    alerts_schedule=al_sch,
+                    alerts_schedule=al_sch, 
                     hnc_reminder=h_rem, 
                     footer=cards.BOT_FOOTER
                 )
