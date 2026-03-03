@@ -1653,7 +1653,7 @@ def lambda_handler(event, context):
                         }
                         medio_raw = transp.get('medio')
                         medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
-                        horas = transp.get('horas', 0)
+                        horas = transp.get('tiempo_traslado_horas', transp.get('horas', 0))
                         
                         if medio_raw == 'home_office':
                             transport_info = f"• Modalidad: {medio_str}\n• Tiempo: 0 hrs/día"
@@ -1692,15 +1692,24 @@ def lambda_handler(event, context):
                     th_list = [f"• {k.capitalize()}: > {v.get('umbral', 100)} pts" for k, v in th_data.items() if isinstance(v, dict) and v.get('active')]
                     alerts_th = "\n".join(th_list) if th_list else "• Ninguna activa."
 
-                    # --- 7. Reportes Programados ---
+                    # --- 7. Reportes Programados (HOMOLOGADO) ---
                     sch_data = alerts_data.get('schedule', {})
                     if not isinstance(sch_data, dict): sch_data = {}
                     sch_list = []
-                    for k, v in sch_data.items():
-                        if isinstance(v, dict) and v.get('active'):
-                            dias_txt = "Diario" if len(v.get('days', [])) == 7 else "Personalizado"
-                            sch_list.append(f"• {k.capitalize()}: {v.get('time', '00:00')} hrs ({dias_txt})")
-                    alerts_sch = "\n".join(sch_list) if sch_list else "• Ninguno programado."
+                    from cards import format_days_text 
+
+                    for loc_k, config in sch_data.items():
+                        if isinstance(config, dict) and config.get('active'):
+                            # 1. Nombre visual (ej. Casa en vez de casa)
+                            nombre_disp = locs_data.get(loc_k, {}).get('display_name', loc_k).capitalize()
+                                
+                            # 2. Formato de días (ej. Diario o Lun, Mar)
+                            d_list = config.get('days', [])
+                            dias_label = format_days_text(d_list) if d_list else "Diario"
+                                
+                            sch_list.append(f"• {nombre_disp}: {config.get('time', '00:00')} hrs ({dias_label})")
+                        
+                    alerts_sch = "\n".join(sch_list) if sch_list else "• Sin reportes"
                 #---
                 else:
                     # LÓGICA FREE: Resumen transparente (Placa + Hoy + Alertas Prueba)
@@ -2113,7 +2122,7 @@ def lambda_handler(event, context):
                             }
                             medio_raw = transp.get('medio')
                             medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
-                            horas = transp.get('horas', 0)
+                            horas = transp.get('tiempo_traslado_horas', transp.get('horas', 0))
                             ruta = "Casa ↔ Trabajo" if ('casa' in locs_data and 'trabajo' in locs_data) else "Ruta habitual"
                             transport_info = f"• Ruta: {ruta}\n• Modo: {medio_str}\n• Tiempo: {horas} hrs/día"
                         else:
