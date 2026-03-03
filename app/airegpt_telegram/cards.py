@@ -378,7 +378,7 @@ Estás intentando {action_text}. Como estás en tus primeros {trial_days} días,
 
 CARD_PAYWALL = """🔒 *Función Bloqueada*
         
-Tu periodo de prueba ha concluido. Para {action_text}, necesitas activar *AIreGPT Premium*.
+Para {action_text}, necesitas activar *AIreGPT Premium*.
 
 *Con Premium obtienes:*
 🚨 Alertas instantáneas de Calidad del Aire, Contingencias y recordatorios de HNC.
