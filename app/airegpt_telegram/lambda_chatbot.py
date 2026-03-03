@@ -1961,10 +1961,6 @@ def lambda_handler(event, context):
                     else:
                         # ❌ FALLO: No hay coordenadas.
                         r = f"⚠️ No encontré coordenadas para '{in_name}'. Pide al usuario que guarde la ubicación o envíe su ubicación actual."
-
-                # --- 🚩 FIN DE HERRAMIENTAS: REGISTRO Y CIERRE ---
-                # Esta línea debe estar DENTRO del bucle 'for tc in ai_msg.tool_calls:'
-                gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
         
                 # --- INICIO DE NUEVAS TOOLS (TEXTO/LLM) ---
                 elif fn == "configurar_transporte":
@@ -1989,7 +1985,6 @@ def lambda_handler(event, context):
                     # 2. Límite de sentido común (Max 6 horas, Min 0)
                     if horas_float > 6.0:
                         r = "⚠️ El tiempo máximo de exposición que puedo calcular son 6 horas diarias. Por favor, explícale esto amablemente al usuario y pídele un tiempo real."
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
                         continue # Saltamos el guardado en BD
                         
                     if horas_float < 0:
@@ -1999,7 +1994,7 @@ def lambda_handler(event, context):
                     MEDIOS_VALIDOS = ["auto_ac", "suburbano", "cablebus", "metro", "metrobus", "auto_ventana", "combi", "caminar", "bicicleta", "home_office"]
                     if medio not in MEDIOS_VALIDOS:
                         r = f"⚠️ '{medio}' no es un modo válido. Dile que elija entre: Auto, Metro, Metrobús, Combi, Tren, Cablebús, Caminar, Bici o Home Office."
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        
                         continue # Saltamos el guardado en BD
 
                     # 4. Guardar en DynamoDB
@@ -2010,7 +2005,7 @@ def lambda_handler(event, context):
                         ExpressionAttributeValues={':p': {'medio': medio, 'horas': horas_db}}
                     )
                     r = f"✅ Perfil actualizado: Viajas en {medio} por {horas_float} horas. Dile al usuario de forma amigable que su transporte ha sido guardado y que ya puede consultar sus cigarros."
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
 
                 elif fn == "calcular_exposicion_diaria":
                     # 0. 🔒 GATEKEEPER STRIPE
@@ -2028,7 +2023,7 @@ def lambda_handler(event, context):
                     
                     if 'casa' not in locs:
                         r = "⚠️ Necesito tu ubicación de CASA para calcular esto. Pídesela al usuario."
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        
                     else:
                         lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
                         resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
@@ -2049,10 +2044,10 @@ def lambda_handler(event, context):
                             
                             # AQUÍ ESTÁ EL FIX: Le devolvemos un string limpio a GPT para que él lo hable.
                             r = f"El usuario respiró el equivalente a {res['cigarros']} cigarros ayer, perdiendo {res['dias_perdidos']} días de vida celular (Edad Urbana). Promedio de exposición integral: {res['promedio_riesgo']} ug/m3. Transmítele esto de forma empática usando emojis."
-                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                            
                         else:
                             r = "⚠️ Aún no tengo los datos atmosféricos de ayer procesados."
-                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                            
                 # --- FIN DE NUEVAS TOOLS ---
                 
                 # --- NUEVA TOOL: ELIMINAR UBICACIÓN (TEXTO) ---
@@ -2068,7 +2063,7 @@ def lambda_handler(event, context):
                         else:
                             r = f"⚠️ No encontré '{nombre}' o ya estaba borrada."
                     
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
 
                 elif fn == "renombrar_ubicacion":
                     nombre_viejo = args.get('nombre_actual')
@@ -2079,7 +2074,7 @@ def lambda_handler(event, context):
                     else:
                         success, r = rename_location_in_db(user_id, nombre_viejo, nombre_nuevo)
                         
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
                 
                 elif fn == "configurar_alerta_ias": 
                     # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
@@ -2093,7 +2088,7 @@ def lambda_handler(event, context):
                         
                     r = configure_ias_alert(user_id, args['nombre_ubicacion'], args['umbral_ias'])
                     # IMPORTANTE: Avisar al LLM que ya se hizo
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
 
                 elif fn == "configurar_recordatorio": 
                     # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
@@ -2108,7 +2103,7 @@ def lambda_handler(event, context):
                     # AHORA PASAMOS EL ARGUMENTO 'dias' QUE VIENE DEL LLM
                     r = configure_schedule_alert(user_id, args['nombre_ubicacion'], args['hora'], args.get('dias'))
                     # IMPORTANTE: Avisar al LLM que ya se hizo
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
 
                 elif fn == "consultar_resumen_configuracion":
                     user = user_profile 
@@ -2285,7 +2280,7 @@ def lambda_handler(event, context):
                             r = "Error al guardar la hora en la base de datos."
                     
                     # ⚠️ FIX: AGREGAR ESTA LÍNEA (FALTABA)
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
                     
                     # Recordatorio: Aquí usamos la lógica 'should_append_result = True' (default)
                     # para que se agregue al historial al final del bucle.
@@ -2302,7 +2297,7 @@ def lambda_handler(event, context):
                     
                     if digit is None or holo is None:
                         r = "⚠️ Faltan datos. Necesito último dígito y holograma."
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        
                     else:
                         # 3. 💾 GUARDADO EN BASE DE DATOS
                         save_vehicle_profile(user_id, digit, holo)
@@ -2362,7 +2357,7 @@ def lambda_handler(event, context):
                     
                     if not es_valida and condicion_raw != "ninguno":
                         r = f"⚠️ Smability solo monitorea condiciones afectadas por la calidad del aire. Dile al usuario amablemente que no es necesario registrar '{condicion_raw}'."
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        
                         continue 
                     
                     # 2. Guardar en BD (TAREAS 10 y 11 APLICADAS)
@@ -2387,23 +2382,23 @@ def lambda_handler(event, context):
                         print(f"❌ Error guardando salud: {e}")
                         r = "Hubo un error al guardar la condición."
                     
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
 
                 # --- NUEVAS TOOLS DE BORRADO (PARTE DE LA TAREA 10) ---
                 elif fn == "eliminar_auto":
                     table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE vehicle")
                     r = "✅ Vehículo eliminado de tu perfil."
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
                     
                 elif fn == "eliminar_rutina":
                     table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE profile_transport")
                     r = "✅ Rutina de transporte eliminada."
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
                     
                 elif fn == "eliminar_perfil_salud":
                     table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="REMOVE health_profile")
                     r = "✅ Perfil de salud eliminado."
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
                 #--------------------        
                 elif fn == "consultar_hoy_no_circula":
                     user = user_profile 
@@ -2468,7 +2463,7 @@ def lambda_handler(event, context):
                     
                     if not veh or not veh.get('active'):
                         r = "⚠️ No tienes auto configurado. Pide al usuario: 'Dime tu terminación de placa y holograma'."
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        
                     else:
                         # Extraer datos de la DB
                         digit = veh.get('plate_last_digit')
@@ -2512,7 +2507,7 @@ def lambda_handler(event, context):
                     
                     if not veh or not veh.get('active'):
                         r = "⚠️ No tienes auto guardado. Dime: 'Mi placa termina en 5 y es holograma 1'."
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        
                     else:
                         plate = veh.get('plate_last_digit')
                         holo = veh.get('hologram')
@@ -2550,7 +2545,7 @@ def lambda_handler(event, context):
                     # Ejecutar guardado
                     r = confirm_saved_location(user_id, nombre_key)
                     
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                    
                     
                 # --- NUEVA TOOL: MIS UBICACIONES (URL FIX) ---
                 elif fn == "consultar_ubicaciones_guardadas":
@@ -2559,7 +2554,7 @@ def lambda_handler(event, context):
                     
                     if not locs:
                         r = "📭 No tienes ubicaciones guardadas."
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        
                     else:
                         lista_txt = ""
                         for k, v in locs.items():
@@ -2581,7 +2576,7 @@ def lambda_handler(event, context):
                         
                         if not lista_txt:
                             r = "⚠️ Tus ubicaciones guardadas no tienen el formato correcto."
-                            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                            
                         else:
                             card = cards.CARD_MY_LOCATIONS.format(
                                 user_name=first_name, 
@@ -2593,47 +2588,47 @@ def lambda_handler(event, context):
                             return {'statusCode': 200, 'body': 'OK'}
 
                 elif fn == "configurar_alerta_contingencia":
-                    # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
+                    # 0. 🔒 GATEKEEPER STRIPE
                     user = get_user_profile(user_id)
                     can_proceed, msg, markup = check_quota_and_permissions(user, 'premium_feature', user_id)
+                    
                     if not can_proceed:
                         send_telegram(chat_id, msg, markup)
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "🛑 Bloqueado: Dile al usuario que requiere suscripción Premium."})
-                        continue
-                    if msg: send_telegram(chat_id, msg)
-                        
-                    val = args.get('activar')
-                    # Manejo robusto de booleanos que vienen como string
-                    if isinstance(val, str): is_active = val.lower() == 'true'
-                    else: is_active = bool(val)
-                    
-                    r = toggle_contingency_alert(user_id, is_active)
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        r = "🛑 Bloqueado: Informa al usuario que esta función requiere suscripción Premium."
+                    else:
+                        if msg: send_telegram(chat_id, msg)
+                        val = args.get('activar')
+                        is_active = val.lower() == 'true' if isinstance(val, str) else bool(val)
+                        r = toggle_contingency_alert(user_id, is_active)
 
                 else: 
-                    # Para cualquier otra tool genérica no contemplada arriba
-                    r = "Acción realizada."
-                    gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
-            
-            # --- FINAL DEL PROCESAMIENTO DE TOOLS ---
-            # Solo llegamos aquí si NO hubo un Hard Stop (como el de las tarjetas visuales)
+                    # Catch-all para cualquier otra tool genérica
+                    r = "Acción realizada correctamente."
+
+                # 🚩 EL ÚNICO REGISTRO DE TODO EL BUCLE (Alineado con los 'elif')
+                gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+
+            # --- 🛑 FIN DEL BUCLE 'FOR' (Alineado con la palabra 'for') ---
+
+            # 🔥 RESOLUCIÓN FINAL DE TEXTO (UNA SOLA VEZ)
             final_res = client.chat.completions.create(
                 model="gpt-4o-mini", 
                 messages=gpt_msgs, 
                 temperature=0.3
             )
             final_text = final_res.choices[0].message.content
+
         else:
-            # Si no hubo tools, usamos el contenido directo del AI
+            # Si GPT no usó herramientas, usamos su respuesta directa
             final_text = ai_msg.content
 
         # --- 📤 SALIDA ÚNICA A TELEGRAM ---
-        markup = None
+        markup_out = None
         if forced_tag:
-            markup = get_inline_markup(forced_tag)
+            markup_out = get_inline_markup(forced_tag)
             final_text = "📍 **Ubicación recibida.**\n\n👇 Confirma para guardar:"
         
-        send_telegram(chat_id, final_text, markup)
+        send_telegram(chat_id, final_text, markup_out)
         return {'statusCode': 200, 'body': 'OK'}
 
     except Exception as e:
