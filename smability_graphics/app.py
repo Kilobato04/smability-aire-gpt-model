@@ -567,41 +567,51 @@ def generar_grafica_tetris(user_id):
             lx = -0.5 + (idx * 0.95)
             dibujar_bloque_tetris(ax, lx, leyenda_y - 0.5, col)
             ax.text(lx+0.4, leyenda_y - 1.2, txt, color='#aaaaaa', ha='center', fontsize=10, fontname='monospace')
-
-        # Scorecard Limpia
+            
+        # --- SCORECARD (Tarjeta Central) ---
         card_x, card_y, card_w, card_h = 0.25, 0.60, 0.50, 0.25
+        
+        # Sombra de la tarjeta
         shadow = mpatches.FancyBboxPatch((card_x+0.01, card_y-0.01), card_w, card_h, boxstyle="round,pad=0.03", facecolor='black', alpha=0.5, transform=fig.transFigure, zorder=2)
         fig.patches.append(shadow)
 
+        # Cuerpo de la tarjeta
         card_outer = mpatches.FancyBboxPatch((card_x, card_y), card_w, card_h, boxstyle="round,pad=0.03", facecolor='#0d0212', edgecolor='#08F7FE', lw=3.5, transform=fig.transFigure, zorder=4)
         fig.patches.append(card_outer)
 
-        fig.text(0.5, 0.77, f"{total_cigarros_ytd}", fontsize=75, color='#08F7FE', ha='center', va='center', fontweight='heavy', fontname='monospace', zorder=5)
-        fig.text(0.5, 0.70, "Cigarros equivalentes a la fecha", fontsize=11, color='#aaaaaa', ha='center', fontname='monospace', zorder=5)
+        # Número Grande (Cigarros YTD)
+        fig.text(0.5, 0.78, f"{total_cigarros_ytd}", fontsize=75, color='#08F7FE', ha='center', va='center', fontweight='heavy', fontname='monospace', zorder=5)
+        fig.text(0.5, 0.72, "Cigarros acumulados en el año", fontsize=11, color='#aaaaaa', ha='center', fontname='monospace', zorder=5)
 
-        line = plt.Line2D((0.3, 0.7), (0.67, 0.67), color='#FF00FF', lw=1, alpha=0.4, transform=fig.transFigure, zorder=5)
+        # --- LÍNEA DIVISORIA Y FECHA (PUNTO NUEVO) ---
+        line = plt.Line2D((0.35, 0.65), (0.70, 0.70), color='#FF00FF', lw=1.5, alpha=0.6, transform=fig.transFigure, zorder=5)
         fig.lines.append(line)
 
-    
-        # --- FIX: MICROCOPY (Textos cortos, uniformes y centrados) ---
-        fig.text(0.5, 0.64, f"{anios_edad_urbana} años más a tu edad urbana", fontsize=12, color='#FF9900', ha='center', va='center', fontweight='bold', zorder=5)
-        fig.text(0.5, 0.615, f"{promedio_ias_mes} puntos de IAS promedio al mes", fontsize=12, color='#FFFF00', ha='center', va='center', fontweight='bold', fontname='monospace', zorder=5)
+        # Fecha de hoy dentro de la card
+        fecha_actual = now_mx.strftime("%d %b %Y")
+        fig.text(0.5, 0.685, f"Corte al: {fecha_actual}", fontsize=10, color='#FF00FF', ha='center', va='center', fontname='monospace', fontweight='bold', zorder=5)
 
-        ax.set_position([0.2, 0.06, 0.6, 0.52])
+        # Microcopy de Salud
+        fig.text(0.5, 0.65, f"{anios_edad_urbana} años más a tu edad urbana", fontsize=12, color='#FF9900', ha='center', va='center', fontweight='bold', zorder=5)
+        fig.text(0.5, 0.625, f"{promedio_ias_mes} puntos de IAS promedio al mes", fontsize=12, color='#FFFF00', ha='center', va='center', fontweight='bold', fontname='monospace', zorder=5)
 
-        # Cintillo y Footer
-        texto_viral = "Mi partida de Tetris Tóxico en CDMX/EDOMEX\n¡Juega la tuya en AIreGPT!"
-        fig.text(0.35, 0.94, texto_viral, fontsize=14, color='white', ha='center', va='center', fontweight='bold', bbox=dict(facecolor='#2b002b', edgecolor='#FF00FF', boxstyle='round,pad=0.8', alpha=0.9, lw=2.5), rotation=3, fontname='monospace')
-        generar_qr_eje(fig)
+        # --- AJUSTE POSICIÓN DEL GRÁFICO (Para que no tape las redes) ---
+        ax.set_position([0.2, 0.08, 0.6, 0.48])
 
-        # --- FIX PUNTO 6: REDES SOCIALES CENTRADAS ---
+        # --- REDES SOCIALES (FIX Z-ORDER Y POSICIÓN) ---
         fig.text(0.5, 0.58, "IG: @airegpt.ai  |  TikTok: @airegpt", 
                  color='#08F7FE', fontsize=11, ha='center', va='center', 
-                 fontname='monospace', fontweight='bold',
+                 fontname='monospace', fontweight='bold', zorder=10,
                  bbox=dict(facecolor='#1c1c28', edgecolor='#FF00FF', boxstyle='round,pad=0.4', alpha=0.9, lw=1.5))
 
-        footer_text = "AIreGPT | Smability.io\nNota: Esto es un estimado algorítmico y no representa un diagnóstico médico oficial.\nEl número en el bloque representa la suma de cigarros equivalentes de esa semana."
-        fig.text(0.5, 0.015, footer_text, color='#666666', fontsize=9, ha='center', linespacing=1.6)
+        # --- CINTILLO SUPERIOR ---
+        texto_viral = "Mi partida de Tetris Tóxico en CDMX/EDOMEX\n¡Juega la tuya en AIreGPT!"
+        fig.text(0.35, 0.94, texto_viral, fontsize=14, color='white', ha='center', va='center', fontweight='bold', bbox=dict(facecolor='#2b002b', edgecolor='#FF00FF', boxstyle='round,pad=0.8', alpha=0.9, lw=2.5), rotation=3, fontname='monospace', zorder=10)
+        generar_qr_eje(fig)
+
+        # --- FOOTER ---
+        footer_text = f"AIreGPT | Smability.io | {now_mx.year}\nNota: Esto es un estimado algorítmico y no representa un diagnóstico médico oficial.\nEl número en el bloque representa los cigarros de esa semana."
+        fig.text(0.5, 0.02, footer_text, color='#666666', fontsize=9, ha='center', linespacing=1.6, zorder=5)
 
         # ==========================================
         # 5. EXPORTAR Y SUBIR A S3
