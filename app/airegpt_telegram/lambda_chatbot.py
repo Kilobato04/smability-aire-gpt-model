@@ -1240,13 +1240,57 @@ def lambda_handler(event, context):
                     
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            # --- NUEVO: BOTÓN "MI RESUMEN" DESDE ALERTAS ---
+            # --- NUEVO: BOTÓN "MI RESUMEN" DESDE ALERTAS (PUNTO 2) ---
             elif data == "ver_resumen":
-                # 1. Avisar a Telegram que recibimos el clic (quita el relojito de "pensando" al instante)
                 send_telegram_action(chat_id, "typing") 
+                user = user_profile  # Usamos el perfil sanitizado del inicio del handler
                 
-                # 2. Usar el perfil ya sanitizado
-                user = user_profile 
+                # 1. Identificar Plan
+                sub_data = user.get('subscription', {})
+                status_str = sub_data.get('status', 'FREE') if isinstance(sub_data, dict) else 'FREE'
+                is_prem = any(x in status_str.upper() for x in ["PREMIUM", "TRIAL"])
+                
+                # 2. Extraer Variables (Lógica unificada con /perfil)
+                locs_data = user.get('locations', {})
+                locs_list = [f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}" for k, v in locs_data.items() if isinstance(v, dict) and v.get('active')]
+                locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
+
+                # Salud
+                health_data = user.get('health_profile', {})
+                condiciones = [info.get('condition', '') for k, info in health_data.items() if isinstance(info, dict) and info.get('active')]
+                health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
+
+                # Auto e HNC (Veredicto Directo)
+                veh_obj = user.get('vehicle', {})
+                veh_str, hnc_rem = "• No registrado", "• No configurado"
+                
+                if isinstance(veh_obj, dict) and veh_obj.get('active'):
+                    v_p, v_h = veh_obj.get('plate_last_digit'), veh_obj.get('hologram')
+                    veh_str = f"• Placa {v_p} (Holo {v_h}) | {veh_obj.get('engomado', 'N/A')}"
+                    try:
+                        hoy_str = get_mexico_time().strftime("%Y-%m-%d")
+                        fase = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {}).get('last_contingency_phase', 'None')
+                        can_drive, _, _ = cards.check_driving_status(v_p, v_h, hoy_str, fase)
+                        hnc_rem = "✅ **HOY circula normal**" if can_drive else "🔴 **HOY no circula**"
+                    except: hnc_rem = "⚠️ Error al calcular"
+
+                # 3. Construir y Enviar Tarjeta
+                card_resumen = cards.CARD_SUMMARY.format(
+                    user_name=str(first_name).replace("_", " "),
+                    plan_status=status_str.upper(),
+                    contingency_status="✅ ACTIVA" if user.get('alerts', {}).get('contingency') else "🔕 INACTIVA",
+                    locations_list=locs_str,
+                    health_display=health_str,
+                    transport_info="• Ver detalle en /perfil",
+                    vehicle_info=veh_str,
+                    alerts_threshold="• Ver detalle en /perfil",
+                    alerts_schedule="• Ver detalle en /perfil",
+                    hnc_reminder=hnc_rem,
+                    footer=cards.BOT_FOOTER
+                )
+                
+                send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs_data, is_prem))
+                return {'statusCode': 200, 'body': 'OK'}
                 
                 # --- Plan ---
                 sub_data = user.get('subscription', {})
