@@ -1286,24 +1286,28 @@ def lambda_handler(event, context):
                     else:
                         transport_info = "• No configurado."
 
-                    # --- 5. Auto e HNC en tiempo real ---
+                    # --- 5. Auto e HNC en tiempo real (PREMIUM FIX) ---
                     veh = user.get('vehicle', {})
                     if isinstance(veh, dict) and veh.get('active'):
                         plate = veh.get('plate_last_digit')
                         holo = veh.get('hologram')
-                        # Mostramos placa y holograma para dar confianza
-                        veh_str = f"• Placa {plate} (Holo {holo}) 🔒" 
+                        # Mantenemos los datos técnicos en una línea
+                        veh_str = f"• Placa {plate} (Holo {holo}) | {veh.get('engomado', 'N/A')}"
                         
                         try:
+                            # 1. Obtenemos fecha y fase actual
                             hoy_str = get_mexico_time().strftime("%Y-%m-%d")
                             sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                             fase = sys_state.get('last_contingency_phase', 'None')
                             
+                            # 2. Calculamos el estatus real
                             can_drive, _, _ = cards.check_driving_status(plate, holo, hoy_str, fase)
-                            # Mostramos estatus de HOY, pero bloqueamos calendario mensual
+                            
+                            # 3. Formateamos el veredicto visual
                             h_emoji = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
-                            hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
-                        except Exception:
+                            hnc_rem = f"• Hoy: **{h_emoji}**\n• Calendario Mensual: ✅ Disponible"
+                        except Exception as e:
+                            print(f"❌ Error calculando HNC en resumen: {e}")
                             hnc_rem = "• Hoy: ⚠️ Error al calcular."
                     else:
                         veh_str = "• No registrado."
