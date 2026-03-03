@@ -2583,13 +2583,19 @@ def lambda_handler(event, context):
 
         # --- FIX ERROR 400: LIMPIEZA FINAL ---
         if final_text and final_text.strip():
-            # Limpiamos caracteres que suelen dejar entidades de Markdown abiertas
+            # Limpiamos caracteres que rompen Markdown
             safe_final_text = final_text.replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
             
-            # Si el texto es el de "Ubicación recibida", dejamos las negritas controladas
+            # Si el texto es del sistema (onboarding), mantenemos formato original
             if "Ubicación recibida" in final_text:
-                safe_final_text = final_text # Aquí no limpiamos porque es un texto seguro del sistema
+                safe_final_text = final_text 
             
             send_telegram(chat_id, safe_final_text, markup_out)
             
         return {'statusCode': 200, 'body': 'OK'}
+
+    # === ¡AQUÍ ESTÁ EL FIX! ===
+    # El error de la línea 2595 es porque faltaba este cierre para el try principal
+    except Exception as e:
+        print(f"🔥 [CRITICAL FAIL] Error en el flujo final: {e}")
+        return {'statusCode': 500, 'body': str(e)}
