@@ -1965,25 +1965,6 @@ def lambda_handler(event, context):
                 # --- 🚩 FIN DE HERRAMIENTAS: REGISTRO Y CIERRE ---
                 # Esta línea debe estar DENTRO del bucle 'for tc in ai_msg.tool_calls:'
                 gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
-
-            # --- 🔥 FUERA DEL BUCLE FOR (Alineado con el 'for') ---
-            # Llamada única final para procesar todos los resultados recolectados
-            final_res = client.chat.completions.create(
-                model="gpt-4o-mini", 
-                messages=gpt_msgs, 
-                temperature=0.3
-            )
-            final_text = final_res.choices[0].message.content
-            
-        else:
-            # Si no hubo tools, usamos el mensaje directo
-            final_text = ai_msg.content
-
-        # Envío de la confirmación final de texto
-        if final_text:
-            send_telegram(chat_id, final_text)
-
-        return {'statusCode': 200, 'body': 'OK'}
         
                 # --- INICIO DE NUEVAS TOOLS (TEXTO/LLM) ---
                 elif fn == "configurar_transporte":
@@ -2635,20 +2616,26 @@ def lambda_handler(event, context):
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
             
             # --- FINAL DEL PROCESAMIENTO DE TOOLS ---
-            # Solo llegamos aquí si NO hubo un Hard Stop (return)
-            final_text = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_msgs, temperature=0.3).choices[0].message.content
+            # Solo llegamos aquí si NO hubo un Hard Stop (como el de las tarjetas visuales)
+            final_res = client.chat.completions.create(
+                model="gpt-4o-mini", 
+                messages=gpt_msgs, 
+                temperature=0.3
+            )
+            final_text = final_res.choices[0].message.content
         else:
-            # Si no hubo tools, usamos el contenido directo
+            # Si no hubo tools, usamos el contenido directo del AI
             final_text = ai_msg.content
 
+        # --- 📤 SALIDA ÚNICA A TELEGRAM ---
         markup = None
         if forced_tag:
             markup = get_inline_markup(forced_tag)
-            final_text = "📍 **Ubicación recibida.**\n\n👇 Confirma:"
+            final_text = "📍 **Ubicación recibida.**\n\n👇 Confirma para guardar:"
         
         send_telegram(chat_id, final_text, markup)
         return {'statusCode': 200, 'body': 'OK'}
-        
+
     except Exception as e:
         print(f"🔥 [CRITICAL FAIL]: {e}")
         return {'statusCode': 500, 'body': str(e)}
