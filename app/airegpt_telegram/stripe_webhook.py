@@ -47,16 +47,26 @@ def lambda_handler(event, context):
                 user_data = response.get('Attributes', {})
                 first_name = user_data.get('first_name', 'Usuario')
                 
-                # Usamos la tarjeta que guardaste en cards.py
+                # --- FIX AJUSTE 2: BIENVENIDA LIMPIA ---
+                # Definimos una función rápida de limpieza para el nombre
+                safe_name = str(first_name).replace("_", " ").replace("*", "")
+                
+                # Ya no pasamos footer=cards.BOT_FOOTER porque la nueva card no lo pide
                 mensaje = cards.CARD_WELCOME_PREMIUM.format(
-                    user_name=first_name,
-                    footer=cards.BOT_FOOTER
+                    user_name=safe_name
                 )
                 
-                # Enviamos el Handshake a Telegram
+                # Enviamos el Handshake a Telegram con link_preview deshabilitado
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-                requests.post(url, json={"chat_id": str(user_id), "text": mensaje, "parse_mode": "Markdown"})
-                print("✅ Mensaje de bienvenida enviado por Telegram.")
+                payload = {
+                    "chat_id": str(user_id), 
+                    "text": mensaje, 
+                    "parse_mode": "Markdown",
+                    "link_preview_options": {"is_disabled": True} # <--- FIX ESTÉTICO
+                }
+                
+                requests.post(url, json=payload)
+                print(f"✅ Mensaje de bienvenida enviado a {safe_name} ({user_id})")
                 
         return {'statusCode': 200, 'body': 'Webhook procesado con éxito'}
         
