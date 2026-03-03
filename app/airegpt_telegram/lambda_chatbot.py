@@ -2160,14 +2160,30 @@ def lambda_handler(event, context):
                             v_p = veh_obj.get('plate_last_digit')
                             v_h = veh_obj.get('hologram')
                             v_c = veh_obj.get('engomado', 'N/A')
-                            # Restauramos el tag técnico: Placa X (Holo X) | Color
+                            
+                            # Info técnica para la parte de arriba
                             veh_str = f"• Placa {v_p} (Holo {v_h}) | {v_c}"
-                            # El status de hoy usa los datos del auto guardado
-                            h_rem_base = f"Terminación {v_p}, Holo {v_h}, Engomado {v_c}"
-                            hnc_rem = f"• Estatus: {h_rem_base}"
+                            
+                            try:
+                                # Llamamos a la lógica real de Hoy No Circula
+                                hoy_str = get_mexico_time().strftime("%Y-%m-%d")
+                                sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                                fase = sys_state.get('last_contingency_phase', 'None')
+                                
+                                can_drive, _, _ = cards.check_driving_status(v_p, v_h, hoy_str, fase)
+                                
+                                # 🔥 EL FIX: Texto directo y humano
+                                if can_drive:
+                                    hnc_rem = "✅ **HOY Circula Normal**"
+                                else:
+                                    hnc_rem = "🔴 **HOY No Circula**"
+                                    
+                            except Exception as e:
+                                print(f"❌ Error HNC Resumen: {e}")
+                                hnc_rem = "⚠️ Error al calcular estatus"
                         else:
                             veh_str, hnc_rem = "• No registrado.", "• No configurado."
-
+                            
                         # --- 6 y 7. Alertas y Recordatorios (PREMIUM: UX Frecuencia) ---
                         al_data = user.get('alerts', {})
                         # Alertas por Umbral
