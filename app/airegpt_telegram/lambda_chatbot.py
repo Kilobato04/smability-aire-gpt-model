@@ -1245,37 +1245,53 @@ def lambda_handler(event, context):
                 send_telegram_action(chat_id, "typing") 
                 user = user_profile 
                 
-                # --- FIX CRÍTICO: Definir estatus para evitar el error de los logs ---
-                sub_data = user.get('subscription', {})
-                status_str = sub_data.get('status', 'FREE').upper()
-                is_prem = any(x in status_str for x in ["PREMIUM", "TRIAL"])
-                # -----------------------------------------------------------------
-
                 def clean_md(text):
                     return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
 
-                # 1. Rutina
+                # 1. Estatus y Plan
+                sub_data = user.get('subscription', {})
+                if not isinstance(sub_data, dict): sub_data = {}
+                status_str = sub_data.get('status', 'FREE').upper()
+                is_prem = any(x in status_str for x in ["PREMIUM", "TRIAL"])
+
+                # 2. Ubicaciones
+                locs_map = user.get('locations', {})
+                locs_list = [f"• {k.capitalize()}: {v.get('display_name', k)}" for k, v in locs_map.items()]
+                locs_display = "\n".join(locs_list) if locs_list else "• No configuradas"
+
+                # 3. Salud (EL FIX)
+                h_profile = user.get('health_profile', {})
+                if not isinstance(h_profile, dict): h_profile = {}
+                condiciones = [clean_md(v.get('condition', '')) for k, v in h_profile.items() if isinstance(v, dict) and v.get('active')]
+                health_display_final = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
+
+                # 4. Rutina
                 tr = user.get('profile_transport', {})
+                if not isinstance(tr, dict): tr = {}
                 m_t = clean_md(tr.get('medio', 'No definido')).replace("auto ventana", "🚗 Auto").replace("metrobus", "🚌 Metrobús").capitalize()
                 h_t = tr.get('tiempo_traslado_horas', '0')
-                ruta_str = "Casa ↔ Trabajo" if 'trabajo' in user.get('locations', {}) else "Local"
+                ruta_str = "Casa ↔ Trabajo" if 'trabajo' in locs_map else "Local"
                 transp_str = f"• Ruta: {ruta_str}\n• Modo: {m_t}\n• Tiempo: {h_t} hrs/día" if h_t != '0' else "• No configurada"
 
-                # 2. Alertas Umbral
+                # 5. Alertas Umbral
                 th = user.get('thresholds', {})
-                locs_map = user.get('locations', {})
+                if not isinstance(th, dict): th = {}
                 al_th_list = [f"• {locs_map.get(k, {}).get('display_name', k).capitalize()}: > {v} pts" for k, v in th.items()]
                 al_th = "\n".join(al_th_list) if al_th_list else "• No configuradas"
                 
-                # 3. Reportes Programados
-                sch_data = user.get('alerts', {}).get('schedule', {})
+                # 6. Reportes Programados
+                al_root = user.get('alerts', {})
+                if not isinstance(al_root, dict): al_root = {}
+                sch_data = al_root.get('schedule', {})
+                if not isinstance(sch_data, dict): sch_data = {}
                 active_sch = [f"• {k[:2]}:{k[2:]} hrs (Diario)" for k, v in sch_data.items() if v is True]
                 al_sch = "\n".join(active_sch) if active_sch else "• Sin reportes"
 
-                # 4. Vehículo e HNC
+                # 7. Vehículo e HNC
                 veh = user.get('vehicle', {})
+                if not isinstance(veh, dict): veh = {}
                 v_str, h_rem = "• No registrado", "• No configurado"
-                if isinstance(veh, dict) and veh.get('active'):
+                if veh.get('active'):
                     v_p, v_h = veh.get('plate_last_digit'), veh.get('hologram')
                     v_str = f"• Placa {v_p} (Holo {v_h})"
                     try:
@@ -1285,13 +1301,22 @@ def lambda_handler(event, context):
                         h_rem = "✅ **HOY circula normal**" if can_d else "🔴 **HOY no circula**"
                     except: h_rem = "⚠️ Error al calcular"
 
-                # 5. CONSTRUCCIÓN FINAL
+                # 8. Contingencia (Safe Boolean)
+                cont_root = al_root.get('contingency', {})
+                if isinstance(cont_root, bool):
+                    cont_status = "✅ ACTIVA" if cont_root else "🔕 INACTIVA"
+                elif isinstance(cont_root, dict):
+                    cont_status = "✅ ACTIVA" if cont_root.get('enabled') else "🔕 INACTIVA"
+                else:
+                    cont_status = "🔕 INACTIVA"
+
+                # 9. RENDER FINAL
                 card_resumen = cards.CARD_SUMMARY.format(
                     user_name=clean_md(first_name), 
-                    plan_status=status_str, # <--- Ya no fallará
-                    contingency_status="✅ ACTIVA" if user.get('alerts', {}).get('contingency', {}).get('enabled') else "🔕 INACTIVA",
-                    locations_list=locs_str, # Esta viene de la parte de arriba del código
-                    health_display=health_str, # Esta también viene de arriba
+                    plan_status=status_str,
+                    contingency_status=cont_status,
+                    locations_list=locs_display,
+                    health_display=health_display_final,
                     transport_info=transp_str,
                     vehicle_info=v_str, 
                     alerts_threshold=al_th,
