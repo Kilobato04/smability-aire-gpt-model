@@ -2026,7 +2026,10 @@ def lambda_handler(event, context):
         
         # 1. Definimos qué eventos deben silenciar el texto de GPT
         # Solo silenciamos si detectamos que ya se envió una imagen (Banner o Gráfica)
-        palabras_clave_silencio = ["Reporte visual", "Tarjeta visual", "Interfaz visual", "Éxito: Reporte visual"]
+        palabras_clave_silencio = [
+            "Reporte visual", "Tarjeta visual", "Interfaz visual", 
+            "Éxito:", "Veredicto visual", "Calendario mensual"
+        ]
         
         # Detectamos si alguna de esas frases está en la respuesta de las TOOLS
         se_envio_foto_o_grafica = any(f in historial_ejecucion for f in palabras_clave_silencio)
