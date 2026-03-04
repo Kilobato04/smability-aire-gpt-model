@@ -1715,7 +1715,7 @@ def lambda_handler(event, context):
 
         save_interaction_and_draft(user_id, first_name, lat, lon)
         
-        # --- 🛡️ FIX DE MEMORIA Y SANITIZACIÓN (REEMPLAZO TOTAL) ---
+        # --- 🛡️ FIX DE MEMORIA Y SANITIZACIÓN (Anti-Decimal Error) ---
         locs = user_profile.get('locations', {})
         alerts = user_profile.get('alerts', {})
         veh = user_profile.get('vehicle', {})
@@ -1730,7 +1730,12 @@ def lambda_handler(event, context):
 
         # 2. Construir contexto para forzar el "Bundle" de Rutina y Salud
         m_curr = transp.get('medio', 'No definido')
-        h_curr = transp.get('horas', 0)
+        
+        # 🚩 FIX QUIRÚRGICO 1: Convertir horas a float para evitar error Decimal
+        try:
+            h_curr = float(transp.get('horas', 0))
+        except:
+            h_curr = 0
         
         memoria_str = f"ESTATUS ACTUAL DEL USUARIO:\n"
         memoria_str += f"- Plan: {plan}\n"
@@ -1745,7 +1750,17 @@ def lambda_handler(event, context):
         
         veh_info = f"Placa terminación {veh.get('plate_last_digit')} (Holo {veh.get('hologram')})" if veh.get('active') else "No registrado"
         memoria_str += f"- Vehículo: {veh_info}\n"
-        memoria_str += f"- Configuración de Alertas: {json.dumps(alerts)}"
+
+        # 🚩 FIX QUIRÚRGICO 2: Limpiar diccionarios de tipos Decimal antes del json.dumps
+        # Usamos una función recursiva rápida para limpiar 'alerts'
+        def clean_decimals(obj):
+            if isinstance(obj, list): return [clean_decimals(i) for i in obj]
+            elif isinstance(obj, dict): return {k: clean_decimals(v) for k, v in obj.items()}
+            elif isinstance(obj, Decimal): return float(obj)
+            return obj
+
+        alerts_cleaned = clean_decimals(alerts)
+        memoria_str += f"- Configuración de Alertas: {json.dumps(alerts_cleaned)}"
         # -------------------------------------------------------
         
         has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
