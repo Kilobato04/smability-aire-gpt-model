@@ -2517,33 +2517,38 @@ def lambda_handler(event, context):
         # =========================================================
         # 📤 SALIDA ÚNICA A TELEGRAM (SILENCIO BLINDADO + ANTI-ERROR 400)
         # =========================================================
-        # 1. Analizamos historial para silenciar eco de IA
         historial_ejecucion = str(gpt_msgs)
-        frases_control = ["Reporte visual", "Tarjeta visual", "Interfaz visual", "enviado correctamente", "IAS"]
         
-        # Si hubo una herramienta técnica, matamos el texto redundante
-        se_envio_tarjeta = any(f in historial_ejecucion for f in frases_control) or (final_text and "IAS" in final_text)
+        # 1. Definimos qué eventos deben silenciar el texto de GPT
+        # Solo silenciamos si detectamos que ya se envió una imagen (Banner o Gráfica)
+        palabras_clave_silencio = ["Reporte visual", "Tarjeta visual", "Interfaz visual", "Éxito: Reporte visual"]
+        
+        # Detectamos si alguna de esas frases está en la respuesta de las TOOLS
+        se_envio_foto_o_grafica = any(f in historial_ejecucion for f in palabras_clave_silencio)
 
-        if se_envio_tarjeta:
-            print("🤫 SILENCIO: Tarjeta técnica detectada. Cancelando texto redundante.")
+        # 2. Lógica de Decisión de Silencio
+        if se_envio_foto_o_grafica:
+            print("🤫 SILENCIO: Tarjeta visual o gráfica enviada. Evitando texto redundante de GPT.")
             return {'statusCode': 200, 'body': 'OK'}
 
-        # 2. Manejo de Flujo Normal (Onboarding o Respuesta IA)
+        # 3. Flujo de Mensajería de Texto (Feedback y Onboarding)
         markup_out = None
         if forced_tag:
             markup_out = get_inline_markup(forced_tag)
             final_text = "📍 **Ubicación recibida.**\n\n👇 Confirma para guardar:"
 
-        # --- FIX ERROR 400: LIMPIEZA FINAL ---
         if final_text and final_text.strip():
-            # Limpiamos caracteres que rompen Markdown
-            safe_final_text = final_text.replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
-            
-            # Si el texto es del sistema (onboarding), mantenemos formato original
-            if "Ubicación recibida" in final_text:
+            # --- FIX ANTI-ERROR 400 (LIMPIEZA PROFUNDA) ---
+            # Solo limpiamos si NO es un mensaje del sistema con formato específico
+            if "Ubicación recibida" not in final_text:
+                # Limpiamos caracteres que rompen Markdown, pero mantenemos los emojis
+                safe_final_text = final_text.replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
+            else:
                 safe_final_text = final_text 
             
-            send_telegram(chat_id, safe_final_text, markup_out)
+            # Solo enviamos si no está vacío tras la limpieza
+            if safe_final_text.strip():
+                send_telegram(chat_id, safe_final_text, markup_out)
             
         return {'statusCode': 200, 'body': 'OK'}
 
