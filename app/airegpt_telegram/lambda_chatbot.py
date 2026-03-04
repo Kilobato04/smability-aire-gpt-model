@@ -1955,31 +1955,67 @@ def lambda_handler(event, context):
                     send_telegram(chat_id, card_res, markup=cards.get_summary_buttons(locs, is_prem))
                     r = "Éxito: Interfaz visual de resumen enviada."
 
-                # --- FIX 3: HNC VISUAL CON MES DINÁMICO ---
+                # --- FIX 2: ORQUESTADOR INTELIGENTE (HOY vs MES vs VERIFICACIÓN) ---
                 elif fn == "consultar_hoy_no_circula":
                     if not veh.get('active'):
                         r = "No tienes auto registrado. Pídele al usuario sus placas y holograma."
                     else:
                         p_d, h_d = str(veh.get('plate_last_digit')), str(veh.get('hologram'))
-                        now = get_mexico_time()
+                        user_ask = user_content.lower()
                         
-                        # Cálculo de Mes Dinámico
-                        meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
-                        mes_nombre = meses_es[now.month]
+                        # A. ESCENARIO VERIFICACIÓN
+                        if any(x in user_ask for x in ["verific", "cuando me toca", "verifi"]):
+                            periodo = cards.get_verification_period(p_d, h_d)
+                            # Calculamos deadline dinámico (fin del segundo mes del bimestre)
+                            card_v = cards.CARD_VERIFICATION.format(
+                                plate_info=p_d, engomado=veh.get('engomado','N/A'),
+                                period_txt=periodo, deadline="Último día del periodo",
+                                fine_amount="2,457", footer=cards.BOT_FOOTER
+                            )
+                            send_telegram(chat_id, card_v)
+                            r = "Éxito: Tarjeta de verificación enviada."
                         
-                        lista_dias = get_monthly_prohibited_dates(p_d, h_d, now.year, now.month)
-                        txt_sem, txt_sab = get_restriction_summary(p_d, h_d)
-                        
-                        card_hnc = cards.CARD_HNC_DETAILED.format(
-                            mes_nombre=mes_nombre, plate=p_d, color=veh.get('engomado','N/A'),
-                            holo=h_d.upper(), verificacion_txt=cards.get_verification_period(p_d, h_d),
-                            dias_semana_txt=txt_sem, sabados_txt=txt_sab,
-                            lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
-                            multa_cdmx="$2,171 - $3,257", multa_edomex="$2,171",
-                            footer=cards.BOT_FOOTER
-                        )
-                        send_telegram(chat_id, card_hnc, markup=cards.get_hnc_buttons())
-                        r = "Éxito: Reporte visual de circulación enviado."
+                        # B. ESCENARIO CALENDARIO COMPLETO (Palabras clave: mes, calendario, fechas)
+                        elif any(x in user_ask for x in ["mes", "calendario", "fechas", "todo el mes"]):
+                            now = get_mexico_time()
+                            meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
+                            mes_nombre = meses_es[now.month]
+                            
+                            lista_dias = get_monthly_prohibited_dates(p_d, h_d, now.year, now.month)
+                            txt_sem, txt_sab = get_restriction_summary(p_d, h_d)
+                            
+                            card_hnc = cards.CARD_HNC_DETAILED.format(
+                                mes_nombre=mes_nombre, plate=p_d, color=veh.get('engomado','N/A'),
+                                holo=h_d.upper(), verificacion_txt=cards.get_verification_period(p_d, h_d),
+                                dias_semana_txt=txt_sem, sabados_txt=txt_sab,
+                                lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
+                                multa_cdmx="$2,171", multa_edomex="$2,171", 
+                                footer=cards.BOT_FOOTER
+                            )
+                            send_telegram(chat_id, card_hnc, markup=cards.get_hnc_buttons())
+                            r = "Éxito: Calendario mensual enviado."
+
+                        # C. ESCENARIO DIARIO (Default: Hoy o Mañana)
+                        else:
+                            target_date = "hoy"
+                            label_fecha = "Hoy"
+                            if "mañana" in user_ask: 
+                                target_date = (get_mexico_time() + timedelta(days=1)).strftime("%Y-%m-%d")
+                                label_fecha = "Mañana"
+                            
+                            can_drive, r_short, visual = cards.check_driving_status(p_d, h_d, target_date)
+                            
+                            card_day = cards.CARD_HNC_RESULT.format(
+                                fecha_str=label_fecha,
+                                dia_semana="", # Podrías calcular el nombre del día si gustas
+                                plate_info=p_d, hologram=h_d,
+                                status_emoji="🟢" if can_drive else "🔴",
+                                status_title="CIRCULA" if can_drive else "NO CIRCULA",
+                                status_message=visual, reason=r_short, 
+                                footer=cards.BOT_FOOTER
+                            )
+                            send_telegram(chat_id, card_day, markup=cards.get_hnc_buttons())
+                            r = f"Éxito: Veredicto de circulación ({label_fecha}) enviado."
 
                 # 🚩 REGISTRO OBLIGATORIO (DENTRO DEL FOR)
                 gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
