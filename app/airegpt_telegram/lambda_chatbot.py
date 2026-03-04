@@ -1932,7 +1932,7 @@ def lambda_handler(event, context):
                     # Registramos éxito para que GPT sepa que ya cumplió
                     r = "Éxito: Interfaz visual de resumen enviada."
 
-                # --- FIX CONSOLIDADO: ORQUESTADOR DE MOVILIDAD INTELIGENTE ---
+                # --- ORQUESTADOR DE MOVILIDAD (FIX FINAL SIN REPETICIONES) ---
                 elif fn in ["consultar_hoy_no_circula", "obtener_calendario_mensual"]:
                     if not veh.get('active'):
                         r = "No tienes auto registrado. Pídele al usuario sus placas y holograma."
@@ -1986,56 +1986,22 @@ def lambda_handler(event, context):
                             target_date_str = (get_mexico_time() + timedelta(days=offset)).strftime("%Y-%m-%d")
                             can_drive, r_short, visual = cards.check_driving_status(p_d, h_d, target_date_str)
                             
-                            # Limpieza de títulos: Solo SÍ/NO CIRCULA
+                            # Títulos limpios
                             status_title = "SÍ CIRCULA" if can_drive else "NO CIRCULA"
                             status_emoji = "🟢" if can_drive else "🔴"
-                            # Razón limpia
+                            
+                            # Razón profesional (Circulación Normal)
                             razon_vis = "Circulación Normal" if "Día Habitual" in r_short or "Permitido" in r_short else r_short
 
                             card_day = cards.CARD_HNC_RESULT.format(
                                 fecha_str=target_date_str,
                                 dia_semana=label_fecha, 
-                                plate_info=p_d, hologram=h_d,
-                                status_emoji=status_emoji,
-                                status_title=status_title,
-                                status_message="", # VACÍO para no repetir el texto debajo del título
-                                reason=razon_vis, 
-                                footer=cards.BOT_FOOTER
-                            )
-                            send_telegram(chat_id, card_day, markup=cards.get_hnc_buttons())
-                            r = f"Éxito: Veredicto de circulación para {label_fecha} enviado."
-
-                        # --- ESCENARIO C: DIARIO (Hoy, Mañana, Pasado Mañana) ---
-                        else:
-                            offset = 0
-                            label_fecha = "Hoy"
-                            
-                            if "pasado mañana" in user_ask:
-                                offset = 2
-                                label_fecha = "Pasado Mañana"
-                            elif "mañana" in user_ask:
-                                offset = 1
-                                label_fecha = "Mañana"
-                            
-                            # Obtenemos fecha exacta para el motor de cards.py
-                            target_date_str = (get_mexico_time() + timedelta(days=offset)).strftime("%Y-%m-%d")
-                            
-                            # Invocamos motor lógico
-                            can_drive, r_short, visual = cards.check_driving_status(p_d, h_d, target_date_str)
-                            
-                            # Formateamos veredicto humano
-                            status_title = "SÍ CIRCULA" if can_drive else "NO CIRCULA"
-                            status_emoji = "🟢" if can_drive else "🔴"
-
-                            card_day = cards.CARD_HNC_RESULT.format(
-                                fecha_str=target_date_str, # <--- Ponemos la fecha real YYYY-MM-DD
-                                dia_semana=label_fecha,    # "Hoy", "Mañana"
                                 plate_info=p_d, 
                                 hologram=h_d,
-                                status_emoji="🟢" if can_drive else "🔴",
-                                status_title="SÍ CIRCULA" if can_drive else "NO CIRCULA",
-                                status_message="", # <--- VACÍO para que no repita "circula" abajo del título
-                                reason=razon_limpia, 
+                                status_emoji=status_emoji,
+                                status_title=status_title,
+                                status_message="", # VACÍO para eliminar duplicidad de "circula"
+                                reason=razon_vis, 
                                 footer=cards.BOT_FOOTER
                             )
                             send_telegram(chat_id, card_day, markup=cards.get_hnc_buttons())
