@@ -34,7 +34,7 @@ def ejecutar_configurar_transporte(user_id, medio, horas_raw):
                 'tiempo_traslado_horas': horas_db
             }}
         )
-        return f"✅ Rutina actualizada: {medio} por {horas_float} hrs."
+        return f"Éxito: Rutina actualizada a {medio}."
     except:
         return "⚠️ Error en formato de tiempo."
 
@@ -49,7 +49,7 @@ def ejecutar_guardar_salud(user_id, condicion_raw):
                 cond_id: {'condition': condicion_raw.capitalize(), 'active': True}
             }}
         )
-        return f"✅ Salud actualizada: {condicion_raw.capitalize()}."
+        return f"Éxito: Salud actualizada con {condicion_raw.capitalize()}."
     except Exception as e:
         return f"❌ Error DB: {str(e)}"
 
@@ -67,7 +67,7 @@ def ejecutar_configurar_auto(user_id, digit, hologram):
             "alert_config": {"enabled": True, "time": "20:00"}
         }
         table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET vehicle = :v", ExpressionAttributeValues={':v': vehicle_data})
-        return f"✅ Auto registrado: Placa {digit} ({color})."
+        return f"Éxito: Auto registrado con placa {digit}."
     except:
         return "❌ Error al guardar vehículo."
 
@@ -86,7 +86,7 @@ def ejecutar_configurar_alerta_ias(user_id, nombre_ubicacion, umbral):
             ExpressionAttributeNames={'#loc': key},
             ExpressionAttributeValues={':v': {'umbral': u_int, 'active': True, 'consecutive_sent': 0}}
         )
-        return f"✅ Alerta configurada en {nombre_ubicacion} > {u_int} pts."
+        return f"Éxito: Alerta configurada en {nombre_ubicacion} > {u_int} pts."
     except:
         return "⚠️ Error en umbral."
 
@@ -105,6 +105,6 @@ def ejecutar_borrado_elemento(user_id, tipo, args=None):
         
         paths = {"auto": "vehicle", "rutina": "profile_transport", "perfil_salud": "health_profile"}
         table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=f"REMOVE {paths[tipo]}")
-        return f"✅ {tipo.capitalize()} eliminado."
+        return f"Éxito: {tipo.capitalize()} eliminado correctamente."
     except:
         return "⚠️ Error en borrado."
