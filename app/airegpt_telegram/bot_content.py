@@ -237,14 +237,18 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "configurar_transporte",
-            "description": "Guarda el medio de transporte y horas de traslado del usuario.",
+            "description": "Guarda el medio de transporte y horas de traslado del usuario. OBLIGATORIO: Si el usuario menciona un cambio de medio pero no el tiempo (o viceversa), DEBES preguntarle el dato faltante antes de llamar a esta función.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "medio": {"type": "string", "enum": ["auto_ac", "suburbano", "cablebus", "metro", "metrobus", "auto_ventana", "combi", "caminar", "bicicleta", "home_office"]},
+                    "medio": {
+                        "type": "string", 
+                        "enum": ["auto_ac", "suburbano", "cablebus", "metro", "metrobus", "auto_ventana", "combi", "caminar", "bicicleta", "home_office"],
+                        "description": "El modo de transporte principal."
+                    },
                     "horas_al_dia": {
                         "type": "number",
-                        "description": "Horas en tránsito. SI EL USUARIO DA MINUTOS, CONVIÉRTELOS A HORAS DECIMALES (ej. 30 min = 0.5, 65 min = 1.1). Máximo permitido: 6.0"
+                        "description": "Tiempo TOTAL de exposición al día (ida + vuelta) en horas decimales. Ej: 30 min = 0.5, 1h 20min = 1.3. Máximo: 6.0."
                     }
                 },
                 "required": ["medio", "horas_al_dia"]
