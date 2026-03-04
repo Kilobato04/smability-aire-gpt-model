@@ -1924,16 +1924,39 @@ def lambda_handler(event, context):
                             send_telegram(chat_id, card_day, markup=cards.get_hnc_buttons())
                             r = f"Éxito: Veredicto para {label} enviado."
 
+                #-----
                 elif fn == "consultar_calidad_aire":
-                    # Tu lógica de banners se mantiene igual aquí
-                    r = "Éxito: Reporte visual de aire enviado."
-
-                # --- 3. AUTO-FEEDBACK VISUAL (Feedback tras cualquier cambio) ---
-                if r and "Éxito" in r and "enviada" not in r.lower() and "enviado" not in r.lower():
-                    card_res = cards.generate_summary_card(first_name, alerts, veh, locs, status_str, transp, salud)
-                    send_telegram(chat_id, f"✅ **{r.replace('Éxito: ', '')}**")
-                    send_telegram(chat_id, card_res, markup=cards.get_summary_buttons(locs, is_prem))
-                    r = "Éxito: Cambio aplicado y resumen actualizado enviado."
+                    in_lat = args.get('lat', 0)
+                    in_lon = args.get('lon', 0)
+                    in_name = args.get('nombre_ubicacion', 'tu ubicación')
+                    
+                    # 1. RESOLUCIÓN DE COORDENADAS (El cerebro del fix)
+                    # Si vienen en 0, buscamos en el perfil del usuario (Casa/Trabajo)
+                    if in_lat == 0 or in_lon == 0:
+                        # Buscamos por el nombre que dio GPT o por lo que escribió el usuario
+                        key = resolve_location_key(user_id, in_name)
+                        if not key: key = resolve_location_key(user_id, user_content)
+                        
+                        if key and key in locs:
+                            in_lat = float(locs[key].get('lat', 0))
+                            in_lon = float(locs[key].get('lon', 0))
+                            in_name = locs[key].get('display_name', key.capitalize())
+                    
+                    # 2. INTENTO DE ENVÍO DE TARJETA
+                    if in_lat != 0 and in_lon != 0:
+                        # Aquí va tu lógica actual de generar el reporte y banners...
+                        # (Asegúrate de que esta función mande el send_telegram_photo_local)
+                        report_text, calidad = generate_report_card(
+                            first_name, in_name, in_lat, in_lon, 
+                            vehicle=veh, user_profile=user_profile, is_premium=is_prem
+                        )
+                        
+                        # Marcamos como "Reporte visual" para que el silenciador lo detecte
+                        r = f"Éxito: Reporte visual de aire enviado para {in_name}."
+                    else:
+                        # Si no logramos rescatar coordenadas, NO usamos la palabra "Éxito"
+                        # Así el silenciador NO se activa y GPT puede pedirle la ubicación al usuario
+                        r = f"Error: No encontré las coordenadas para '{in_name}'. Por favor solicita la ubicación al usuario."
 
                 gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
@@ -1953,10 +1976,12 @@ def lambda_handler(event, context):
         
         # 1. Definimos qué eventos deben silenciar el texto de GPT
         # Solo silenciamos si detectamos que ya se envió una imagen (Banner o Gráfica)
-        palabras_clave_silencio = [
-            "Reporte visual", "Tarjeta visual", "Interfaz visual", 
-            "Éxito:", "Veredicto visual", "Calendario mensual",
-            "Configuración actualizada", "Recordatorio guardado"
+        palabras_clave_interfaz = [
+            "Reporte visual", 
+            "Tarjeta visual", 
+            "Interfaz visual", 
+            "Veredicto visual", 
+            "Calendario mensual"
         ]
         
         # Detectamos si alguna de esas frases está en la respuesta de las TOOLS
