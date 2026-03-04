@@ -1998,9 +1998,7 @@ def lambda_handler(event, context):
                             r = f"✅ Ubicación '{nombre}' eliminada de tu perfil."
                         else:
                             r = f"⚠️ No encontré '{nombre}' o ya estaba borrada."
-                    
-                    
-
+                                       
                 elif fn == "renombrar_ubicacion":
                     nombre_viejo = args.get('nombre_actual')
                     nombre_nuevo = args.get('nombre_nuevo')
@@ -2010,8 +2008,6 @@ def lambda_handler(event, context):
                     else:
                         success, r = rename_location_in_db(user_id, nombre_viejo, nombre_nuevo)
                         
-                    
-                
                 elif fn == "configurar_alerta_ias": 
                     # 0. 🔒 GATEKEEPER STRIPE PARA TOOLS
                     user = get_user_profile(user_id)
@@ -2040,7 +2036,6 @@ def lambda_handler(event, context):
                     r = configure_schedule_alert(user_id, args['nombre_ubicacion'], args['hora'], args.get('dias'))
                     # IMPORTANTE: Avisar al LLM que ya se hizo
                     
-
                 #-----
                 elif fn == "consultar_resumen_configuracion":
                     user = user_profile 
@@ -2141,7 +2136,8 @@ def lambda_handler(event, context):
                     )
                     send_telegram(chat_id, card_visual, markup=cards.get_summary_buttons(locs_data, is_prem))
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Reporte visual enviado correctamente."})
-                    return {'statusCode': 200, 'body': 'OK'}
+                    ###############
+                    return {'statusCode': 200, 'body': 'OK'} 
 
                     if not is_prem:
                         # LÓGICA FREE: Resumen transparente (Placa + Hoy + Alertas Prueba)
@@ -2204,6 +2200,7 @@ def lambda_handler(event, context):
                     
                     # Cortamos ejecución con un mensaje claro para el historial de GPT
                     gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": "Interfaz visual enviada correctamente."})
+                    ##############
                     return {'statusCode': 200, 'body': 'OK'}
 
                 # --- NUEVOS BLOQUES HNC (PEGAR AQUÍ) ---
