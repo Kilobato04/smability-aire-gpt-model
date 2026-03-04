@@ -1975,7 +1975,7 @@ def lambda_handler(event, context):
         historial_ejecucion = str(gpt_msgs)
         
         # 1. Definimos qué eventos deben silenciar el texto de GPT
-        # Solo silenciamos si detectamos que ya se envió una imagen (Banner o Gráfica)
+        # IMPORTANTE: El nombre de esta lista debe coincidir con el del bucle de abajo
         palabras_clave_interfaz = [
             "Reporte visual", 
             "Tarjeta visual", 
@@ -1984,8 +1984,8 @@ def lambda_handler(event, context):
             "Calendario mensual"
         ]
         
-        # Detectamos si alguna de esas frases está en la respuesta de las TOOLS
-        se_envio_foto_o_grafica = any(f in historial_ejecucion for f in palabras_clave_silencio)
+        # 🚩 FIX AQUÍ: Se cambió 'palabras_clave_silencio' por 'palabras_clave_interfaz'
+        se_envio_foto_o_grafica = any(f in historial_ejecucion for f in palabras_clave_interfaz)
 
         # 2. Lógica de Decisión de Silencio
         if se_envio_foto_o_grafica:
@@ -2000,14 +2000,11 @@ def lambda_handler(event, context):
 
         if final_text and final_text.strip():
             # --- FIX ANTI-ERROR 400 (LIMPIEZA PROFUNDA) ---
-            # Solo limpiamos si NO es un mensaje del sistema con formato específico
             if "Ubicación recibida" not in final_text:
-                # Limpiamos caracteres que rompen Markdown, pero mantenemos los emojis
                 safe_final_text = final_text.replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
             else:
                 safe_final_text = final_text 
             
-            # Solo enviamos si no está vacío tras la limpieza
             if safe_final_text.strip():
                 send_telegram(chat_id, safe_final_text, markup_out)
             
