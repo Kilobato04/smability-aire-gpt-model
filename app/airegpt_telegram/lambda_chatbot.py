@@ -1861,17 +1861,85 @@ def lambda_handler(event, context):
 
                 # --- 2. LLAMADAS LOCALES (Visuales/Fotos) ---
                 elif fn == "consultar_calidad_aire":
-                    # Mantenemos aquí tu bloque de Phase 1 que genera el reporte con foto
-                    # porque usa las funciones generate_report_card y send_telegram_photo_local
-                    # (Pega aquí ese bloque pero asegúrate de asignar r = "Éxito...")
-                    r = "Éxito: Reporte visual enviado."
+                    in_lat = args.get('lat', 0)
+                    in_lon = args.get('lon', 0)
+                    in_name = args.get('nombre_ubicacion', 'Ubicación')
+                    
+                    # Resolución de coordenadas (Memoria -> DB -> Usuario)
+                    if in_lat == 0 or in_lon == 0:
+                        key = resolve_location_key(user_id, in_name)
+                        if not key: key = resolve_location_key(user_id, user_content)
+                        if key and key in locs:
+                            in_lat = float(locs[key].get('lat', 0))
+                            in_lon = float(locs[key].get('lon', 0))
+                            in_name = locs[key].get('display_name', key.capitalize()) 
+                    
+                    if in_lat != 0 and in_lon != 0:
+                        sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                        current_phase = sys_state.get('last_contingency_phase', 'None')
+                        
+                        # Generamos tarjeta visual
+                        report_text, calidad = generate_report_card(
+                            first_name, in_name, in_lat, in_lon, 
+                            vehicle=veh, 
+                            contingency_phase=current_phase, 
+                            user_profile=user_profile,
+                            is_premium=is_prem
+                        )
+                        
+                        # Selección de Banner local
+                        mapa_archivos = {
+                            "Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png",
+                            "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"
+                        }
+                        calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
+                        nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
+                        
+                        import os
+                        ruta_imagen = os.path.join(os.path.dirname(os.path.abspath(__file__)), "banners", nombre_png)
+                        
+                        # Enviamos Foto y asignamos éxito a 'r'
+                        send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
+                        r = f"Éxito: Reporte visual enviado para {in_name}."
+                    else:
+                        r = f"⚠️ No encontré coordenadas para '{in_name}'."
 
                 elif fn == "consultar_resumen_configuracion":
-                    # Mantenemos aquí tu bloque de Phase 2 que arma la tarjeta de resumen visual
-                    # (Pega aquí ese bloque pero asegúrate de asignar r = "Éxito...")
-                    r = "Éxito: Interfaz de resumen enviada."
+                    def clean_md(text): return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
+                    
+                    # 1. Ubicaciones
+                    l_list = [f"• {k.capitalize()}: {clean_md(v.get('display_name', k)).capitalize()}" for k, v in locs.items() if isinstance(v, dict) and v.get('active')]
+                    l_str = "\n".join(l_list) if l_list else "• No configuradas"
+                    
+                    # 2. Salud
+                    conds = [clean_md(v.get('condition', '')) for k, v in salud.items() if isinstance(v, dict) and v.get('active')]
+                    h_str = "• " + ", ".join(conds) if conds else "• Ninguna"
+                    
+                    # 3. Rutina
+                    n_medios = {"auto_ac": "🚗 Auto (A/C)", "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "caminar": "🚶 Caminar", "home_office": "🏠 Home Office"}
+                    m_raw = transp.get('medio', 'No definido')
+                    m_vis = n_medios.get(m_raw, m_raw.capitalize())
+                    h_vis = str(transp.get('horas', '0'))
+                    t_str = f"• Modo: {m_vis}\n• Tiempo: {h_vis} hrs/día" if h_vis != '0' else "• No configurada"
 
-                # 🚩 REGISTRO OBLIGATORIO: MATA EL ERROR 400
+                    # 4. Alertas (threshold)
+                    th_map = alerts.get('threshold', {})
+                    th_list = [f"• {clean_md(locs.get(k,{}).get('display_name', k)).capitalize()}: > {v.get('umbral', 100)} pts" for k, v in th_map.items() if isinstance(v, dict) and v.get('active')]
+                    al_th = "\n".join(th_list) if th_list else "• No configuradas"
+
+                    # Armamos la tarjeta unificada
+                    card_res = cards.CARD_SUMMARY.format(
+                        user_name=clean_md(first_name), plan_status=plan,
+                        contingency_status="✅ ACTIVA" if alerts.get('contingency') else "🔕 INACTIVA",
+                        locations_list=l_str, health_display=h_str, transport_info=t_str,
+                        vehicle_info="Ver en perfil", alerts_threshold=al_th, 
+                        alerts_schedule="Ver en reporte", hnc_reminder="Calculado", footer=cards.BOT_FOOTER
+                    )
+                    
+                    send_telegram(chat_id, card_res, markup=cards.get_summary_buttons(locs, is_prem))
+                    r = "Éxito: Interfaz visual de resumen enviada."
+
+                # 🚩 REGISTRO OBLIGATORIO: MATA EL ERROR 400 (DENTRO DEL FOR)
                 gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
             # --- CIERRE MAESTRO TRAS EL BUCLE FOR ---
