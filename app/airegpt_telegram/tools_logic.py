@@ -75,44 +75,53 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     except Exception as e:
         print(f"❌ Error en configure_schedule_alert: {e}")
         return f"⚠️ Error al guardar horario: {str(e)}"
-#----------------
 
 # --- 📍 GESTIÓN DE UBICACIONES (Soporte 3 ranuras para Premium) ---
-def ejecutar_guardar_ubicacion(user_id, nombre, lat, lon, is_premium=False):
+def ejecutar_guardar_ubicacion(user_id, nombre, lat=None, lon=None, is_premium=False):
     try:
         # 1. Normalizar la llave (ej. 'Casa' -> 'casa')
         key = normalize_key(nombre)
         if not key: return "⚠️ Nombre de ubicación no válido."
 
-        # 2. Verificar límites de la base de datos
+        # 2. Obtener datos actuales para verificar límites y buscar el DRAFT
         user_data = table.get_item(Key={'user_id': str(user_id)}).get('Item', {})
         locs = user_data.get('locations', {})
         
-        # Contamos cuántas ubicaciones activas existen
+        # 🚨 RESCATE DE COORDENADAS: Si no vienen en la tool, las sacamos del PIN previo (draft)
+        if lat is None or lon is None:
+            draft = user_data.get('draft_location')
+            if draft and isinstance(draft, dict):
+                lat = draft.get('lat')
+                lon = draft.get('lon')
+            
+            if not lat or not lon:
+                return "⚠️ No encontré coordenadas pendientes. Por favor envía primero tu ubicación con el clip 📎."
+
+        # 3. Lógica de Límites (3 para Premium, 2 para Free)
         activas = [k for k, v in locs.items() if isinstance(v, dict) and v.get('active')]
-        
-        # Límite: 3 para Premium, 2 para Free
         limite = 3 if is_premium else 2
         
         if len(activas) >= limite and key not in locs:
-            return f"⚠️ Límite alcanzado ({limite}). Como usuario {'Premium' if is_premium else 'Gratis'}, debes eliminar una para agregar '{nombre}'."
+            plan = "Premium" if is_premium else "Gratis"
+            return f"🛑 Límite de {limite} lugares alcanzado para tu plan {plan}. Borra uno para agregar '{nombre}'."
 
-        # 3. Guardado Atómico en DynamoDB
+        # 4. Guardado Atómico en DynamoDB + LIMPIEZA DEL DRAFT
+        # Agregamos 'REMOVE draft_location' para limpiar la memoria temporal
         table.update_item(
             Key={'user_id': str(user_id)},
-            UpdateExpression="SET locations.#loc = :val",
+            UpdateExpression="SET locations.#loc = :val, alerts.threshold.#loc = :alert REMOVE draft_location",
             ExpressionAttributeNames={'#loc': key},
             ExpressionAttributeValues={
                 ':val': {
-                    'display_name': nombre.capitalize(),
+                    'display_name': nombre.strip().capitalize(),
                     'lat': str(lat),
                     'lon': str(lon),
                     'active': True
-                }
+                },
+                ':alert': {'umbral': 100, 'active': True, 'consecutive_sent': 0}
             }
         )
         
-        # 🚩 Retornamos con "Éxito" para que GPT confirme por texto
         return f"Éxito: Ubicación '{nombre.capitalize()}' guardada correctamente."
 
     except Exception as e:
