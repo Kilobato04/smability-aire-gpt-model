@@ -1278,22 +1278,35 @@ def lambda_handler(event, context):
                 else:
                     transp_str = "• No configurada"
 
-                # 5. Alertas Umbral
-                th = user.get('thresholds', user.get('threshold', {}))
-                al_th_list = [f"• {locs_data.get(k, {}).get('display_name', k).capitalize()}: > {v.get('umbral') if isinstance(v, dict) else v} pts" for k, v in th.items() if (isinstance(v, dict) and v.get('active')) or isinstance(v, (int, float))]
-                al_th = "\n".join(al_th_list) if al_th_list else "• No configuradas"
+                # --- 5. Alertas Umbral (FIX: Búsqueda Dual + Anti-Error 400) ---
+                # Tu DB usa 'threshold', el código anterior buscaba 'thresholds'
+                th = user.get('threshold', user.get('thresholds', {}))
+                if not isinstance(th, dict): th = {}
                 
-                # 6. Reportes Programados (FIX DÍAS)
+                al_th_list = []
+                for k, v in th.items():
+                    if isinstance(v, dict) and v.get('active'):
+                        val_umbral = v.get('umbral', '100')
+                        # Obtenemos nombre visual del mapa sanitizado
+                        raw_n = locs_data.get(k, {}).get('display_name', k)
+                        n_clean = clean_md(raw_n).capitalize()
+                        al_th_list.append(f"• {n_clean}: > {val_umbral} pts")
+                
+                alerts_th = "\n".join(al_th_list) if al_th_list else "• No configuradas"
+                
+                # --- 6. Reportes Programados (FIX: Sanitización de nombres) ---
                 sch_data = user.get('alerts', {}).get('schedule', {})
                 sch_list = []
                 from cards import format_days_text 
                 if isinstance(sch_data, dict):
                     for l_k, conf in sch_data.items():
                         if isinstance(conf, dict) and conf.get('active'):
-                            n_disp = locs_data.get(l_k, {}).get('display_name', l_k).capitalize()
+                            raw_n = locs_data.get(l_k, {}).get('display_name', l_k)
+                            n_clean = clean_md(raw_n).capitalize()
                             d_label = format_days_text(conf.get('days', []))
-                            sch_list.append(f"• {n_disp}: {conf.get('time')} hrs ({d_label})")
-                al_sch = "\n".join(sch_list) if sch_list else "• Sin reportes"
+                            sch_list.append(f"• {n_clean}: {conf.get('time')} hrs ({d_label})")
+                
+                alerts_sch = "\n".join(sch_list) if sch_list else "• Sin reportes"
 
                 # 7. Vehículo e HNC
                 veh = user.get('vehicle', {})
@@ -1602,13 +1615,20 @@ def lambda_handler(event, context):
                     if not isinstance(alerts_data, dict): alerts_data = {}
                     contingency = "✅ ACTIVA" if alerts_data.get('contingency') else "🔕 INACTIVA"
 
-                    # --- 2. Ubicaciones ---
+                    # --- 2. Ubicaciones (FIX ANTI-ERROR 400) ---
                     locs_data = user.get('locations', {})
                     if not isinstance(locs_data, dict): locs_data = {}
                     locs_list = []
+                    
                     for k, v in locs_data.items():
                         if isinstance(v, dict) and v.get('active'):
-                            locs_list.append(f"• {k.capitalize()}: {v.get('display_name', k).capitalize()}")
+                            # Extraemos el nombre y lo saneamos de inmediato
+                            raw_name = v.get('display_name', k)
+                            # clean_md quitará el _ de "ubicación_usuario" y lo hará seguro
+                            name_safe = clean_md(raw_name).capitalize()
+                            
+                            locs_list.append(f"• {k.capitalize()}: {name_safe}")
+                    
                     locs_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones."
 
                     # --- 3. Salud ---
@@ -2148,15 +2168,18 @@ def lambda_handler(event, context):
                         veh = user.get('vehicle', {})
                         if isinstance(veh, dict) and veh.get('active'):
                             p, h = veh.get('plate_last_digit'), veh.get('hologram')
-                            veh_str = f"• Placa {p} (Holo {h}) 🔒"
+                            # Saneamos p y h para evitar el Error 400
+                            p_s, h_s = str(p).replace("_", " "), str(h).replace("_", " ")
+                            veh_str = f"• Placa {p_s} (Holo {h_s}) 🔒"
                             try:
                                 hoy = get_mexico_time().strftime("%Y-%m-%d")
+                                # Aseguramos que cards.check_driving_status reciba 4 argumentos si así lo definimos
                                 can, _, _ = cards.check_driving_status(p, h, hoy)
                                 h_emoji = "🟢 CIRCULA" if can else "🔴 NO CIRCULA"
                                 hnc_rem = f"• Hoy: {h_emoji}\n• Calendario Mensual: 🔒 Premium"
                             except: hnc_rem = "• Hoy: ⚠️ Error"
-                    else:
-                        veh_str, hnc_rem = "• No registrado.", "• No configurado."
+                        else:
+                            veh_str, hnc_rem = "• No registrado.", "• No configurado."
 
                     # --- 6. Alertas Umbral (FREE: Degustación 3 Alertas) ---
                     used = int(user.get('free_alerts_sent', 0))
