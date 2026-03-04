@@ -75,7 +75,65 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     except Exception as e:
         print(f"❌ Error en configure_schedule_alert: {e}")
         return f"⚠️ Error al guardar horario: {str(e)}"
+#----------------
+
+# --- 📍 GESTIÓN DE UBICACIONES (Soporte 3 ranuras para Premium) ---
+def ejecutar_guardar_ubicacion(user_id, nombre, lat, lon, is_premium=False):
+    try:
+        # 1. Normalizar la llave (ej. 'Casa' -> 'casa')
+        key = normalize_key(nombre)
+        if not key: return "⚠️ Nombre de ubicación no válido."
+
+        # 2. Verificar límites de la base de datos
+        user_data = table.get_item(Key={'user_id': str(user_id)}).get('Item', {})
+        locs = user_data.get('locations', {})
         
+        # Contamos cuántas ubicaciones activas existen
+        activas = [k for k, v in locs.items() if isinstance(v, dict) and v.get('active')]
+        
+        # Límite: 3 para Premium, 2 para Free
+        limite = 3 if is_premium else 2
+        
+        if len(activas) >= limite and key not in locs:
+            return f"⚠️ Límite alcanzado ({limite}). Como usuario {'Premium' if is_premium else 'Gratis'}, debes eliminar una para agregar '{nombre}'."
+
+        # 3. Guardado Atómico en DynamoDB
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET locations.#loc = :val",
+            ExpressionAttributeNames={'#loc': key},
+            ExpressionAttributeValues={
+                ':val': {
+                    'display_name': nombre.capitalize(),
+                    'lat': str(lat),
+                    'lon': str(lon),
+                    'active': True
+                }
+            }
+        )
+        
+        # 🚩 Retornamos con "Éxito" para que GPT confirme por texto
+        return f"Éxito: Ubicación '{nombre.capitalize()}' guardada correctamente."
+
+    except Exception as e:
+        print(f"❌ Error en guardar_ubicacion: {e}")
+        return f"⚠️ Error al guardar en DB: {str(e)}"
+
+# --- 🗑️ BORRADO ESPECÍFICO (Refuerzo) ---
+def ejecutar_borrar_ubicacion(user_id, nombre):
+    try:
+        key = normalize_key(nombre)
+        # En lugar de REMOVE (que borra la llave), marcamos active: False 
+        # para mantener consistencia si hay alertas amarradas, o REMOVE si prefieres limpieza total.
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="REMOVE locations.#k, alerts.threshold.#k, alerts.schedule.#k",
+            ExpressionAttributeNames={'#k': key}
+        )
+        return f"Éxito: Ubicación '{nombre}' eliminada."
+    except Exception as e:
+        return f"⚠️ Error al eliminar: {str(e)}"
+
 # --- 🩺 SALUD (Atomic Replace) ---
 def ejecutar_guardar_salud(user_id, condicion_raw):
     try:
