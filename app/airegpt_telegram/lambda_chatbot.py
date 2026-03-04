@@ -1874,13 +1874,14 @@ def lambda_handler(event, context):
                 elif fn in ["eliminar_auto", "eliminar_rutina", "eliminar_perfil_salud", "eliminar_ubicacion"]:
                     r = tools_logic.ejecutar_borrado_elemento(user_id, fn.replace("eliminar_", ""), args)
 
-                # --- 2. LLAMADAS LOCALES (Visuales/Fotos) ---
+                # =========================================================
+                # 🛠️ ORQUESTADOR MODULAR ACTUALIZADO (FIXES PREMIUM + DINÁMICO)
+                # =========================================================
                 elif fn == "consultar_calidad_aire":
                     in_lat = args.get('lat', 0)
                     in_lon = args.get('lon', 0)
                     in_name = args.get('nombre_ubicacion', 'Ubicación')
                     
-                    # Resolución de coordenadas (Memoria -> DB -> Usuario)
                     if in_lat == 0 or in_lon == 0:
                         key = resolve_location_key(user_id, in_name)
                         if not key: key = resolve_location_key(user_id, user_content)
@@ -1893,68 +1894,94 @@ def lambda_handler(event, context):
                         sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                         current_phase = sys_state.get('last_contingency_phase', 'None')
                         
-                        # Generamos tarjeta visual
+                        # --- FIX 1: PASAR is_prem PARA QUITAR CANDADOS ---
                         report_text, calidad = generate_report_card(
                             first_name, in_name, in_lat, in_lon, 
                             vehicle=veh, 
                             contingency_phase=current_phase, 
                             user_profile=user_profile,
-                            is_premium=is_prem
+                            is_premium=is_prem # <-- Desbloquea consejo de salud
                         )
                         
-                        # Selección de Banner local
-                        mapa_archivos = {
-                            "Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png",
-                            "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"
-                        }
+                        mapa_archivos = {"Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png", "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"}
                         calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
                         nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
-                        
-                        import os
                         ruta_imagen = os.path.join(os.path.dirname(os.path.abspath(__file__)), "banners", nombre_png)
                         
-                        # Enviamos Foto y asignamos éxito a 'r'
                         send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
-                        r = f"Éxito: Reporte visual enviado para {in_name}."
+                        r = f"Éxito: Reporte visual de calidad del aire enviado para {in_name}."
                     else:
                         r = f"⚠️ No encontré coordenadas para '{in_name}'."
 
                 elif fn == "consultar_resumen_configuracion":
+                    # --- FIX 2: SINCRONIZACIÓN TOTAL ON-DEMAND ---
                     def clean_md(text): return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
                     
-                    # 1. Ubicaciones
                     l_list = [f"• {k.capitalize()}: {clean_md(v.get('display_name', k)).capitalize()}" for k, v in locs.items() if isinstance(v, dict) and v.get('active')]
-                    l_str = "\n".join(l_list) if l_list else "• No configuradas"
                     
-                    # 2. Salud
-                    conds = [clean_md(v.get('condition', '')) for k, v in salud.items() if isinstance(v, dict) and v.get('active')]
-                    h_str = "• " + ", ".join(conds) if conds else "• Ninguna"
-                    
-                    # 3. Rutina
-                    n_medios = {"auto_ac": "🚗 Auto (A/C)", "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "caminar": "🚶 Caminar", "home_office": "🏠 Home Office"}
+                    # Rutina con Emojis Sincronizados
+                    n_medios = {
+                        "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
+                        "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
+                        "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
+                    }
                     m_raw = transp.get('medio', 'No definido')
                     m_vis = n_medios.get(m_raw, m_raw.capitalize())
-                    h_vis = str(transp.get('horas', '0'))
-                    t_str = f"• Modo: {m_vis}\n• Tiempo: {h_vis} hrs/día" if h_vis != '0' else "• No configurada"
+                    h_val = str(transp.get('horas', transp.get('tiempo_traslado_horas', '0')))
+                    t_str = f"• Modo: {m_vis}\n• Tiempo: {h_val} hrs/día" if h_val != '0' else "• No configurada"
 
-                    # 4. Alertas (threshold)
+                    # Auto con Placa y Holograma
+                    v_str, hnc_rem = "• No registrado", "• No configurado"
+                    if veh.get('active'):
+                        p_d, h_d = str(veh.get('plate_last_digit')), str(veh.get('hologram'))
+                        v_str = f"• Placa {p_d} (Holo {h_d}) | {veh.get('engomado','N/A')}"
+                        try:
+                            can, _, _ = cards.check_driving_status(p_d, h_d, get_mexico_time().strftime("%Y-%m-%d"))
+                            hnc_rem = "✅ **HOY circula normal**" if can else "🔴 **HOY no circula**"
+                        except: hnc_rem = "⚠️ Error HNC"
+
                     th_map = alerts.get('threshold', {})
                     th_list = [f"• {clean_md(locs.get(k,{}).get('display_name', k)).capitalize()}: > {v.get('umbral', 100)} pts" for k, v in th_map.items() if isinstance(v, dict) and v.get('active')]
-                    al_th = "\n".join(th_list) if th_list else "• No configuradas"
 
-                    # Armamos la tarjeta unificada
                     card_res = cards.CARD_SUMMARY.format(
-                        user_name=clean_md(first_name), plan_status=plan,
+                        user_name=clean_md(first_name), plan_status=status_str.upper(),
                         contingency_status="✅ ACTIVA" if alerts.get('contingency') else "🔕 INACTIVA",
-                        locations_list=l_str, health_display=h_str, transport_info=t_str,
-                        vehicle_info="Ver en perfil", alerts_threshold=al_th, 
-                        alerts_schedule="Ver en reporte", hnc_reminder="Calculado", footer=cards.BOT_FOOTER
+                        locations_list="\n".join(l_list) if l_list else "• No configuradas",
+                        health_display="• " + ", ".join([clean_md(v.get('condition', '')) for v in salud.values() if v.get('active')]) or "• Ninguna",
+                        transport_info=t_str, vehicle_info=v_str,
+                        alerts_threshold="\n".join(th_list) if th_list else "• No configuradas",
+                        alerts_schedule="Ver en reporte diario", hnc_reminder=hnc_rem, footer=cards.BOT_FOOTER
                     )
-                    
                     send_telegram(chat_id, card_res, markup=cards.get_summary_buttons(locs, is_prem))
                     r = "Éxito: Interfaz visual de resumen enviada."
 
-                # 🚩 REGISTRO OBLIGATORIO: MATA EL ERROR 400 (DENTRO DEL FOR)
+                # --- FIX 3: HNC VISUAL CON MES DINÁMICO ---
+                elif fn == "consultar_hoy_no_circula":
+                    if not veh.get('active'):
+                        r = "No tienes auto registrado. Pídele al usuario sus placas y holograma."
+                    else:
+                        p_d, h_d = str(veh.get('plate_last_digit')), str(veh.get('hologram'))
+                        now = get_mexico_time()
+                        
+                        # Cálculo de Mes Dinámico
+                        meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
+                        mes_nombre = meses_es[now.month]
+                        
+                        lista_dias = get_monthly_prohibited_dates(p_d, h_d, now.year, now.month)
+                        txt_sem, txt_sab = get_restriction_summary(p_d, h_d)
+                        
+                        card_hnc = cards.CARD_HNC_DETAILED.format(
+                            mes_nombre=mes_nombre, plate=p_d, color=veh.get('engomado','N/A'),
+                            holo=h_d.upper(), verificacion_txt=cards.get_verification_period(p_d, h_d),
+                            dias_semana_txt=txt_sem, sabados_txt=txt_sab,
+                            lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
+                            multa_cdmx="$2,171 - $3,257", multa_edomex="$2,171",
+                            footer=cards.BOT_FOOTER
+                        )
+                        send_telegram(chat_id, card_hnc, markup=cards.get_hnc_buttons())
+                        r = "Éxito: Reporte visual de circulación enviado."
+
+                # 🚩 REGISTRO OBLIGATORIO (DENTRO DEL FOR)
                 gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
             # --- CIERRE MAESTRO TRAS EL BUCLE FOR ---
