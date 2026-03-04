@@ -1266,11 +1266,27 @@ def lambda_handler(event, context):
                 condiciones = [clean_md(info.get('condition', '')) for k, info in h_profile.items() if isinstance(info, dict) and info.get('active')]
                 health_display_final = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
 
-                # 4. Rutina
+                # --- 4. Rutina (Emoji Fix + Bundle) ---
                 tr = user.get('profile_transport', {})
-                m_t = clean_md(tr.get('medio', 'No definido')).lower().replace("auto ventana", "🚗 Auto").replace("metrobus", "🚌 Metrobús").capitalize()
+                if not isinstance(tr, dict): tr = {}
+                
+                # Mapa de emojis para recuperar la identidad visual
+                nombres_medios = {
+                    "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
+                    "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
+                    "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
+                }
+                
+                medio_raw = tr.get('medio', 'No definido')
+                medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
+                # Buscamos ambas llaves por seguridad
                 h_t = str(tr.get('tiempo_traslado_horas', tr.get('horas', '0')))
-                transp_str = f"• Ruta: {'Casa ↔ Trabajo' if 'trabajo' in locs_data else 'Local'}\n• Modo: {m_t}\n• Tiempo: {h_t} hrs/día" if h_t != '0' else "• No configurada"
+                
+                if h_t != '0' and h_t != 'None' and medio_raw != 'No definido':
+                    ruta_v = "Casa ↔ Trabajo" if 'trabajo' in locs_data else "Ruta habitual"
+                    transp_str = f"• Ruta: {ruta_v}\n• Modo: {medio_str}\n• Tiempo: {h_t} hrs/día"
+                else:
+                    transp_str = "• No configurada"
 
                 # 5. Alertas Umbral (FIX DEFINITIVO: Jerarquía alerts.threshold)
                 al_root = user.get('alerts', {})
@@ -1618,15 +1634,25 @@ def lambda_handler(event, context):
                 conds = [clean_md(v.get('condition', '')) for k, v in h_data.items() if isinstance(v, dict) and v.get('active')]
                 health_str = "• " + ", ".join(conds) if conds else "• Ninguna"
 
-                # --- 4. Rutina (Fix Llaves) ---
+                # --- 4. Rutina (Emoji Fix + Bundle) ---
                 tr = user.get('profile_transport', {})
                 if not isinstance(tr, dict): tr = {}
-                m_t = clean_md(tr.get('medio', 'No definido')).lower().replace("auto ventana", "🚗 Auto").replace("metrobus", "🚌 Metrobús").capitalize()
+                
+                # Mapa de emojis para recuperar la identidad visual
+                nombres_medios = {
+                    "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
+                    "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
+                    "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
+                }
+                
+                medio_raw = tr.get('medio', 'No definido')
+                medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
+                # Buscamos ambas llaves por seguridad
                 h_t = str(tr.get('tiempo_traslado_horas', tr.get('horas', '0')))
                 
-                if h_t != '0' and h_t != 'None' and m_t != 'No definido':
-                    ruta_v = "Casa ↔ Trabajo" if 'trabajo' in locs_data else "Local"
-                    transp_str = f"• Ruta: {ruta_v}\n• Modo: {m_t}\n• Tiempo: {h_t} hrs/día"
+                if h_t != '0' and h_t != 'None' and medio_raw != 'No definido':
+                    ruta_v = "Casa ↔ Trabajo" if 'trabajo' in locs_data else "Ruta habitual"
+                    transp_str = f"• Ruta: {ruta_v}\n• Modo: {medio_str}\n• Tiempo: {h_t} hrs/día"
                 else:
                     transp_str = "• No configurada"
 
@@ -2036,14 +2062,25 @@ def lambda_handler(event, context):
                     condiciones = [clean_md(info.get('condition', '')) for k, info in h_profile.items() if isinstance(info, dict) and info.get('active')]
                     health_str = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
 
-                    # 3. Rutina (USO DE LLAVE NUEVA + VIEJA)
+                    # 3. Rutina (Emoji Fix + Bundle) 
                     tr = user.get('profile_transport', {})
-                    m_t = clean_md(tr.get('medio', 'No definido')).lower().replace("auto ventana", "🚗 Auto").replace("metrobus", "🚌 Metrobús").capitalize()
+                    if not isinstance(tr, dict): tr = {}
+                    
+                    # Mapa de emojis para recuperar la identidad visual
+                    nombres_medios = {
+                        "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
+                        "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
+                        "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
+                    }
+                    
+                    medio_raw = tr.get('medio', 'No definido')
+                    medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
+                    # Buscamos ambas llaves por seguridad
                     h_t = str(tr.get('tiempo_traslado_horas', tr.get('horas', '0')))
                     
-                    if h_t != '0' and h_t != 'None' and m_t != 'No definido':
-                        ruta_v = "Casa ↔ Trabajo" if 'trabajo' in locs_data else "Local"
-                        transp_str = f"• Ruta: {ruta_v}\n• Modo: {m_t}\n• Tiempo: {h_t} hrs/día"
+                    if h_t != '0' and h_t != 'None' and medio_raw != 'No definido':
+                        ruta_v = "Casa ↔ Trabajo" if 'trabajo' in locs_data else "Ruta habitual"
+                        transp_str = f"• Ruta: {ruta_v}\n• Modo: {medio_str}\n• Tiempo: {h_t} hrs/día"
                     else:
                         transp_str = "• No configurada"
 
@@ -2271,18 +2308,20 @@ def lambda_handler(event, context):
                                 UpdateExpression="REMOVE health_profile"
                             )
                             r = "✅ Perfil de salud restablecido a 'Ninguno'."
+                       
                         else:
                             cond_id = condicion_raw.strip().replace(" ", "_")
-                            # Tarea 11: Reemplaza el objeto completo en vez de añadir (elimina Paso A y Paso B)
+                            # Tarea 11: Sobreescritura total para limpieza automática
                             table.update_item(
                                 Key={'user_id': str(user_id)},
                                 UpdateExpression="SET health_profile = :val",
                                 ExpressionAttributeValues={':val': {cond_id: {'condition': condicion_raw.capitalize(), 'active': True}}}
                             )
-                            r = f"✅ Condición '{condicion_raw.capitalize()}' guardada exitosamente."
+                            r = f"✅ Condición '{condicion_raw.capitalize()}' guardada. Se han actualizado tus recomendaciones de salud."
+                    
                     except Exception as e:
                         print(f"❌ Error guardando salud: {e}")
-                        r = "Hubo un error al guardar la condición."
+                        r = f"Hubo un error al guardar la condición: {str(e)}"
                     
                     
 
