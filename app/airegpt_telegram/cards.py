@@ -533,12 +533,12 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         plan_status=safe_plan.upper(),
         contingency_status=contingency_status,
         locations_list=loc_str,
+        health_display=health_str,        # 🏥 Fix Salud Dinámica
         transport_info=trans_str,
         vehicle_info=veh_str,
-        alerts_threshold=threshold_str,
-        alerts_schedule=schedule_str,
+        alerts_threshold=threshold_str,   # 🔔 Fix Alertas On-demand
+        alerts_schedule=schedule_str,     # ⏰ Fix Reportes On-demand
         hnc_reminder=hnc_str,
-        health_display=health_str, # <--- AHORA SÍ ES DINÁMICO
         footer=BOT_FOOTER
     )
 
