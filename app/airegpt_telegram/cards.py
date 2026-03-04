@@ -439,24 +439,23 @@ def format_days_text(days_list):
 
 
 # --- 2. ACTUALIZAR FUNCIÓN GENERADORA DE RESUMEN ---
-def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, transport_data=None):
+def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, transport_data=None, health_data=None):
     # --- ESCUDO ANTI-ERROR 400 ---
     def clean(text):
         if text is None: return ""
-        # Eliminamos lo que rompe Markdown V2 pero mantenemos la legibilidad
         return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
 
     safe_plan = clean(plan_status)
     is_premium = any(x in safe_plan.upper() for x in ["PREMIUM", "TRIAL"])
     
-    # Lógica de Contingencia (Reforzada)
+    # 1. Lógica de Contingencia
     if is_premium:
         is_active_db = alerts.get('contingency', False)
         contingency_status = "✅ **ACTIVA**" if is_active_db else "🔕 **DESACTIVADA**"
     else:
         contingency_status = "🔒 **BLOQUEADA** (Solo Premium)"
     
-    # Ubicaciones (Misma lógica, más robusta)
+    # 2. Ubicaciones
     locs = []
     if isinstance(locations, dict):
         for k, v in locations.items():
@@ -466,7 +465,14 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
                 locs.append(f"• **{safe_k}:** {safe_name}")
     loc_str = "\n".join(locs) if locs else "• *Sin ubicaciones guardadas*"
 
-    # Transporte (Misma lógica, emojis integrados)
+    # 3. SALUD (FIX DINÁMICO): Cruce con health_data
+    health_str = "• Ninguna"
+    if health_data and isinstance(health_data, dict):
+        conds = [clean(v.get('condition', '')) for k, v in health_data.items() if v.get('active')]
+        if conds:
+            health_str = "• " + ", ".join(conds)
+
+    # 4. Transporte
     if transport_data and transport_data.get('medio'):
         medio_raw = transport_data.get('medio')
         horas = transport_data.get('horas', 0)
@@ -476,22 +482,21 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
             "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
         }
         medio_str = nombres_medios.get(medio_raw, clean(medio_raw).capitalize())
-        
         if medio_raw == "home_office":
             trans_str = f"• Modalidad: **{medio_str}**"
         else:
             trans_str = f"• Ruta: **Casa ↔ Trabajo**\n• Modo: **{medio_str}**\n• Tiempo: **{horas} hrs/día**"
     else:
-        trans_str = "• *Sin configurar (Escribe 'Viajo en metro 2 horas')*"
+        trans_str = "• *Sin configurar*"
 
-    # Auto (Refuerzo de Placa y Holo)
+    # 5. Auto
     veh_str = "• *Sin auto registrado*"
     if vehicle and vehicle.get('active'):
         digit = vehicle.get('plate_last_digit', '?')
         holo = clean(vehicle.get('hologram'))
         veh_str = f"• Placa **{digit}** (Holo {holo})"
 
-    # Alertas Umbral (Corregido para On-Demand)
+    # 6. Alertas Umbral
     threshold_list = []
     thresholds = alerts.get('threshold', {})
     if isinstance(thresholds, dict):
@@ -501,7 +506,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
                 threshold_list.append(f"• {safe_k}: > {v.get('umbral')} pts")
     threshold_str = "\n".join(threshold_list) if threshold_list else "• *Sin alertas de umbral*"
 
-    # Reportes Programados
+    # 7. Reportes Programados
     schedule_list = []
     schedules = alerts.get('schedule', {})
     if isinstance(schedules, dict):
@@ -509,11 +514,11 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
             if v.get('active') and k in locations: 
                 safe_k = clean(locations[k].get('display_name', k)).capitalize()
                 days = v.get('days', [])
-                days_txt = format_days_text(days) # Usamos tu helper
+                days_txt = format_days_text(days)
                 schedule_list.append(f"• {safe_k}: {v.get('time')} hrs ({days_txt})")
     schedule_str = "\n".join(schedule_list) if schedule_list else "• *Sin reportes programados*"
 
-    # Hoy No Circula Dinámico (Mismo bloque)
+    # 8. Hoy No Circula
     if vehicle and vehicle.get('active'):
         plate = vehicle.get('plate_last_digit')
         holo = vehicle.get('hologram')
@@ -533,7 +538,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         alerts_threshold=threshold_str,
         alerts_schedule=schedule_str,
         hnc_reminder=hnc_str,
-        health_display="Configurado", # Ajustado para evitar Nones
+        health_display=health_str, # <--- AHORA SÍ ES DINÁMICO
         footer=BOT_FOOTER
     )
 
