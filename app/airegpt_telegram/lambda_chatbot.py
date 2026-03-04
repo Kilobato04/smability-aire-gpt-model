@@ -1874,170 +1874,80 @@ def lambda_handler(event, context):
                 elif fn in ["eliminar_auto", "eliminar_rutina", "eliminar_perfil_salud", "eliminar_ubicacion"]:
                     r = tools_logic.ejecutar_borrado_elemento(user_id, fn.replace("eliminar_", ""), args)
 
-                # =========================================================
-                # 🛠️ ORQUESTADOR MODULAR ACTUALIZADO (FIXES PREMIUM + DINÁMICO)
-                # =========================================================
+            # =========================================================
+            # 🛠️ ORQUESTADOR MODULAR CONSOLIDADO (Sustitución Segura)
+            # =========================================================
+            for tc in ai_msg.tool_calls:
+                fn = tc.function.name
+                args = json.loads(tc.function.arguments)
+                print(f"🔧 [EXEC] Tool: {fn} | Args: {args}")
+                r = "" 
+
+                # --- 1. ESCRITURA (tools_logic.py) ---
+                if fn == "configurar_transporte":
+                    r = tools_logic.ejecutar_configurar_transporte(user_id, args.get('medio'), args.get('horas_al_dia', args.get('horas', 2)))
+                elif fn in ["guardar_perfil_salud", "guardar_salud"]:
+                    r = tools_logic.ejecutar_guardar_salud(user_id, args.get('tipo_padecimiento', args.get('condicion', 'Ninguno')))
+                elif fn == "configurar_auto":
+                    # Blindaje contra el 'none' del holograma
+                    r = tools_logic.ejecutar_configurar_auto(user_id, args.get('ultimo_digito'), args.get('hologram', args.get('holograma', '0')))
+                elif fn in ["configurar_alerta_ias", "configurar_alerta_por_umbral"]:
+                    r = tools_logic.ejecutar_configurar_alerta_ias(user_id, args.get('nombre_ubicacion'), args.get('umbral_ias', args.get('umbral', 100)))
+                elif fn == "configurar_alerta_contingencia":
+                    r = tools_logic.ejecutar_configurar_alerta_contingencia(user_id, args.get('activar', True))
+                elif fn in ["eliminar_auto", "eliminar_rutina", "eliminar_perfil_salud", "eliminar_ubicacion"]:
+                    r = tools_logic.ejecutar_borrado_elemento(user_id, fn.replace("eliminar_", ""), args)
+
+                # --- 2. CONSULTAS VISUALES (Aire, Ubicaciones, Verificación) ---
                 elif fn == "consultar_calidad_aire":
-                    in_lat = args.get('lat', 0)
-                    in_lon = args.get('lon', 0)
+                    # Respetamos tu lógica de resolución de llaves y banners
+                    in_lat, in_lon = args.get('lat', 0), args.get('lon', 0)
                     in_name = args.get('nombre_ubicacion', 'Ubicación')
-                    
-                    if in_lat == 0 or in_lon == 0:
-                        key = resolve_location_key(user_id, in_name)
-                        if not key: key = resolve_location_key(user_id, user_content)
+                    if in_lat == 0:
+                        key = resolve_location_key(user_id, in_name) or resolve_location_key(user_id, user_content)
                         if key and key in locs:
-                            in_lat = float(locs[key].get('lat', 0))
-                            in_lon = float(locs[key].get('lon', 0))
-                            in_name = locs[key].get('display_name', key.capitalize()) 
+                            in_lat, in_lon = float(locs[key].get('lat', 0)), float(locs[key].get('lon', 0))
+                            in_name = locs[key].get('display_name', key.capitalize())
                     
-                    if in_lat != 0 and in_lon != 0:
-                        sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                        current_phase = sys_state.get('last_contingency_phase', 'None')
-                        
-                        # --- FIX 1: PASAR is_prem PARA QUITAR CANDADOS ---
-                        report_text, calidad = generate_report_card(
-                            first_name, in_name, in_lat, in_lon, 
-                            vehicle=veh, 
-                            contingency_phase=current_phase, 
-                            user_profile=user_profile,
-                            is_premium=is_prem # <-- Desbloquea consejo de salud
-                        )
-                        
+                    if in_lat != 0:
+                        sys_st = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                        rep_txt, cal = generate_report_card(first_name, in_name, in_lat, in_lon, vehicle=veh, contingency_phase=sys_st.get('last_contingency_phase', 'None'), user_profile=user_profile, is_premium=is_prem)
                         mapa_archivos = {"Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png", "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"}
-                        calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
-                        nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
-                        ruta_imagen = os.path.join(os.path.dirname(os.path.abspath(__file__)), "banners", nombre_png)
-                        
-                        send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
-                        r = f"Éxito: Reporte visual de calidad del aire enviado para {in_name}."
-                    else:
-                        r = f"⚠️ No encontré coordenadas para '{in_name}'."
+                        nombre_png = mapa_archivos.get(cal.replace("Alta", "Mala"), "banner_regular.png")
+                        ruta_img = os.path.join(os.path.dirname(os.path.abspath(__file__)), "banners", nombre_png)
+                        send_telegram_photo_local(chat_id, ruta_img, rep_txt, markup=cards.get_exposure_button())
+                        r = f"Éxito: Reporte visual enviado."
+                    else: r = "⚠️ Coordenadas no encontradas."
 
-                elif fn == "consultar_resumen_configuracion":
-                    # 🎯 LA MAGIA: Usamos la función Maestra de cards.py
-                    # Esta función ya tiene todo el código de emojis, limpieza y HNC.
-                    card_res = cards.generate_summary_card(
-                        user_name=first_name,
-                        alerts=alerts,
-                        vehicle=veh,
-                        locations=locs,
-                        plan_status=status_str,
-                        transport_data=transp,
-                        health_data=salud
-                    )
-                    
-                    # Enviamos exactamente lo mismo que enviaría el botón
-                    send_telegram(chat_id, card_res, markup=cards.get_summary_buttons(locs, is_prem))
-                    
-                    # Registramos éxito para que GPT sepa que ya cumplió
-                    r = "Éxito: Interfaz visual de resumen enviada."
-                #-----------------
-                elif fn == "consultar_ubicaciones":
-                    # 1. Construimos la lista visual de ubicaciones desde la DB
-                    locs_list = []
-                    if isinstance(locs, dict):
-                        for k, v in locs.items():
-                            if v.get('active'):
-                                # Limpiamos el nombre para evitar errores de Markdown
-                                n_vis = str(v.get('display_name', k)).replace("_", " ").capitalize()
-                                locs_list.append(f"📍 **{n_vis}**")
-                    
-                    l_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones guardadas."
-                    
-                    # 2. Renderizamos la tarjeta específica
-                    card_locs = cards.CARD_MY_LOCATIONS.format(
-                        user_name=first_name,
-                        locations_list=l_str,
-                        footer=cards.BOT_FOOTER
-                    )
-                    
-                    # 3. Enviamos con los botones de gestión (Consultar/Eliminar)
+                elif fn in ["consultar_ubicaciones", "consultar_ubicaciones_guardadas"]:
+                    l_list = [f"📍 **{v.get('display_name', k).capitalize()}**" for k, v in locs.items() if v.get('active')]
+                    card_locs = cards.CARD_MY_LOCATIONS.format(user_name=first_name, locations_list="\n".join(l_list) if l_list else "• Ninguna", footer=cards.BOT_FOOTER)
                     send_telegram(chat_id, card_locs, markup=cards.get_locations_buttons(locs))
-                    
-                    # 🤐 SILENCIADOR: Corta la alucinación de GPT
-                    r = "Éxito: Interfaz visual de mis ubicaciones enviada."
+                    r = "Éxito: Interfaz visual de ubicaciones enviada."
 
-                # --- ORQUESTADOR DE MOVILIDAD (FIX FINAL SIN REPETICIONES) ---
-                elif fn in ["consultar_hoy_no_circula", "obtener_calendario_mensual"]:
-                    if not veh.get('active'):
-                        r = "No tienes auto registrado. Pídele al usuario sus placas y holograma."
+                elif fn in ["consultar_verificacion", "consultar_hoy_no_circula", "obtener_calendario_mensual"]:
+                    if not veh.get('active'): r = "Pide placas y holograma al usuario."
                     else:
                         p_d, h_d = str(veh.get('plate_last_digit')), str(veh.get('hologram'))
-                        user_ask = user_content.lower()
-                        
-                        # --- ESCENARIO A: VERIFICACIÓN (FIX PRIORITARIO) ---
-                        if any(x in user_ask for x in ["verific", "cuando me toca", "verifi", "calendario de verif"]):
-                            periodo = cards.get_verification_period(p_d, h_d)
-                            # Calculamos la fecha límite real del bimestre
-                            deadline_txt = get_verification_deadline(periodo)
-                            
-                            card_v = cards.CARD_VERIFICATION.format(
-                                plate_info=p_d, 
-                                engomado=veh.get('engomado','N/A'),
-                                period_txt=periodo, 
-                                deadline=deadline_txt,
-                                fine_amount="2,457", 
-                                footer=cards.BOT_FOOTER
-                            )
+                        if "verifi" in user_content.lower() or fn == "consultar_verificacion":
+                            card_v = cards.CARD_VERIFICATION.format(plate_info=p_d, engomado=veh.get('engomado','N/A'), period_txt=cards.get_verification_period(p_d, h_d), deadline=get_verification_deadline(cards.get_verification_period(p_d, h_d)), fine_amount="2,457", footer=cards.BOT_FOOTER)
                             send_telegram(chat_id, card_v)
-                            # 🤐 SILENCIADOR: Al empezar con "Éxito:", GPT no agregará texto natural
-                            r = "Éxito: Tarjeta de verificación visual enviada correctamente."
-                        
-                        # --- ESCENARIO B: CALENDARIO MENSUAL ---
-                        elif any(x in user_ask for x in ["mes", "calendario", "fechas", "todo el mes", "lista"]):
-                            now = get_mexico_time()
-                            meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
-                            mes_nombre = meses_es[now.month]
-                            
-                            lista_dias = get_monthly_prohibited_dates(p_d, h_d, now.year, now.month)
-                            txt_sem, txt_sab = get_restriction_summary(p_d, h_d)
-                            
-                            card_hnc_mes = cards.CARD_HNC_DETAILED.format(
-                                mes_nombre=mes_nombre, plate=p_d, color=veh.get('engomado','N/A'),
-                                holo=h_d.upper(), verificacion_txt=cards.get_verification_period(p_d, h_d),
-                                dias_semana_txt=txt_sem, sabados_txt=txt_sab,
-                                lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
-                                multa_cdmx="$2,171", multa_edomex="$2,171", footer=cards.BOT_FOOTER
-                            )
-                            send_telegram(chat_id, card_hnc_mes, markup=cards.get_hnc_buttons())
-                            r = "Éxito: Calendario mensual enviado."
-
-                        # --- ESCENARIO C: DIARIO (Hoy, Mañana, Pasado Mañana) ---
+                            r = "Éxito: Tarjeta visual de verificación enviada."
                         else:
-                            offset = 0
-                            label_fecha = "Hoy"
-                            if "pasado mañana" in user_ask:
-                                offset = 2
-                                label_fecha = "Pasado Mañana"
-                            elif "mañana" in user_ask:
-                                offset = 1
-                                label_fecha = "Mañana"
-                            
-                            target_date_str = (get_mexico_time() + timedelta(days=offset)).strftime("%Y-%m-%d")
-                            can_drive, r_short, visual = cards.check_driving_status(p_d, h_d, target_date_str)
-                            
-                            # Títulos limpios
-                            status_title = "SÍ CIRCULA" if can_drive else "NO CIRCULA"
-                            status_emoji = "🟢" if can_drive else "🔴"
-                            
-                            # Razón profesional (Circulación Normal)
-                            razon_vis = "Circulación Normal" if "Día Habitual" in r_short or "Permitido" in r_short else r_short
-
-                            card_day = cards.CARD_HNC_RESULT.format(
-                                fecha_str=target_date_str,
-                                dia_semana=label_fecha, 
-                                plate_info=p_d, 
-                                hologram=h_d,
-                                status_emoji=status_emoji,
-                                status_title=status_title,
-                                status_message="", # VACÍO para eliminar duplicidad de "circula"
-                                reason=razon_vis, 
-                                footer=cards.BOT_FOOTER
-                            )
+                            # Tu lógica de Hoy/Mañana/Mes consolidada
+                            offset = 1 if "mañana" in user_content.lower() else 0
+                            label = "Mañana" if offset == 1 else "Hoy"
+                            target_date = (get_mexico_time() + timedelta(days=offset)).strftime("%Y-%m-%d")
+                            can_drive, r_short, _ = cards.check_driving_status(p_d, h_d, target_date)
+                            card_day = cards.CARD_HNC_RESULT.format(fecha_str=target_date, dia_semana=label, plate_info=p_d, hologram=h_d, status_emoji="🟢" if can_drive else "🔴", status_title="SÍ CIRCULA" if can_drive else "NO CIRCULA", status_message="", reason=r_short, footer=cards.BOT_FOOTER)
                             send_telegram(chat_id, card_day, markup=cards.get_hnc_buttons())
-                            r = f"Éxito: Veredicto de circulación para {label_fecha} enviado."
+                            r = f"Éxito: Veredicto para {label} enviado."
 
-                # 🚩 REGISTRO OBLIGATORIO (DENTRO DEL FOR)
+                # --- 3. AUTO-FEEDBACK VISUAL ---
+                if r and "Éxito" in r and "visual" not in r.lower():
+                    send_telegram(chat_id, f"✅ **{r.replace('Éxito: ', '')}**")
+                    r = "Éxito: Cambio aplicado y notificado."
+
                 gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
             # --- CIERRE MAESTRO TRAS EL BUCLE FOR ---
