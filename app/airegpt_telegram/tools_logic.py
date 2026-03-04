@@ -57,19 +57,38 @@ def ejecutar_guardar_salud(user_id, condicion_raw):
 def ejecutar_configurar_auto(user_id, digit, hologram):
     try:
         digit = int(digit)
+        # Limpieza para evitar el "none"
         holo = str(hologram).lower().replace("holograma", "").strip()
+        if holo in ["ninguno", "no tengo", "none"]: holo = "0" # Valor default seguro
+
         colors = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
         color = colors.get(digit, "Desconocido")
         
         vehicle_data = {
             "active": True, "plate_last_digit": digit, "hologram": holo,
-            "engomado": color, "updated_at": datetime.now().isoformat(),
-            "alert_config": {"enabled": True, "time": "20:00"}
+            "engomado": color, "updated_at": datetime.now().isoformat()
         }
-        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET vehicle = :v", ExpressionAttributeValues={':v': vehicle_data})
-        return f"Éxito: Auto registrado con placa {digit}."
+        table.update_item(
+            Key={'user_id': str(user_id)}, 
+            UpdateExpression="SET vehicle = :v", 
+            ExpressionAttributeValues={':v': vehicle_data}
+        )
+        return f"Éxito: Vehículo placa {digit} registrado."
     except:
         return "❌ Error al guardar vehículo."
+
+# --- 🚨 CONTINGENCIA (Ruta Exacta) ---
+def ejecutar_configurar_alerta_contingencia(user_id, activar):
+    try:
+        # Según tu JSON la ruta es alerts -> contingency
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET alerts.contingency = :v",
+            ExpressionAttributeValues={':v': bool(activar)}
+        )
+        return "Éxito: Alerta de contingencia actualizada."
+    except:
+        return "⚠️ Error en DB contingencia."
 
 # --- 🔔 ALERTAS Y RECORDATORIOS ---
 def ejecutar_configurar_alerta_ias(user_id, nombre_ubicacion, umbral):
