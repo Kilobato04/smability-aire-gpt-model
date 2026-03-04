@@ -1931,6 +1931,31 @@ def lambda_handler(event, context):
                     
                     # Registramos éxito para que GPT sepa que ya cumplió
                     r = "Éxito: Interfaz visual de resumen enviada."
+                #-----------------
+                elif fn == "consultar_ubicaciones":
+                    # 1. Construimos la lista visual de ubicaciones desde la DB
+                    locs_list = []
+                    if isinstance(locs, dict):
+                        for k, v in locs.items():
+                            if v.get('active'):
+                                # Limpiamos el nombre para evitar errores de Markdown
+                                n_vis = str(v.get('display_name', k)).replace("_", " ").capitalize()
+                                locs_list.append(f"📍 **{n_vis}**")
+                    
+                    l_str = "\n".join(locs_list) if locs_list else "• No tienes ubicaciones guardadas."
+                    
+                    # 2. Renderizamos la tarjeta específica
+                    card_locs = cards.CARD_MY_LOCATIONS.format(
+                        user_name=first_name,
+                        locations_list=l_str,
+                        footer=cards.BOT_FOOTER
+                    )
+                    
+                    # 3. Enviamos con los botones de gestión (Consultar/Eliminar)
+                    send_telegram(chat_id, card_locs, markup=cards.get_locations_buttons(locs))
+                    
+                    # 🤐 SILENCIADOR: Corta la alucinación de GPT
+                    r = "Éxito: Interfaz visual de mis ubicaciones enviada."
 
                 # --- ORQUESTADOR DE MOVILIDAD (FIX FINAL SIN REPETICIONES) ---
                 elif fn in ["consultar_hoy_no_circula", "obtener_calendario_mensual"]:
@@ -1940,18 +1965,23 @@ def lambda_handler(event, context):
                         p_d, h_d = str(veh.get('plate_last_digit')), str(veh.get('hologram'))
                         user_ask = user_content.lower()
                         
-                        # --- ESCENARIO A: VERIFICACIÓN ---
-                        if any(x in user_ask for x in ["verific", "cuando me toca", "verifi"]):
+                        # --- ESCENARIO A: VERIFICACIÓN (FIX PRIORITARIO) ---
+                        if any(x in user_ask for x in ["verific", "cuando me toca", "verifi", "calendario de verif"]):
                             periodo = cards.get_verification_period(p_d, h_d)
+                            # Calculamos la fecha límite real del bimestre
                             deadline_txt = get_verification_deadline(periodo)
                             
                             card_v = cards.CARD_VERIFICATION.format(
-                                plate_info=p_d, engomado=veh.get('engomado','N/A'),
-                                period_txt=periodo, deadline=deadline_txt,
-                                fine_amount="2,457", footer=cards.BOT_FOOTER
+                                plate_info=p_d, 
+                                engomado=veh.get('engomado','N/A'),
+                                period_txt=periodo, 
+                                deadline=deadline_txt,
+                                fine_amount="2,457", 
+                                footer=cards.BOT_FOOTER
                             )
                             send_telegram(chat_id, card_v)
-                            r = "Éxito: Tarjeta de verificación enviada."
+                            # 🤐 SILENCIADOR: Al empezar con "Éxito:", GPT no agregará texto natural
+                            r = "Éxito: Tarjeta de verificación visual enviada correctamente."
                         
                         # --- ESCENARIO B: CALENDARIO MENSUAL ---
                         elif any(x in user_ask for x in ["mes", "calendario", "fechas", "todo el mes", "lista"]):
