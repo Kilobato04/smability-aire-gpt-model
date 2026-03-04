@@ -830,16 +830,16 @@ def lambda_handler(event, context):
         raw_name = update_origin['from'].get('first_name', 'Usuario')
         first_name = str(raw_name).replace("_", " ").replace("*", "").replace("`", "")
 
-        # --- 🛡️ PASO 1: CARGAR PERFIL Y SANITIZAR DE INMEDIATO (Cambio A) ---
-        # Esto se ejecuta PARA TODO: botones, texto y GPS.
+        # --- 🛡️ PASO 1: CARGAR PERFIL Y SANITIZAR DE INMEDIATO ---
         user_profile = get_user_profile(user_id)
         
-        campos_dict = ['locations', 'alerts', 'vehicle', 'health_profile', 'subscription']
+        # Agregamos 'profile_transport' a la limpieza obligatoria
+        campos_dict = ['locations', 'alerts', 'vehicle', 'health_profile', 'subscription', 'profile_transport']
         for campo in campos_dict:
             if not isinstance(user_profile.get(campo), dict):
                 user_profile[campo] = {}
         
-        # Limpieza profunda de ubicaciones (evita strings en lugar de objetos)
+        # Limpieza profunda de ubicaciones
         locs_validadas = {}
         for k, v in user_profile.get('locations', {}).items():
             if isinstance(v, dict): 
@@ -1714,28 +1714,38 @@ def lambda_handler(event, context):
 
         save_interaction_and_draft(user_id, first_name, lat, lon)
         
-        # Parche de seguridad
-        if isinstance(user_profile.get('alerts'), str): user_profile['alerts'] = {}
-        
-        # Preparar memoria para GPT
+        # --- 🛡️ FIX DE MEMORIA Y SANITIZACIÓN (REEMPLAZO TOTAL) ---
         locs = user_profile.get('locations', {})
-        if isinstance(locs, str): locs = {} 
         alerts = user_profile.get('alerts', {})
-        if isinstance(alerts, str): alerts = {} 
-        
-        # --- FIX: RECUPERAR DATOS DEL AUTO ---
         veh = user_profile.get('vehicle', {})
-        veh_info = "No registrado"
-        if veh and veh.get('active'):
-            veh_info = f"Placa terminación {veh.get('plate_last_digit')} (Holo {veh.get('hologram')})"
-        # -------------------------------------
+        transp = user_profile.get('profile_transport', {})
+        salud = user_profile.get('health_profile', {})
+        plan = user_profile.get('subscription', {}).get('status', 'FREE')
 
-        plan_status = user_profile.get('subscription',{}).get('status','FREE')
+        # 1. Asegurar diccionarios para evitar errores .get() o de iteración
+        if not isinstance(alerts, dict): alerts = {}
+        if not isinstance(transp, dict): transp = {}
+        if not isinstance(salud, dict): salud = {}
 
-        memoria_str = "**Tus lugares:**\n" + "\n".join([f"- {v.get('display_name')}" for k, v in locs.items()])
-        memoria_str += f"\n**Auto:** {veh_info}" 
-        memoria_str += f"\n**Alertas:** {alerts}"
-        memoria_str += f"\n**Plan:** {plan_status}"
+        # 2. Construir contexto para forzar el "Bundle" de Rutina y Salud
+        m_curr = transp.get('medio', 'No definido')
+        h_curr = transp.get('horas', 0)
+        
+        memoria_str = f"ESTATUS ACTUAL DEL USUARIO:\n"
+        memoria_str += f"- Plan: {plan}\n"
+        memoria_str += f"- Lugares Guardados: " + ", ".join([v.get('display_name', k) for k, v in locs.items()]) + "\n"
+        
+        # Esto le dice a GPT: "Si cambia el modo, verifica este tiempo"
+        memoria_str += f"- Rutina de Transporte: Modo {m_curr}, Tiempo {h_curr} hrs (Total ida/vuelta)\n"
+        
+        # Esto le dice a GPT: "Si cambia salud, recuerda que solo puede haber una"
+        conds = [v.get('condition', k) for k, v in salud.items() if v.get('active')]
+        memoria_str += f"- Perfil de Salud: " + (", ".join(conds) if conds else "Ninguno") + "\n"
+        
+        veh_info = f"Placa terminación {veh.get('plate_last_digit')} (Holo {veh.get('hologram')})" if veh.get('active') else "No registrado"
+        memoria_str += f"- Vehículo: {veh_info}\n"
+        memoria_str += f"- Configuración de Alertas: {json.dumps(alerts)}"
+        # -------------------------------------------------------
         
         has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
         forced_tag = None
