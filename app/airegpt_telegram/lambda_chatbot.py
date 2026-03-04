@@ -1859,13 +1859,14 @@ def lambda_handler(event, context):
                 r = "" 
 
                 # --- NUEVO: CONECTOR DE GUARDADO DE UBICACIÓN ---
-                if fn == "guardar_ubicacion":
+                if fn == "guardar_ubicacion_personalizada":
+                    # GPT manda 'nombre' según tu bot_content.py
                     r = tools_logic.ejecutar_guardar_ubicacion(
                         user_id, 
-                        args.get('nombre_ubicacion') or args.get('nombre'), 
-                        args.get('lat'), 
-                        args.get('lon'), 
-                        is_premium=is_prem # Usamos la variable que ya definiste arriba
+                        args.get('nombre'), 
+                        lat=args.get('lat'), 
+                        lon=args.get('lon'), 
+                        is_premium=is_prem 
                     )
                     
                 # --- 1. ESCRITURA Y CONFIGURACIÓN (Feedback Automático) ---
