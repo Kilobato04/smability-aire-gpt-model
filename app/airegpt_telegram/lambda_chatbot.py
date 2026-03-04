@@ -1858,6 +1858,16 @@ def lambda_handler(event, context):
                 print(f"🔧 [EXEC] Tool: {fn} | Args: {args}")
                 r = "" 
 
+                # --- NUEVO: CONECTOR DE GUARDADO DE UBICACIÓN ---
+                if fn == "guardar_ubicacion":
+                    r = tools_logic.ejecutar_guardar_ubicacion(
+                        user_id, 
+                        args.get('nombre_ubicacion') or args.get('nombre'), 
+                        args.get('lat'), 
+                        args.get('lon'), 
+                        is_premium=is_prem # Usamos la variable que ya definiste arriba
+                    )
+                    
                 # --- 1. ESCRITURA Y CONFIGURACIÓN (Feedback Automático) ---
                 if fn in ["configurar_transporte", "guardar_perfil_salud", "guardar_salud", "configurar_auto", "configurar_alerta_ias", "configurar_alerta_contingencia", "configurar_recordatorio"]:
                     if fn == "configurar_transporte":
@@ -2026,7 +2036,9 @@ def lambda_handler(event, context):
         if final_text and final_text.strip():
             # --- FIX ANTI-ERROR 400 (LIMPIEZA PROFUNDA) ---
             if "Ubicación recibida" not in final_text:
-                safe_final_text = final_text.replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
+                # Quitamos asteriscos y corchetes, pero DEJAMOS el guion bajo (_) 
+                # para que los links de Google Maps no se rompan.
+                safe_final_text = final_text.replace("*", "").replace("[", "(").replace("]", ")")
             else:
                 safe_final_text = final_text 
             
