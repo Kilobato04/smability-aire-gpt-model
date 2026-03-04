@@ -440,37 +440,42 @@ def format_days_text(days_list):
 
 # --- 2. ACTUALIZAR FUNCIÓN GENERADORA DE RESUMEN ---
 def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, transport_data=None):
+    # --- ESCUDO ANTI-ERROR 400 ---
     def clean(text):
-        return str(text).replace("_", " ").replace("*", "").replace("[", "").replace("]", "")
+        if text is None: return ""
+        # Eliminamos lo que rompe Markdown V2 pero mantenemos la legibilidad
+        return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
 
     safe_plan = clean(plan_status)
-    is_premium = "PREMIUM" in safe_plan.upper() or "TRIAL" in safe_plan.upper()
+    is_premium = any(x in safe_plan.upper() for x in ["PREMIUM", "TRIAL"])
     
+    # Lógica de Contingencia (Reforzada)
     if is_premium:
         is_active_db = alerts.get('contingency', False)
         contingency_status = "✅ **ACTIVA**" if is_active_db else "🔕 **DESACTIVADA**"
     else:
         contingency_status = "🔒 **BLOQUEADA** (Solo Premium)"
     
+    # Ubicaciones (Misma lógica, más robusta)
     locs = []
     if isinstance(locations, dict):
         for k, v in locations.items():
-            safe_k = clean(k.capitalize())
-            safe_name = clean(v.get('display_name','Ubicación'))
-            locs.append(f"• **{safe_k}:** {safe_name}")
+            if v.get('active'):
+                safe_k = clean(k.capitalize())
+                safe_name = clean(v.get('display_name', k))
+                locs.append(f"• **{safe_k}:** {safe_name}")
     loc_str = "\n".join(locs) if locs else "• *Sin ubicaciones guardadas*"
 
-    # --- NUEVO: Procesar Transporte ---
+    # Transporte (Misma lógica, emojis integrados)
     if transport_data and transport_data.get('medio'):
         medio_raw = transport_data.get('medio')
         horas = transport_data.get('horas', 0)
-        
         nombres_medios = {
             "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
             "metro": "🚇 Metro/Tren", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
             "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
         }
-        medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
+        medio_str = nombres_medios.get(medio_raw, clean(medio_raw).capitalize())
         
         if medio_raw == "home_office":
             trans_str = f"• Modalidad: **{medio_str}**"
@@ -479,57 +484,57 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
     else:
         trans_str = "• *Sin configurar (Escribe 'Viajo en metro 2 horas')*"
 
+    # Auto (Refuerzo de Placa y Holo)
     veh_str = "• *Sin auto registrado*"
     if vehicle and vehicle.get('active'):
-        digit = vehicle.get('plate_last_digit')
+        digit = vehicle.get('plate_last_digit', '?')
         holo = clean(vehicle.get('hologram'))
         veh_str = f"• Placa **{digit}** (Holo {holo})"
 
+    # Alertas Umbral (Corregido para On-Demand)
     threshold_list = []
     thresholds = alerts.get('threshold', {})
-    for k, v in thresholds.items():
-        if v.get('active') and k in locations: 
-            safe_k = clean(k.capitalize())
-            threshold_list.append(f"• {safe_k}: > {v.get('umbral')} pts")
+    if isinstance(thresholds, dict):
+        for k, v in thresholds.items():
+            if v.get('active') and k in locations: 
+                safe_k = clean(locations[k].get('display_name', k)).capitalize()
+                threshold_list.append(f"• {safe_k}: > {v.get('umbral')} pts")
     threshold_str = "\n".join(threshold_list) if threshold_list else "• *Sin alertas de umbral*"
 
+    # Reportes Programados
     schedule_list = []
     schedules = alerts.get('schedule', {})
-    for k, v in schedules.items():
-        if v.get('active') and k in locations: 
-            safe_k = clean(k.capitalize())
-            days = v.get('days', [])
-            days_txt = "Diario" if len(days)==7 else "Días selec."
-            schedule_list.append(f"• {safe_k}: {v.get('time')} hrs ({days_txt})")
+    if isinstance(schedules, dict):
+        for k, v in schedules.items():
+            if v.get('active') and k in locations: 
+                safe_k = clean(locations[k].get('display_name', k)).capitalize()
+                days = v.get('days', [])
+                days_txt = format_days_text(days) # Usamos tu helper
+                schedule_list.append(f"• {safe_k}: {v.get('time')} hrs ({days_txt})")
     schedule_str = "\n".join(schedule_list) if schedule_list else "• *Sin reportes programados*"
 
-    # ====================================================
-    # AQUÍ ESTÁ EL BLOQUE DEL HOY NO CIRCULA DINÁMICO
-    # ====================================================
+    # Hoy No Circula Dinámico (Mismo bloque)
     if vehicle and vehicle.get('active'):
         plate = vehicle.get('plate_last_digit')
         holo = vehicle.get('hologram')
-        # Calculamos al vuelo si circula HOY (asumimos Fase regular para el resumen rápido)
         can_drive, r_short, _ = check_driving_status(plate, holo, "hoy", "None")
         status_text = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
         hnc_str = f"• Hoy: **{status_text}** ({r_short})"
     else:
         hnc_str = "• 🔕 Registra tu auto para ver restricciones." 
-    # ====================================================
-
-    tip = "Tip: Dile al bot 'Cambia mi transporte a...' para ajustar tu rutina."
 
     return CARD_SUMMARY.format(
         user_name=clean(user_name),
-        plan_status=safe_plan,
+        plan_status=safe_plan.upper(),
         contingency_status=contingency_status,
         locations_list=loc_str,
-        transport_info=trans_str,  # <--- SE INYECTA AQUÍ
+        transport_info=trans_str,
         vehicle_info=veh_str,
         alerts_threshold=threshold_str,
         alerts_schedule=schedule_str,
         hnc_reminder=hnc_str,
-        tip_footer=tip
+        health_display="Configurado", # Ajustado para evitar Nones
+        footer=BOT_FOOTER
     )
 
 # --- 3. ACTUALIZAR BOTONES DE RESUMEN (UPSELLING) ---
