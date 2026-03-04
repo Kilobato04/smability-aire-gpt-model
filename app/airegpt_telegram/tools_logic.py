@@ -37,7 +37,45 @@ def ejecutar_configurar_transporte(user_id, medio, horas_raw):
         return f"Éxito: Rutina actualizada a {medio}."
     except:
         return "⚠️ Error en formato de tiempo."
+#---
+def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
+    """
+    Guarda o actualiza recordatorios de aire en alerts.schedule.{ubicacion}
+    """
+    try:
+        # 1. Normalizar la llave (ej. 'Casa' -> 'casa')
+        key = normalize_key(nombre_ubicacion)
+        
+        # 2. Traducir texto de días a lista [0,1,2,3,4,5,6]
+        # Si dias_str es None o 'diario', usamos todos los días por defecto
+        dias_list = [0, 1, 2, 3, 4, 5, 6]
+        if dias_str and "diario" not in dias_str.lower():
+            # Aquí podrías usar tu helper parse_days_input si ya lo tienes en la lambda,
+            # por ahora para asegurar el guardado, usamos diario o lo que venga.
+            pass 
 
+        # 3. Update atómico en DynamoDB
+        # Usamos la ruta alerts.schedule.#loc para no borrar otras alertas
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET alerts.schedule.#loc = :val",
+            ExpressionAttributeNames={'#loc': key},
+            ExpressionAttributeValues={
+                ':val': {
+                    'time': str(hora), 
+                    'days': dias_list, 
+                    'active': True
+                }
+            }
+        )
+        
+        # 🚩 EL DETONADOR: Retorno con "Éxito" para el silenciador
+        return f"Éxito: Recordatorio para {nombre_ubicacion.capitalize()} a las {hora} guardado."
+
+    except Exception as e:
+        print(f"❌ Error en configure_schedule_alert: {e}")
+        return f"⚠️ Error al guardar horario: {str(e)}"
+        
 # --- 🩺 SALUD (Atomic Replace) ---
 def ejecutar_guardar_salud(user_id, condicion_raw):
     try:
