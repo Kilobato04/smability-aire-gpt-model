@@ -1,0 +1,110 @@
+import json
+import boto3
+import os
+import requests
+from datetime import datetime
+from decimal import Decimal
+
+# --- CONFIGURACIÓN ---
+DYNAMODB_TABLE = 'SmabilityUsers'
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table(DYNAMODB_TABLE)
+
+def normalize_key(text):
+    if not text: return ""
+    text = text.lower().strip().replace(" ", "_")
+    replacements = (("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"), ("ñ", "n"))
+    for a, b in replacements:
+        text = text.replace(a, b)
+    return text
+
+# --- 🧪 RUTINA Y TRANSPORTE ---
+def ejecutar_configurar_transporte(user_id, medio, horas_raw):
+    try:
+        horas_float = round(float(horas_raw), 1)
+        if horas_float > 6.0: horas_float = 6.0
+        horas_db = Decimal(str(horas_float))
+        
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET profile_transport = :p",
+            ExpressionAttributeValues={':p': {
+                'medio': medio, 
+                'horas': horas_db, 
+                'tiempo_traslado_horas': horas_db
+            }}
+        )
+        return f"✅ Rutina actualizada: {medio} por {horas_float} hrs."
+    except:
+        return "⚠️ Error en formato de tiempo."
+
+# --- 🩺 SALUD (Atomic Replace) ---
+def ejecutar_guardar_salud(user_id, condicion_raw):
+    try:
+        cond_id = condicion_raw.lower().strip().replace(" ", "_")
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET health_profile = :val",
+            ExpressionAttributeValues={':val': {
+                cond_id: {'condition': condicion_raw.capitalize(), 'active': True}
+            }}
+        )
+        return f"✅ Salud actualizada: {condicion_raw.capitalize()}."
+    except Exception as e:
+        return f"❌ Error DB: {str(e)}"
+
+# --- 🚗 VEHÍCULO ---
+def ejecutar_configurar_auto(user_id, digit, hologram):
+    try:
+        digit = int(digit)
+        holo = str(hologram).lower().replace("holograma", "").strip()
+        colors = {5:"Amarillo", 6:"Amarillo", 7:"Rosa", 8:"Rosa", 3:"Rojo", 4:"Rojo", 1:"Verde", 2:"Verde", 9:"Azul", 0:"Azul"}
+        color = colors.get(digit, "Desconocido")
+        
+        vehicle_data = {
+            "active": True, "plate_last_digit": digit, "hologram": holo,
+            "engomado": color, "updated_at": datetime.now().isoformat(),
+            "alert_config": {"enabled": True, "time": "20:00"}
+        }
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET vehicle = :v", ExpressionAttributeValues={':v': vehicle_data})
+        return f"✅ Auto registrado: Placa {digit} ({color})."
+    except:
+        return "❌ Error al guardar vehículo."
+
+# --- 🔔 ALERTAS Y RECORDATORIOS ---
+def ejecutar_configurar_alerta_ias(user_id, nombre_ubicacion, umbral):
+    try:
+        u_int = int(umbral)
+        if u_int < 100: return "⚠️ El umbral mínimo es 100 pts."
+        
+        # Nota: Aquí asumimos que la validación de existencia de ubicación se hizo en el handler 
+        # o GPT ya sabe que existe por su memoria.
+        key = normalize_key(nombre_ubicacion)
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET alerts.threshold.#loc = :v",
+            ExpressionAttributeNames={'#loc': key},
+            ExpressionAttributeValues={':v': {'umbral': u_int, 'active': True, 'consecutive_sent': 0}}
+        )
+        return f"✅ Alerta configurada en {nombre_ubicacion} > {u_int} pts."
+    except:
+        return "⚠️ Error en umbral."
+
+# --- 🗑️ BORRADOS ATÓMICOS ---
+def ejecutar_borrado_elemento(user_id, tipo, args=None):
+    try:
+        if tipo == "ubicacion":
+            nombre = args.get('nombre_ubicacion', '')
+            key = normalize_key(nombre)
+            table.update_item(
+                Key={'user_id': str(user_id)},
+                UpdateExpression="REMOVE locations.#k, alerts.threshold.#k, alerts.schedule.#k",
+                ExpressionAttributeNames={'#k': key}
+            )
+            return f"🗑️ Ubicación '{nombre}' eliminada."
+        
+        paths = {"auto": "vehicle", "rutina": "profile_transport", "perfil_salud": "health_profile"}
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=f"REMOVE {paths[tipo]}")
+        return f"✅ {tipo.capitalize()} eliminado."
+    except:
+        return "⚠️ Error en borrado."
