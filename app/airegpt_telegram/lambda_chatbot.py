@@ -1766,6 +1766,19 @@ def lambda_handler(event, context):
         has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
         forced_tag = None
         system_extra = "NORMAL"
+
+        draft = user_profile.get('draft_location')
+        if draft and isinstance(draft, dict) and 'lat' in draft:
+            system_extra = (
+                f"ESTADO: PENDING_NAME. El usuario envió coordenadas ({draft.get('lat')}, {draft.get('lon')}) "
+                f"y ahora está proporcionando el nombre para este lugar. "
+                f"Si el usuario escribe un nombre (ej. 'Polanco' o 'Circuito'), "
+                f"DEBES usar la herramienta 'guardar_ubicacion_personalizada' con ese nombre."
+            )
+        elif not has_casa: 
+            system_extra = "ONBOARDING 1: Pide CASA"
+        elif not has_trabajo: 
+            system_extra = "ONBOARDING 2: Pide TRABAJO"
         
         # 1. Prioridad: Si hay mapa en este mensaje (Override total)
         if lat:
@@ -1856,18 +1869,19 @@ def lambda_handler(event, context):
                 fn = tc.function.name
                 args = json.loads(tc.function.arguments)
                 print(f"🔧 [EXEC] Tool: {fn} | Args: {args}")
-                r = "" 
+                r = ""
 
-                # --- NUEVO: CONECTOR DE GUARDADO DE UBICACIÓN ---
+                # --- CONECTOR ÚNICO HOMOLOGADO ---
                 if fn == "guardar_ubicacion_personalizada":
-                    # GPT manda 'nombre' según tu bot_content.py
                     r = tools_logic.ejecutar_guardar_ubicacion(
                         user_id, 
                         args.get('nombre'), 
-                        lat=args.get('lat'), 
-                        lon=args.get('lon'), 
+                        lat=args.get('lat'), # Puede ser None si el usuario solo dio el nombre
+                        lon=args.get('lon'), # Puede ser None
                         is_premium=is_prem 
                     )
+                
+                # ... aquí siguen tus otros elif fn == "configurar_transporte", etc.
                     
                 # --- 1. ESCRITURA Y CONFIGURACIÓN (Feedback Automático) ---
                 if fn in ["configurar_transporte", "guardar_perfil_salud", "guardar_salud", "configurar_auto", "configurar_alerta_ias", "configurar_alerta_contingencia", "configurar_recordatorio"]:
