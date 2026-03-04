@@ -13,6 +13,9 @@ COPY cards.py ${LAMBDA_TASK_ROOT}
 COPY bot_content.py ${LAMBDA_TASK_ROOT}
 COPY prompts.py ${LAMBDA_TASK_ROOT}
 
+# --- NUEVO ARCHIVO DE LÓGICA DE TOOLS ---
+COPY tools_logic.py ${LAMBDA_TASK_ROOT}
+
 # --- FIX CRÍTICO: Faltaba este archivo ---
 COPY lambda_api_light.py ${LAMBDA_TASK_ROOT}
 
