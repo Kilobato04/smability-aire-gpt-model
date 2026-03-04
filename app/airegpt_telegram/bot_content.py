@@ -83,8 +83,15 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "guardar_perfil_salud",
-            "description": "Agrega padecimiento.",
-            "parameters": {"type": "object", "properties": {"tipo_padecimiento": {"type": "string"}, "es_vulnerable": {"type": "boolean"}}, "required": ["tipo_padecimiento", "es_vulnerable"]}
+            "description": "Registra el padecimiento del usuario. NOTA: Esta acción reemplaza cualquier padecimiento guardado anteriormente (solo puede haber uno activo).",
+            "parameters": {
+                "type": "object", 
+                "properties": {
+                    "tipo_padecimiento": {"type": "string", "description": "Ej: asma, neumonía, rinitis."},
+                    "es_vulnerable": {"type": "boolean", "description": "True si es grupo sensible."}
+                }, 
+                "required": ["tipo_padecimiento", "es_vulnerable"]
+            }
         }
     },
     {
