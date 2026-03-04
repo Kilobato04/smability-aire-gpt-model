@@ -1272,14 +1272,22 @@ def lambda_handler(event, context):
                 h_t = str(tr.get('tiempo_traslado_horas', tr.get('horas', '0')))
                 transp_str = f"• Ruta: {'Casa ↔ Trabajo' if 'trabajo' in locs_data else 'Local'}\n• Modo: {m_t}\n• Tiempo: {h_t} hrs/día" if h_t != '0' else "• No configurada"
 
-                # 5. Alertas Umbral (FIX NOMBRE VARIABLE)
-                th = user.get('threshold', user.get('thresholds', {}))
+                # 5. Alertas Umbral (FIX DEFINITIVO: Jerarquía alerts.threshold)
+                al_root = user.get('alerts', {})
+                if not isinstance(al_root, dict): al_root = {}
+                
+                # Accedemos a 'threshold' (singular) dentro de 'alerts'
+                th = al_root.get('threshold', {})
                 al_th_list = []
+                
                 if isinstance(th, dict):
                     for k, v in th.items():
                         if isinstance(v, dict) and v.get('active'):
                             n_disp = clean_md(locs_data.get(k, {}).get('display_name', k)).capitalize()
-                            al_th_list.append(f"• {n_disp}: > {v.get('umbral', 100)} pts")
+                            # Extraemos el valor real de 'umbral' que vimos en tu log (110)
+                            u_val = v.get('umbral', 100)
+                            al_th_list.append(f"• {n_disp}: > {u_val} pts")
+                
                 al_th = "\n".join(al_th_list) if al_th_list else "• No configuradas"
                 
                 # 6. Reportes Programados (FIX NOMBRE VARIABLE)
@@ -2039,18 +2047,20 @@ def lambda_handler(event, context):
                     else:
                         transp_str = "• No configurada"
 
-                    # 4. Alertas Umbral (FIX SINGULAR 'threshold')
-                    th = user.get('threshold', user.get('thresholds', {}))
+                    # --- 4. Alertas Umbral (FIX JERARQUÍA) ---
+                    al_root = user.get('alerts', {})
+                    th = al_root.get('threshold', {})
                     al_th_list = []
                     if isinstance(th, dict):
                         for k, v in th.items():
                             if isinstance(v, dict) and v.get('active'):
                                 n_disp = clean_md(locs_data.get(k, {}).get('display_name', k)).capitalize()
-                                al_th_list.append(f"• {n_disp}: > {v.get('umbral', 100)} pts")
+                                u_val = v.get('umbral', 100)
+                                al_th_list.append(f"• {n_disp}: > {u_val} pts")
                     alerts_th = "\n".join(al_th_list) if al_th_list else "• No configuradas"
 
-                    # 5. Reportes Programados
-                    sch_data = user.get('alerts', {}).get('schedule', {})
+                    # --- 5. Reportes Programados (FIX JERARQUÍA) ---
+                    sch_data = al_root.get('schedule', {})
                     sch_list = []
                     from cards import format_days_text 
                     if isinstance(sch_data, dict):
