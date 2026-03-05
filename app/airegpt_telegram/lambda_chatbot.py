@@ -1858,41 +1858,65 @@ def lambda_handler(event, context):
             is_prem = any(x in status_str for x in ["PREMIUM", "TRIAL"])
 
             # =========================================================
-            # 🛠️ ORQUESTADOR MODULAR UNIFICADO (FIXES: HORARIOS + MES + RESUMEN)
+            # 🛠️ ORQUESTADOR MODULAR UNIFICADO (CON GATEKEEPER)
             # =========================================================
             for tc in ai_msg.tool_calls:
                 fn = tc.function.name
                 args = json.loads(tc.function.arguments)
-                print(f"🔧 [EXEC] Tool: {fn} | Args: {args}")
                 r = ""
 
-                # --- CONECTOR ÚNICO HOMOLOGADO ---
-                if fn == "guardar_ubicacion_personalizada":
-                    r = tools_logic.ejecutar_guardar_ubicacion(
-                        user_id, 
-                        args.get('nombre'), 
-                        lat=args.get('lat'), # Puede ser None si el usuario solo dio el nombre
-                        lon=args.get('lon'), # Puede ser None
-                        is_premium=is_prem 
-                    )
+                # --- 🛡️ PASO 1: EVALUACIÓN DE TIER Y PERMISOS ---
+                tier, days_left = stripeairegpt.evaluate_user_tier(user_profile)
+                is_prem_val = tier in ['PREMIUM', 'TRIAL']
                 
-                # ... aquí siguen tus otros elif fn == "configurar_transporte", etc.
-                    
-                # --- 1. ESCRITURA Y CONFIGURACIÓN (Feedback Automático) ---
-                if fn in ["configurar_transporte", "guardar_perfil_salud", "guardar_salud", "configurar_auto", "configurar_alerta_ias", "configurar_alerta_contingencia", "configurar_recordatorio"]:
-                    if fn == "configurar_transporte":
-                        r = tools_logic.ejecutar_configurar_transporte(user_id, args.get('medio'), args.get('horas_al_dia', args.get('horas', 2)))
-                    elif fn in ["guardar_perfil_salud", "guardar_salud"]:
-                        r = tools_logic.ejecutar_guardar_salud(user_id, args.get('tipo_padecimiento', args.get('condicion')))
-                    elif fn == "configurar_auto":
-                        r = tools_logic.ejecutar_configurar_auto(user_id, args.get('ultimo_digito'), args.get('hologram', args.get('holograma', '0')))
-                    elif fn == "configurar_alerta_contingencia":
-                        r = tools_logic.ejecutar_configurar_alerta_contingencia(user_id, args.get('activar', True))
-                    elif fn == "configurar_recordatorio": 
-                        # FIX 1: Mapeo directo para reportes por horario (Casa 8am / Trabajo 10am)
-                        r = tools_logic.configure_schedule_alert(user_id, args.get('nombre_ubicacion'), args.get('hora'), args.get('dias', 'diario'))
-                    elif fn in ["configurar_alerta_ias", "configurar_alerta_por_umbral"]:
-                        r = tools_logic.ejecutar_configurar_alerta_ias(user_id, args.get('nombre_ubicacion'), args.get('umbral_ias', args.get('umbral', 100)))
+                # Mapeo de herramientas a acciones de negocio (Cerebro Maestro)
+                action_map = {
+                    "guardar_ubicacion_personalizada": "add_location",
+                    "configurar_recordatorio": "alertas",
+                    "configurar_alerta_ias": "alertas",
+                    "obtener_calendario_mensual": "movilidad_mensual"
+                }
+                action_to_check = action_map.get(fn, fn)
+                
+                # Preguntamos a business_logic si se permite la acción
+                allowed, reason = business_logic.is_action_allowed(user_profile, action_to_check)
+                
+                if not allowed:
+                    # 🛑 BLOQUEO: Enviamos Paywall y cortamos esta tool específica
+                    texto_pw, botones_pw = stripeairegpt.get_paywall_response(tier, days_left, action_to_check, str(user_id))
+                    send_telegram(chat_id, texto_pw, markup=botones_pw)
+                    r = f"ERROR: Acción bloqueada. Suscripción Premium requerida. Motivo: {reason}"
+                    print(f"🚫 [GATEKEEPER] Bloqueado: {fn} para User: {user_id}")
+                
+                else:
+                    # ✅ PASO 2: EJECUCIÓN PERMITIDA
+                    print(f"🔧 [EXEC] Tool: {fn} | Tier: {tier}")
+
+                    # --- CONECTOR ÚNICO HOMOLOGADO ---
+                    if fn == "guardar_ubicacion_personalizada":
+                        r = tools_logic.ejecutar_guardar_ubicacion(
+                            user_id, 
+                            args.get('nombre'), 
+                            lat=args.get('lat'), 
+                            lon=args.get('lon'), 
+                            is_premium=is_prem_val # Usamos el tier real detectado
+                        )
+                        
+                    # --- 1. ESCRITURA Y CONFIGURACIÓN ---
+                    elif fn in ["configurar_transporte", "guardar_perfil_salud", "guardar_salud", "configurar_auto", "configurar_alerta_ias", "configurar_alerta_contingencia", "configurar_recordatorio"]:
+                        if fn == "configurar_transporte":
+                            r = tools_logic.ejecutar_configurar_transporte(user_id, args.get('medio'), args.get('horas_al_dia', args.get('horas', 2)))
+                        elif fn in ["guardar_perfil_salud", "guardar_salud"]:
+                            r = tools_logic.ejecutar_guardar_salud(user_id, args.get('tipo_padecimiento', args.get('condicion')))
+                        elif fn == "configurar_auto":
+                            r = tools_logic.ejecutar_configurar_auto(user_id, args.get('ultimo_digito'), args.get('hologram', args.get('holograma', '0')))
+                        elif fn == "configurar_alerta_contingencia":
+                            r = tools_logic.ejecutar_configurar_alerta_contingencia(user_id, args.get('activar', True))
+                        elif fn == "configurar_recordatorio": 
+                            # FIX 1: Mapeo directo para reportes por horario (Casa 8am / Trabajo 10am)
+                            r = tools_logic.configure_schedule_alert(user_id, args.get('nombre_ubicacion'), args.get('hora'), args.get('dias', 'diario'))
+                        elif fn in ["configurar_alerta_ias", "configurar_alerta_por_umbral"]:
+                            r = tools_logic.ejecutar_configurar_alerta_ias(user_id, args.get('nombre_ubicacion'), args.get('umbral_ias', args.get('umbral', 100)))
 
                 # --- 2. CONSULTAS VISUALES (Ubicaciones, Movilidad, Resumen) ---
                 elif fn in ["consultar_resumen_configuracion", "consultar_perfil"]: 
