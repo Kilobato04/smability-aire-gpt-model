@@ -349,7 +349,7 @@ def process_user(user, current_hour_str, contingency_data):
                             
                             # Botón exclusivo para reportes automáticos
                             markup_reporte = {
-                                "inline_keyboard": [[{"text": "📊 Mi Resumen", "callback_data": "ver_resumen"}]]
+                                "inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]
                             }
                             send_telegram_photo_local(user_id, ruta_imagen, card, markup=markup_reporte)
                             # ---------------------------------------------
@@ -485,7 +485,7 @@ def process_user(user, current_hour_str, contingency_data):
                                     mapa_archivos = {"Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png", "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"}
                                     ruta_imagen = os.path.join(directorio_actual, "banners", mapa_archivos.get(cat, "banner_regular.png"))
                                     
-                                    markup_umbral = {"inline_keyboard": [[{"text": "📊 Mi Resumen", "callback_data": "ver_resumen"}]]}
+                                    markup_umbral = {"inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]}
                                     send_telegram_photo_local(user_id, ruta_imagen, card, markup=markup_umbral)
                                     
                                     try:
