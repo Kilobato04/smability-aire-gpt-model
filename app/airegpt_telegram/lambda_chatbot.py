@@ -1927,7 +1927,7 @@ def lambda_handler(event, context):
                                 lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
                                 multa_cdmx="$2,171", multa_edomex="$2,171", footer=cards.BOT_FOOTER
                             )
-                            send_telegram(chat_id, card_mes, markup=cards.get_hnc_buttons())
+                            send_telegram(chat_id, card_mes, card_v, markup=cards.get_hnc_buttons())
                             # 🚩 AGREGADO "visual" para silenciador
                             r = "Éxito: Calendario mensual visual enviado."
                         
