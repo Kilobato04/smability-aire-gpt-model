@@ -1877,7 +1877,12 @@ def lambda_handler(event, context):
                     "guardar_ubicacion_personalizada": "add_location",
                     "configurar_recordatorio": "alertas",
                     "configurar_alerta_ias": "alertas",
-                    "obtener_calendario_mensual": "movilidad_mensual", # 🚩 ASEGURADO
+                    "configurar_alerta_por_umbral": "alertas",
+                    "configurar_alerta_contingencia": "alertas", # 🚩 Mapeado a alertas para el cadenero
+                    "guardar_perfil_salud": "guardar_salud",
+                    "guardar_salud": "guardar_salud",
+                    "configurar_transporte": "configurar_transporte",
+                    "obtener_calendario_mensual": "movilidad_mensual",
                     "consultar_verificacion": "movilidad_mensual"
                 }
                 
