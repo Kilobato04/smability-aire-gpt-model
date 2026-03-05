@@ -1566,13 +1566,13 @@ def lambda_handler(event, context):
                 
             elif text_clean in ["reglas", "limitaciones", "como funciona", "alcance", "restricciones"]:
                 msg_envio = cards.CARD_RULES.format(**card_args)
-                markup_rules = {"inline_keyboard": [[{"text": "📊 Ver mi Resumen", "callback_data": "ver_resumen"}]]}
+                markup_rules = {"inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]}
                 send_telegram(chat_id, msg_envio, markup=markup_rules)
                 return {'statusCode': 200, 'body': 'OK'}
                 
             elif any(k in text_clean for k in ["que te pregunto", "que te puedo preguntar", "ejemplos", "prompts"]):
                 msg_envio = cards.CARD_PROMPTS.format(**card_args)
-                markup_prompts = {"inline_keyboard": [[{"text": "📊 Ver mi Resumen", "callback_data": "ver_resumen"}]]}
+                markup_prompts = {"inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]}
                 send_telegram(chat_id, msg_envio, markup=markup_prompts)
                 return {'statusCode': 200, 'body': 'OK'}
                 
@@ -1598,7 +1598,7 @@ def lambda_handler(event, context):
                 
             elif any(k in text_clean for k in ["que es el ias", "que es ias", "imeca"]):
                 msg_envio = cards.CARD_IAS_INFO.format(**card_args)
-                markup_ias = {"inline_keyboard": [[{"text": "📊 Ver mi Resumen", "callback_data": "ver_resumen"}]]}
+                markup_ias = {"inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]}
                 send_telegram(chat_id, msg_envio, markup=markup_ias)
                 return {'statusCode': 200, 'body': 'OK'}
                 
