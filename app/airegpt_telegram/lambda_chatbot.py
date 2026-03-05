@@ -1882,12 +1882,17 @@ def lambda_handler(event, context):
                 
                 # Preguntamos a business_logic si se permite la acción
                 allowed, reason = business_logic.is_action_allowed(user_profile, action_to_check)
-                
+
                 if not allowed:
-                    # 🛑 BLOQUEO: Enviamos Paywall y cortamos esta tool específica
-                    texto_pw, botones_pw = stripeairegpt.get_paywall_response(tier, days_left, action_to_check, str(user_id))
-                    send_telegram(chat_id, texto_pw, markup=botones_pw)
-                    r = f"ERROR_SUSCRIPCION: Requiere plan Premium. Motivo: {reason}. Tarjeta enviada."
+                    # 🛡️ SOLO ENVIAMOS UN PAYWALL POR TURNO (Evita el "metralleo")
+                    if not paywall_enviado:
+                        texto_pw, botones_pw = stripeairegpt.get_paywall_response(tier, days_left, action_to_check, str(user_id))
+                        send_telegram(chat_id, texto_pw, markup=botones_pw)
+                        paywall_enviado = True # Marcamos que ya cumplimos
+                        print(f"💳 [PAYWALL] Tarjeta enviada por primera vez en este flujo.")
+
+                    # 🚩 Para GPT siempre registramos el error, pero ya sin mandar más mensajes a Telegram
+                    r = f"ERROR_SUSCRIPCION: Requiere plan Premium. Motivo: {reason}. Tarjeta ya enviada."
                     print(f"🚫 [GATEKEEPER] Bloqueado: {fn} para User: {user_id}")
                 
                 else:
