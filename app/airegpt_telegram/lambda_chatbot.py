@@ -674,7 +674,7 @@ def send_persistent_gps_button(chat_id):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     markup = {
         "keyboard": [
-            [{"text": "📍 Calidad Aquí (GPS)", "request_location": True}]
+            [{"text": "📍 Calidad del Aire", "request_location": True}]
         ],
         "resize_keyboard": True,
         "is_persistent": True
