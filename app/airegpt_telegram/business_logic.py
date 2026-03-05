@@ -78,7 +78,8 @@ def is_action_allowed(user_profile, action_type):
         "configure_routine", 
         "alertas", 
         "configurar_recordatorio",
-        "configurar_alerta_contingencia" # 🚩 Agregado aquí
+        "configurar_alerta_contingencia",
+        "calcular_exposicion_diaria"  # 🚩 Aseguramos que el cálculo de cigarros pase por aquí
     ]
     if action_type in pro_actions:
         if user_tier == 'FREE':
