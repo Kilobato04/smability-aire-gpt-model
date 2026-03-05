@@ -72,7 +72,14 @@ def is_action_allowed(user_profile, action_type):
 
     # 4. Personalización Pro (Salud, Transporte, Alertas y Rutina)
     # UNIFICADO: Si es FREE, todo esto rebota.
-    pro_actions = ["guardar_salud", "configurar_transporte", "configure_routine", "alertas", "configurar_recordatorio"]
+    pro_actions = [
+        "guardar_salud", 
+        "configurar_transporte", 
+        "configure_routine", 
+        "alertas", 
+        "configurar_recordatorio",
+        "configurar_alerta_contingencia" # 🚩 Agregado aquí
+    ]
     if action_type in pro_actions:
         if user_tier == 'FREE':
             return False, "La personalización de salud, transporte, alertas horarias y umbrales de IAS es exclusiva de AIreGPT Premium."
