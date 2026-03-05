@@ -1563,17 +1563,15 @@ def lambda_handler(event, context):
                 markup_menu = cards.get_summary_buttons(user_profile.get('locations', {}), is_prem_eval)
                 send_telegram(chat_id, msg_envio, markup=markup_menu)
                 return {'statusCode': 200, 'body': 'OK'}
-                
+
             elif text_clean in ["reglas", "limitaciones", "como funciona", "alcance", "restricciones"]:
                 msg_envio = cards.CARD_RULES.format(**card_args)
-                markup_rules = {"inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]}
-                send_telegram(chat_id, msg_envio, markup=markup_rules)
+                send_telegram(chat_id, msg_envio, markup=cards.get_hnc_buttons()) # <-- Limpio
                 return {'statusCode': 200, 'body': 'OK'}
-                
+
             elif any(k in text_clean for k in ["que te pregunto", "que te puedo preguntar", "ejemplos", "prompts"]):
                 msg_envio = cards.CARD_PROMPTS.format(**card_args)
-                markup_prompts = {"inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]}
-                send_telegram(chat_id, msg_envio, markup=markup_prompts)
+                send_telegram(chat_id, msg_envio, markup=cards.get_hnc_buttons()) # <-- Limpio
                 return {'statusCode': 200, 'body': 'OK'}
                 
             elif text_clean in ["/borrar_mis_datos", "borrar mis datos", "borrar todo", "/reset_perfil"]:
@@ -1598,8 +1596,7 @@ def lambda_handler(event, context):
                 
             elif any(k in text_clean for k in ["que es el ias", "que es ias", "imeca"]):
                 msg_envio = cards.CARD_IAS_INFO.format(**card_args)
-                markup_ias = {"inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]}
-                send_telegram(chat_id, msg_envio, markup=markup_ias)
+                send_telegram(chat_id, msg_envio, markup=cards.get_hnc_buttons()) # <-- Limpio
                 return {'statusCode': 200, 'body': 'OK'}
                 
             # =========================================================
