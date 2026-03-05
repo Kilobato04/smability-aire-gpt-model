@@ -1918,42 +1918,42 @@ def lambda_handler(event, context):
                         elif fn in ["configurar_alerta_ias", "configurar_alerta_por_umbral"]:
                             r = tools_logic.ejecutar_configurar_alerta_ias(user_id, args.get('nombre_ubicacion'), args.get('umbral_ias', args.get('umbral', 100)))
 
-                # --- 2. CONSULTAS VISUALES (Ubicaciones, Movilidad, Resumen) ---
-                elif fn in ["consultar_resumen_configuracion", "consultar_perfil"]: 
-                    # FIX 3: RESUMEN BLINDADO
-                    card_res = cards.generate_summary_card(first_name, alerts, veh, locs, status_str, transp, salud)
-                    send_telegram(chat_id, card_res, markup=cards.get_summary_buttons(locs, is_prem))
-                    r = "Éxito: Interfaz visual de resumen enviada."
+                    # --- 2. CONSULTAS VISUALES (Ubicaciones, Movilidad, Resumen) ---
+                    elif fn in ["consultar_resumen_configuracion", "consultar_perfil"]: 
+                        # FIX 3: RESUMEN BLINDADO
+                        card_res = cards.generate_summary_card(first_name, alerts, veh, locs, status_str, transp, salud)
+                        send_telegram(chat_id, card_res, markup=cards.get_summary_buttons(locs, is_prem))
+                        r = "Éxito: Interfaz visual de resumen enviada."
 
-                elif fn in ["consultar_ubicaciones", "consultar_ubicaciones_guardadas"]:
-                    l_list = [f"📍 **{v.get('display_name', k).capitalize()}**" for k, v in locs.items() if v.get('active')]
-                    card_locs = cards.CARD_MY_LOCATIONS.format(user_name=first_name, locations_list="\n".join(l_list) if l_list else "• Ninguna", footer=cards.BOT_FOOTER)
-                    send_telegram(chat_id, card_locs, markup=cards.get_locations_buttons(locs))
-                    r = "Éxito: Interfaz visual de ubicaciones enviada."
+                    elif fn in ["consultar_ubicaciones", "consultar_ubicaciones_guardadas"]:
+                        l_list = [f"📍 **{v.get('display_name', k).capitalize()}**" for k, v in locs.items() if v.get('active')]
+                        card_locs = cards.CARD_MY_LOCATIONS.format(user_name=first_name, locations_list="\n".join(l_list) if l_list else "• Ninguna", footer=cards.BOT_FOOTER)
+                        send_telegram(chat_id, card_locs, markup=cards.get_locations_buttons(locs))
+                        r = "Éxito: Interfaz visual de ubicaciones enviada."
 
-                elif fn in ["consultar_verificacion", "consultar_hoy_no_circula", "obtener_calendario_mensual"]:
-                    if not veh.get('active'): 
-                        r = "⚠️ No tienes auto registrado."
-                    else:
-                        p_d, h_d = str(veh.get('plate_last_digit')), str(veh.get('hologram'))
-                        u_ask = user_content.lower()
-                        
-                        # A. Calendario Mensual
-                        if any(x in u_ask for x in ["mes", "calendario", "fechas", "lista"]) or fn == "obtener_calendario_mensual":
-                            now = get_mexico_time()
-                            meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
-                            lista_dias = get_monthly_prohibited_dates(p_d, h_d, now.year, now.month)
-                            txt_sem, txt_sab = get_restriction_summary(p_d, h_d)
-                            card_mes = cards.CARD_HNC_DETAILED.format(
-                                mes_nombre=meses_es[now.month], plate=p_d, color=veh.get('engomado','N/A'),
-                                holo=h_d.upper(), verificacion_txt=cards.get_verification_period(p_d, h_d),
-                                dias_semana_txt=txt_sem, sabados_txt=txt_sab,
-                                lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
-                                multa_cdmx="$2,171", multa_edomex="$2,171", footer=cards.BOT_FOOTER
-                            )
-                            send_telegram(chat_id, card_mes, markup=cards.get_hnc_buttons())
-                            # 🚩 AGREGADO "visual" para silenciador
-                            r = "Éxito: Calendario mensual visual enviado."
+                    elif fn in ["consultar_verificacion", "consultar_hoy_no_circula", "obtener_calendario_mensual"]:
+                        if not veh.get('active'): 
+                            r = "⚠️ No tienes auto registrado."
+                        else:
+                            p_d, h_d = str(veh.get('plate_last_digit')), str(veh.get('hologram'))
+                            u_ask = user_content.lower()
+                            
+                            # A. Calendario Mensual
+                            if any(x in u_ask for x in ["mes", "calendario", "fechas", "lista"]) or fn == "obtener_calendario_mensual":
+                                now = get_mexico_time()
+                                meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
+                                lista_dias = get_monthly_prohibited_dates(p_d, h_d, now.year, now.month)
+                                txt_sem, txt_sab = get_restriction_summary(p_d, h_d)
+                                card_mes = cards.CARD_HNC_DETAILED.format(
+                                    mes_nombre=meses_es[now.month], plate=p_d, color=veh.get('engomado','N/A'),
+                                    holo=h_d.upper(), verificacion_txt=cards.get_verification_period(p_d, h_d),
+                                    dias_semana_txt=txt_sem, sabados_txt=txt_sab,
+                                    lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
+                                    multa_cdmx="$2,171", multa_edomex="$2,171", footer=cards.BOT_FOOTER
+                                )
+                                send_telegram(chat_id, card_mes, markup=cards.get_hnc_buttons())
+                                # 🚩 AGREGADO "visual" para silenciador
+                                r = "Éxito: Calendario mensual visual enviado."
                         
                         # B. Verificación
                         elif "verifi" in u_ask or fn == "consultar_verificacion":
@@ -1973,61 +1973,61 @@ def lambda_handler(event, context):
                             # 🚩 AGREGADO "visual" para silenciador
                             r = f"Éxito: Veredicto visual para {label} enviado."
 
-                #-----
-                elif fn == "consultar_calidad_aire":
-                    in_lat = args.get('lat', 0)
-                    in_lon = args.get('lon', 0)
-                    in_name = args.get('nombre_ubicacion', 'tu ubicación')
-                    
-                    # 1. RESOLUCIÓN DE COORDENADAS
-                    if in_lat == 0 or in_lon == 0:
-                        key = resolve_location_key(user_id, in_name)
-                        if not key: key = resolve_location_key(user_id, user_content)
+                    #-----
+                    elif fn == "consultar_calidad_aire":
+                        in_lat = args.get('lat', 0)
+                        in_lon = args.get('lon', 0)
+                        in_name = args.get('nombre_ubicacion', 'tu ubicación')
                         
-                        if key and key in locs:
-                            in_lat = float(locs[key].get('lat', 0))
-                            in_lon = float(locs[key].get('lon', 0))
-                            in_name = locs[key].get('display_name', key.capitalize())
-                    
-                    # 2. INTENTO DE ENVÍO DE TARJETA VISUAL
-                    if in_lat != 0 and in_lon != 0:
-                        # Obtenemos fase de contingencia actual del sistema
-                        sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                        current_phase = sys_state.get('last_contingency_phase', 'None')
+                        # 1. RESOLUCIÓN DE COORDENADAS
+                        if in_lat == 0 or in_lon == 0:
+                            key = resolve_location_key(user_id, in_name)
+                            if not key: key = resolve_location_key(user_id, user_content)
+                            
+                            if key and key in locs:
+                                in_lat = float(locs[key].get('lat', 0))
+                                in_lon = float(locs[key].get('lon', 0))
+                                in_name = locs[key].get('display_name', key.capitalize())
+                        
+                        # 2. INTENTO DE ENVÍO DE TARJETA VISUAL
+                        if in_lat != 0 and in_lon != 0:
+                            # Obtenemos fase de contingencia actual del sistema
+                            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                            current_phase = sys_state.get('last_contingency_phase', 'None')
+    
+                            # Generamos el texto del reporte y la categoría de calidad
+                            report_text, calidad = generate_report_card(
+                                first_name, in_name, in_lat, in_lon, 
+                                vehicle=veh, contingency_phase=current_phase,
+                                user_profile=user_profile, is_premium=is_prem
+                            )
+                            
+                            # --- SELECCIÓN DINÁMICA DE BANNER ---
+                            mapa_archivos = {
+                                "Buena": "banner_buena.png", 
+                                "Regular": "banner_regular.png", 
+                                "Mala": "banner_mala.png", 
+                                "Muy Mala": "banner_muy_mala.png", 
+                                "Extremadamente Mala": "banner_extrema.png"
+                            }
+                            # Limpieza por si la API devuelve "Alta" en vez de "Mala"
+                            calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
+                            nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
+                            
+                            import os
+                            directorio_actual = os.path.dirname(os.path.abspath(__file__))
+                            ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
+                            
+                            # ENVIAMOS FOTO LOCAL + REPORTE
+                            send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
+                            
+                            # 🚩 LA SEÑAL PARA EL SILENCIADOR:
+                            r = f"Éxito: Reporte visual enviado para {in_name}."
+                        else:
+                            # Sin coordenadas, r no tiene la palabra "visual", permitiendo que GPT pida la ubicación.
+                            r = f"Error: No encontré coordenadas para '{in_name}'."
 
-                        # Generamos el texto del reporte y la categoría de calidad
-                        report_text, calidad = generate_report_card(
-                            first_name, in_name, in_lat, in_lon, 
-                            vehicle=veh, contingency_phase=current_phase,
-                            user_profile=user_profile, is_premium=is_prem
-                        )
-                        
-                        # --- SELECCIÓN DINÁMICA DE BANNER ---
-                        mapa_archivos = {
-                            "Buena": "banner_buena.png", 
-                            "Regular": "banner_regular.png", 
-                            "Mala": "banner_mala.png", 
-                            "Muy Mala": "banner_muy_mala.png", 
-                            "Extremadamente Mala": "banner_extrema.png"
-                        }
-                        # Limpieza por si la API devuelve "Alta" en vez de "Mala"
-                        calidad_clean = calidad.replace("Extremadamente Alta", "Extremadamente Mala").replace("Muy Alta", "Muy Mala").replace("Alta", "Mala")
-                        nombre_png = mapa_archivos.get(calidad_clean, "banner_regular.png")
-                        
-                        import os
-                        directorio_actual = os.path.dirname(os.path.abspath(__file__))
-                        ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
-                        
-                        # ENVIAMOS FOTO LOCAL + REPORTE
-                        send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
-                        
-                        # 🚩 LA SEÑAL PARA EL SILENCIADOR:
-                        r = f"Éxito: Reporte visual enviado para {in_name}."
-                    else:
-                        # Sin coordenadas, r no tiene la palabra "visual", permitiendo que GPT pida la ubicación.
-                        r = f"Error: No encontré coordenadas para '{in_name}'."
-
-                gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
             # --- CIERRE MAESTRO TRAS EL BUCLE FOR ---
             print(f"🔄 [GPT] Resolviendo respuesta final tras {len(ai_msg.tool_calls)} herramientas.")
