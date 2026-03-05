@@ -111,22 +111,22 @@ CARD_PROMPTS = """💡 *GUÍA DE USO: ¿QUÉ PUEDES PREGUNTARME?*
 Puedes hablarme de forma natural. Aquí tienes los ejemplos más útiles para sacarme provecho:
 
 💨 *Calidad del Aire y Clima:*
-• *"¿Cómo está el aire en Casa?"*
-• *"Dame el pronóstico para el Trabajo."*
-• *"Soy asmático, ¿me recomiendas salir a correr hoy?"*
+• "¿Cómo está el aire en Casa?"
+• "Dame el IAS para el Trabajo."
+• "Soy asmático, ¿me recomiendas salir a correr hoy?"
 
 🚗 *Movilidad y Auto:*
-• *"¿Circula mi auto hoy?"*
-• *"¿Me toca verificar este mes?"*
+• "¿Circula mi auto hoy?"
+• "¿Me toca verificar este mes?"
 
 🚬 *Salud y Exposición:*
-• *"Calcula mi exposición: Viajo 2 horas en metro."*
-• *"Hoy hice Home Office."*
+• "Calcula mi exposición: Viajo 2 horas al día en metro."
+• "Hoy hice Home Office, ajusta mi rutina."
 
 ⚙️ *Configuración:*
-• *"Avisa si el aire supera los 100 puntos IAS en Casa."*
-• *"Mándame un reporte todos los días a las 7:30 AM de Casa."*
-• *"Dame mi resumen."*
+• "Avisa si el aire supera los 100 puntos IAS en Casa."
+• "Mándame un reporte todos los días a las 7:00 AM de Casa."
+• "Dame mi resumen."
 
 ¡Copia, pega y prueba cualquiera de estos mensajes ahora mismo! 👇
 
@@ -134,7 +134,7 @@ Puedes hablarme de forma natural. Aquí tienes los ejemplos más útiles para sa
 
 CARD_MENU = """🛠️ *MENÚ DE CAPACIDADES*
 
-Soy *AIreGPT*, tu asistente inteligente de salud urbana. Aquí tienes todo lo que podemos hacer juntos:
+👋 ¡Hola, {user_name}! Soy *AIreGPT*, tu asistente inteligente de salud urbana. Aquí tienes todo lo que podemos hacer juntos:
 
 🚨 *Contingencias en Tiempo Real:* *(¡Nuestra especialidad!)* Te enviaré una alerta inmediata en el segundo exacto en que se *active o suspenda* una Contingencia Ambiental.
 📍 *Reportes y Pronósticos:* Guarda hasta 3 ubicaciones (Casa, Trabajo, Escuela) y pídeme la calidad del aire actual, el pronóstico y recomendaciones de salud.
@@ -170,7 +170,7 @@ Para protegerte, necesito saber dónde te mueves.
 CARD_ONBOARDING_WORK = """✅ *¡Tu Casa está protegida!*
 
 🚀 *PASO 2: Tu destino principal.*
-Para calcular cuánto humo te *"fumas"* en el tráfico, necesito saber a dónde vas todos los días.
+Para calcular cuánto humo te *"fumas"* en en tu rutina, necesito saber a dónde vas todos los días.
 
 👇 *Por favor, toca el clip 📎 (abajo a la izquierda), selecciona "Ubicación" y envíame la ubicación de tu TRABAJO o escuela.*
 
@@ -193,6 +193,7 @@ Para avisarte exactamente qué días no circulas y cuándo te toca verificar, re
 # ACTUALIZADA: Se agregó {trend_arrow} para aprovechar el dato de la nueva API
 
 CARD_REPORT = """🌤️ *{greeting}, {user_name}!*
+
 Tu *reporte* de 📍 **[{location_name}]({maps_url})**:
 🗺️ {region} • 🕒 {report_time}
 
@@ -267,7 +268,7 @@ Se levantan las restricciones del Doble Hoy No Circula. Tu auto vuelve a su cale
 
 📄 [Leer Comunicado Oficial]({oficial_link})
 
-_Fuente: SIMAT / Smability_
+_Fuente: CAMe/Smability_
 
 {footer}"""
 
@@ -306,27 +307,27 @@ CARD_HNC_DETAILED = """🚗 *Reporte Mensual HNC: {mes_nombre}*
 CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
 👤 {user_name} | Plan: {plan_status}
 
-🚨 Alerta Contingencia: {contingency_status}
+🚨 *Alerta Contingencia:* {contingency_status}
 
-📍 Tus Ubicaciones:
+📍 *Tus Ubicaciones:*
 {locations_list}
 
-🏥 Tu Salud:
+🏥 *Tu Salud:*
 {health_display}
 
-🚇 Tu Rutina (Cálculo de Exposición):
+🚇 *Tu Rutina (Cálculo de Exposición):*
 {transport_info}
 
-🚗 Tu Auto:
+🚗 *Tu Auto:*
 {vehicle_info}
 
-🔔 Alertas Aire (Por Nivel/Umbral):
+🔔 *Alertas de Aire Por Nivel/Umbral:*
 {alerts_threshold}
 
-⏰ Reportes Aire (Programados):
+⏰ *Reportes Aire Programados:*
 {alerts_schedule}
 
-🚫 Tu Auto Circula Hoy?:
+🚫 *¿Tú Auto Circula Hoy?:*
 {hnc_reminder}
 
 💡 _Tip: Pregúntame 'Cambia mi transporte a...' para ajustar tu rutina._
@@ -403,7 +404,7 @@ Bienvenido a *AIreGPT Premium*, {user_name}. Tu cuenta ha sido desbloqueada exit
 
 Pideme *ver mi resumen* o dime qué quieres configurar ahora. 🚀
 
-💎 *¡Gracias por apoyar AIreGPT!* Tu cuenta Premium ya está activa."""
+💎 *¡Gracias por apoyarnos!* Tu cuenta Premium ya está activa."""
 
 # --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
 def get_exposure_button():
