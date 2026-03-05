@@ -1,0 +1,77 @@
+# business_logic.py - El Cerebro de AIreGPT
+# Centraliza las reglas de suscripción para Chatbot y Scheduler
+
+def get_user_tier(user_profile):
+    """
+    Determina si el usuario es PREMIUM o FREE basándose en su perfil de DynamoDB.
+    """
+    sub = user_profile.get('subscription', {})
+    status = str(sub.get('status', 'FREE')).upper()
+    
+    # PREMIUM incluye: PREMIUM real, TRIAL activo o MANUAL (Devs)
+    is_premium = any(x in status for x in ["PREMIUM", "TRIAL", "MANUAL"])
+    return "PREMIUM" if is_premium else "FREE"
+
+def get_tier_config(user_profile):
+    """
+    Retorna el diccionario de capacidades basado en el tier del usuario.
+    """
+    tier = get_user_tier(user_profile)
+    
+    if tier == "PREMIUM":
+        return {
+            "tier_name": "PREMIUM",
+            "max_locations": 3,
+            "can_custom_alerts": True,      # Alertas a cualquier hora
+            "can_contingency": True,       # Recibe avisos de contingencia
+            "can_gamification": True,      # Acceso a Serpiente y Tetris
+            "can_mobility_active": True,   # ¿Circulo mañana?, Calendario mensual
+            "can_custom_routine": True,    # Cambiar transporte y > 2 horas
+            "show_locks": False,           # Tarjetas limpias
+            "lock_emoji": ""
+        }
+    else:
+        return {
+            "tier_name": "FREE",
+            "max_locations": 2,            # Solo Casa y Trabajo
+            "fixed_reminder_hour": "09:00",# Única hora permitida para recordatorio
+            "fixed_threshold": 100,        # Único umbral de emergencia permitido
+            "can_custom_alerts": False,
+            "can_contingency": False,
+            "can_gamification": False,
+            "can_mobility_active": False,
+            "can_custom_routine": False,   # Bloqueado cambio de rutina profundo
+            "show_locks": True,            # Activa los candados visuales
+            "lock_emoji": "🔒"
+        }
+
+def is_action_allowed(user_profile, action_type):
+    """
+    Validador de seguridad para el Orquestador y Tools.
+    Retorna (Allowed: bool, Reason: str)
+    """
+    config = get_tier_config(user_profile)
+    
+    # 1. Validación de Ubicaciones
+    if action_type == "add_location":
+        locs = user_profile.get('locations', {})
+        active_count = len([k for k, v in locs.items() if isinstance(v, dict) and v.get('active')])
+        if active_count >= config["max_locations"]:
+            return False, f"Límite de {config['max_locations']} ubicaciones alcanzado."
+            
+    # 2. Validación de Movilidad Activa
+    if action_type in ["check_tomorrow", "get_monthly_calendar", "consultar_verificacion"]:
+        if not config["can_mobility_active"]:
+            return False, "Esta consulta requiere suscripción Premium."
+
+    # 3. Validación de Gráficas
+    if action_type in ["get_graphic", "get_tetris"]:
+        if not config["can_gamification"]:
+            return False, "Las gráficas de exposición son exclusivas para Premium."
+
+    # 4. Validación de Rutina
+    if action_type == "configure_routine":
+        if not config["can_custom_routine"]:
+            return False, "La personalización profunda de rutina es Premium."
+
+    return True, "OK"
