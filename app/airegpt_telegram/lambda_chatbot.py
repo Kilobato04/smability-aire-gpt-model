@@ -1870,9 +1870,26 @@ def lambda_handler(event, context):
 
                     # --- 2. CONSULTAS VISUALES (Ubicaciones, Movilidad, Resumen) ---
                     elif fn in ["consultar_resumen_configuracion", "consultar_perfil"]: 
-                        # FIX 3: RESUMEN BLINDADO
-                        card_res = cards.generate_summary_card(first_name, alerts, veh, locs, status_str, transp, salud)
-                        send_telegram(chat_id, card_res, markup=cards.get_summary_buttons(locs, is_prem))
+                        # 1. Re-validamos el Tier real para evitar fugas legacy
+                        user_fresh = get_user_profile(user_id)
+                        tier_real, _ = stripeairegpt.evaluate_user_tier(user_fresh)
+                        is_prem_real = tier_real in ['PREMIUM', 'TRIAL']
+
+                        # 2. Invocamos a cards.py (Garantiza los candados 🔒 si tier_real == 'FREE')
+                        card_res = cards.generate_summary_card(
+                            user_name=first_name, 
+                            alerts=user_fresh.get('alerts', {}), 
+                            vehicle=user_fresh.get('vehicle', {}), 
+                            locations=user_fresh.get('locations', {}), 
+                            plan_status=tier_real, 
+                            transport_data=user_fresh.get('profile_transport', {}), 
+                            health_data=user_fresh.get('health_profile', {})
+                        )
+                        
+                        # 3. Mandamos la tarjeta con los botones correctos (Go Premium si aplica)
+                        send_telegram(chat_id, card_res, markup=cards.get_summary_buttons(user_fresh.get('locations', {}), is_premium=is_prem_real))
+                        
+                        # 4. Señal para el silenciador
                         r = "Éxito: Interfaz visual de resumen enviada."
 
                     elif fn in ["consultar_ubicaciones", "consultar_ubicaciones_guardadas"]:
