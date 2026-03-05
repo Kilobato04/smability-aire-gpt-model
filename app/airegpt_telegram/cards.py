@@ -453,7 +453,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
     # 🛡️ FIX: Detección binaria ultra-estricta
     # Forzamos string y mayúsculas para que no haya fallos por 'Free' vs 'FREE'
     plan_clean = str(plan_status).upper()
-    is_premium = "PREMIUM" in safe_plan or "TRIAL" in plan_clean
+    is_premium = "PREMIUM" in plan_clean or "TRIAL" in plan_clean
 
     estado_candados = "🔓 ABIERTO (Premium)" if is_premium else "🔒 BLOQUEADO (Free)"
     print(f"DEBUG_CARDS: Generando tarjeta para {user_name} | Plan: {plan_clean} | Estado: {estado_candados}")
@@ -563,7 +563,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
 
     return CARD_SUMMARY.format(
         user_name=clean(user_name),
-        plan_status=safe_plan.upper(),
+        plan_status=plan_clean.upper(),
         contingency_status=contingency_status,
         locations_list=loc_str,
         health_display=health_str,
