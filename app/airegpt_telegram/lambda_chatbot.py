@@ -1887,6 +1887,7 @@ def lambda_handler(event, context):
                 }
                 
                 action_to_check = action_map.get(fn, fn)
+                print(f"DEBUG: GPT llamó a la función '{fn}'. Mapeada a la acción: '{action_to_check}'.")
                 
                 # Preguntamos a business_logic si se permite la acción
                 allowed, reason = business_logic.is_action_allowed(user_profile, action_to_check)
