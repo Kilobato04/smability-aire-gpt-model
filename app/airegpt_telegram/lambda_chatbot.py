@@ -774,7 +774,7 @@ def lambda_handler(event, context):
             # Si no la tienes, inyectamos el JSON directamente aquí:
             markup_contingencia = {
                 "inline_keyboard": [
-                    [{"text": "📊 Mi Resumen", "callback_data": "ver_resumen"}],
+                    [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}],
                     [{"text": "📲 Compartir Alerta", "switch_inline_query": "contingencia"}] 
                 ]
             }
@@ -1242,104 +1242,38 @@ def lambda_handler(event, context):
                     
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            # --- NUEVO: BOTÓN "MI RESUMEN" DESDE ALERTAS (PUNTO 2) ---
+            # --- 📊 BLOQUE HOMOLOGADO: MI RESUMEN / PERFIL (CON CANDADOS) ---
             elif data == "ver_resumen":
                 send_telegram_action(chat_id, "typing") 
-                user = user_profile 
-                def clean_md(text):
-                    return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
-
-                # 1. Estatus
-                sub_data = user.get('subscription', {})
-                status_str = sub_data.get('status', 'FREE').upper() if isinstance(sub_data, dict) else str(sub_data).upper()
-                is_prem = any(x in status_str for x in ["PREMIUM", "TRIAL"])
-
-                # 2. Ubicaciones
-                locs_data = user.get('locations', {})
-                locs_list = []
-                for k, v in locs_data.items():
-                    if isinstance(v, dict) and v.get('active'):
-                        n_saneado = clean_md(v.get('display_name', k)).capitalize()
-                        locs_list.append(f"• {k.capitalize()}: {n_saneado}")
-                locs_display = "\n".join(locs_list) if locs_list else "• No configuradas"
-
-                # 3. Salud
-                h_profile = user.get('health_profile', {})
-                condiciones = [clean_md(info.get('condition', '')) for k, info in h_profile.items() if isinstance(info, dict) and info.get('active')]
-                health_display_final = "• " + ", ".join(condiciones) if condiciones else "• Ninguna"
-
-                # --- 4. Rutina (Emoji Fix + Bundle) ---
-                tr = user.get('profile_transport', {})
-                if not isinstance(tr, dict): tr = {}
                 
-                # Mapa de emojis para recuperar la identidad visual
-                nombres_medios = {
-                    "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
-                    "metro": "🚇 Metro", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
-                    "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
-                }
-                
-                medio_raw = tr.get('medio', 'No definido')
-                medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
-                # Buscamos ambas llaves por seguridad
-                h_t = str(tr.get('tiempo_traslado_horas', tr.get('horas', '0')))
-                
-                if h_t != '0' and h_t != 'None' and medio_raw != 'No definido':
-                    ruta_v = "Casa ↔ Trabajo" if 'trabajo' in locs_data else "Ruta habitual"
-                    transp_str = f"• Ruta: {ruta_v}\n• Modo: {medio_str}\n• Tiempo: {h_t} hrs/día"
-                else:
-                    transp_str = "• No configurada"
+                # 1. Cargar perfil fresco y evaluar Tier
+                user = get_user_profile(user_id)
+                tier, _ = stripeairegpt.evaluate_user_tier(user)
+                is_prem = tier in ['PREMIUM', 'TRIAL']
 
-                # 5. Alertas Umbral (FIX DEFINITIVO: Jerarquía alerts.threshold)
-                al_root = user.get('alerts', {})
-                if not isinstance(al_root, dict): al_root = {}
-                
-                # Accedemos a 'threshold' (singular) dentro de 'alerts'
-                th = al_root.get('threshold', {})
-                al_th_list = []
-                
-                if isinstance(th, dict):
-                    for k, v in th.items():
-                        if isinstance(v, dict) and v.get('active'):
-                            n_disp = clean_md(locs_data.get(k, {}).get('display_name', k)).capitalize()
-                            # Extraemos el valor real de 'umbral' que vimos en tu log (110)
-                            u_val = v.get('umbral', 100)
-                            al_th_list.append(f"• {n_disp}: > {u_val} pts")
-                
-                al_th = "\n".join(al_th_list) if al_th_list else "• No configuradas"
-                
-                # 6. Reportes Programados (FIX NOMBRE VARIABLE)
-                sch_data = user.get('alerts', {}).get('schedule', {})
-                sch_list = []
-                from cards import format_days_text 
-                if isinstance(sch_data, dict):
-                    for l_k, conf in sch_data.items():
-                        if isinstance(conf, dict) and conf.get('active'):
-                            n_disp = clean_md(locs_data.get(l_k, {}).get('display_name', l_k)).capitalize()
-                            sch_list.append(f"• {n_disp}: {conf.get('time')} hrs ({format_days_text(conf.get('days', []))})")
-                al_sch = "\n".join(sch_list) if sch_list else "• Sin reportes"
+                # 2. Extraer sub-objetos (Usando tus llaves reales de DB)
+                alerts = user.get('alerts', {})
+                vehicle = user.get('vehicle', {})
+                locations = user.get('locations', {})
+                transport = user.get('profile_transport', {}) # Tu llave real
+                health = user.get('health_profile', {})        # Tu llave real
 
-                # 7. Vehículo
-                veh = user.get('vehicle', {})
-                v_str, h_rem = "• No registrado", "• No configurado"
-                if isinstance(veh, dict) and veh.get('active'):
-                    v_p, v_h = str(veh.get('plate_last_digit')), str(veh.get('hologram'))
-                    v_str = f"• Placa {v_p} (Holo {v_h}) | {clean_md(veh.get('engomado', 'N/A'))}"
-                    try:
-                        sys = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
-                        can, _, _ = cards.check_driving_status(v_p, v_h, get_mexico_time().strftime("%Y-%m-%d"), sys.get('last_contingency_phase', 'None'))
-                        h_rem = "✅ **HOY circula normal**" if can else "🔴 **HOY no circula**"
-                    except: h_rem = "⚠️ Error al calcular"
-
-                # 8. Render Final
-                card_resumen = cards.CARD_SUMMARY.format(
-                    user_name=clean_md(first_name), plan_status=status_str,
-                    contingency_status="✅ ACTIVA" if user.get('alerts', {}).get('contingency') else "🔕 INACTIVA",
-                    locations_list=locs_display, health_display=health_display_final, transport_info=transp_str,
-                    vehicle_info=v_str, alerts_threshold=al_th, alerts_schedule=al_sch, 
-                    hnc_reminder=h_rem, footer=cards.BOT_FOOTER
+                # 3. 🚩 INVOCAR LA TARJETA MAESTRA (AQUÍ ESTÁN LOS CANDADOS 🔒)
+                card_resumen = cards.generate_summary_card(
+                    user_name=first_name,
+                    alerts=alerts,
+                    vehicle=vehicle,
+                    locations=locations,
+                    plan_status=tier, # 'PREMIUM', 'TRIAL' o 'FREE'
+                    transport_data=transport,
+                    health_data=health
                 )
-                send_telegram(chat_id, card_resumen, cards.get_summary_buttons(locs_data, is_prem))
+                
+                # 4. Obtener botones (Muestra "Go Premium" si es FREE)
+                botones = cards.get_summary_buttons(locations, is_premium=is_prem)
+
+                # 5. Envío limpio
+                send_telegram(chat_id, card_resumen, markup=botones)
                 return {'statusCode': 200, 'body': 'OK'}
                 
             elif data in ["CONFIG_ADVANCED", "GO_PREMIUM"]:
