@@ -1875,6 +1875,9 @@ def lambda_handler(event, context):
                         tier_real, _ = stripeairegpt.evaluate_user_tier(user_fresh)
                         is_prem_real = tier_real in ['PREMIUM', 'TRIAL']
 
+                        print(f"🕵️ FUGA CHECK: User {user_id} pidiendo resumen. Tier Real: {tier_real}")
+                        print(f"🕵️ DATA CHECK: Salud en DB: {user_fresh.get('health_profile')} | Transp en DB: {user_fresh.get('profile_transport')}")
+
                         # 2. Invocamos a cards.py pasándole el Tier real detectado
                         card_res = cards.generate_summary_card(
                             user_name=first_name, 
