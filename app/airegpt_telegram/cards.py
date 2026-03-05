@@ -315,7 +315,7 @@ CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
 🏥 *Tu Salud:*
 {health_display}
 
-🚇 *Tu Rutina (Cálculo de Exposición):*
+🚇 *Tu Rutina - Cálculo de Exposición:*
 {transport_info}
 
 🚗 *Tu Auto:*
@@ -324,7 +324,7 @@ CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
 🔔 *Alertas de Aire Por Nivel/Umbral:*
 {alerts_threshold}
 
-⏰ *Reportes Aire Programados:*
+⏰ *Reportes de Aire Programados:*
 {alerts_schedule}
 
 🚫 *¿Tú Auto Circula Hoy?:*
