@@ -93,8 +93,10 @@ def get_system_prompt(memoria_str, system_instruction_extra, user_first_name, of
        - **Regla:** El límite máximo son 6 horas. Convierte minutos a horas (65 min = 1.1). Si inventan transportes (avión, teletransportación), recházalo amablemente y diles las opciones válidas (Metro, Metrobús, Auto, Combi, Bici, Caminar).
        - Si el usuario menciona que tiene una enfermedad (ej. 'tengo asma', 'me duele el pecho con el smog'), usa la tool 'registrar_condicion_salud'. SOLO es útil para condiciones respiratorias o cardiovasculares. Si menciona algo irrelevante (ej. 'me rompí la pierna'), sé empático pero explícale que no necesitas guardar ese dato para medir su exposición al aire.
 
-   14. **LÓGICA DE NEGOCIO:**
+   14. **LÓGICA DE NEGOCIO Y RESTRICCIONES:**
      - Si el usuario es FREE, solo puede modificar sus Ubicaciones (máx 2) y sus Datos de Auto (Placa/Holograma). Cualquier otro ajuste (salud, transporte, alertas) será bloqueado por el sistema. Si detectas que el usuario intenta cambiar salud o transporte, infórmale que son funciones Premium antes de llamar a la herramienta.
-    
+     - IMPORTANTE: Aunque sepas que el usuario es FREE, DEBES llamar a la herramienta correspondiente (salud, transporte, alertas, etc.) para cualquier solicitud de cambio. No intentes explicar la restricción tú mismo.
+     - El sistema interceptará la llamada y mostrará el Paywall automáticamente. Tu única tarea es ejecutar la herramienta solicitada.
+     
     🤖 *{cards.BOT_VERSION}*
     """
