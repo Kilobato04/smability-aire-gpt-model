@@ -1955,23 +1955,23 @@ def lambda_handler(event, context):
                                 # 🚩 AGREGADO "visual" para silenciador
                                 r = "Éxito: Calendario mensual visual enviado."
                         
-                        # B. Verificación
-                        elif "verifi" in u_ask or fn == "consultar_verificacion":
-                            card_v = cards.CARD_VERIFICATION.format(plate_info=p_d, engomado=veh.get('engomado','N/A'), period_txt=cards.get_verification_period(p_d, h_d), deadline=get_verification_deadline(cards.get_verification_period(p_d, h_d)), fine_amount="2,457", footer=cards.BOT_FOOTER)
-                            send_telegram(chat_id, card_v, markup=cards.get_hnc_buttons())
-                            # 🚩 AGREGADO "visual" para silenciador
-                            r = "Éxito: Tarjeta visual de verificación enviada."
+                            # B. Verificación
+                            elif "verifi" in u_ask or fn == "consultar_verificacion":
+                                card_v = cards.CARD_VERIFICATION.format(plate_info=p_d, engomado=veh.get('engomado','N/A'), period_txt=cards.get_verification_period(p_d, h_d), deadline=get_verification_deadline(cards.get_verification_period(p_d, h_d)), fine_amount="2,457", footer=cards.BOT_FOOTER)
+                                send_telegram(chat_id, card_v, markup=cards.get_hnc_buttons())
+                                # 🚩 AGREGADO "visual" para silenciador
+                                r = "Éxito: Tarjeta visual de verificación enviada."
                         
-                        # C. Veredicto Diario
-                        else:
-                            offset = 1 if "mañana" in u_ask else 2 if "pasado mañana" in u_ask else 0
-                            label = "Mañana" if offset == 1 else "Pasado Mañana" if offset == 2 else "Hoy"
-                            target_date = (get_mexico_time() + timedelta(days=offset)).strftime("%Y-%m-%d")
-                            can_drive, r_short, _ = cards.check_driving_status(p_d, h_d, target_date)
-                            card_day = cards.CARD_HNC_RESULT.format(fecha_str=target_date, dia_semana=label, plate_info=p_d, hologram=h_d, status_emoji="🟢" if can_drive else "🔴", status_title="SÍ CIRCULA" if can_drive else "NO CIRCULA", status_message="", reason=r_short, footer=cards.BOT_FOOTER)
-                            send_telegram(chat_id, card_day, markup=cards.get_hnc_buttons())
-                            # 🚩 AGREGADO "visual" para silenciador
-                            r = f"Éxito: Veredicto visual para {label} enviado."
+                            # C. Veredicto Diario
+                            else:
+                                offset = 1 if "mañana" in u_ask else 2 if "pasado mañana" in u_ask else 0
+                                label = "Mañana" if offset == 1 else "Pasado Mañana" if offset == 2 else "Hoy"
+                                target_date = (get_mexico_time() + timedelta(days=offset)).strftime("%Y-%m-%d")
+                                can_drive, r_short, _ = cards.check_driving_status(p_d, h_d, target_date)
+                                card_day = cards.CARD_HNC_RESULT.format(fecha_str=target_date, dia_semana=label, plate_info=p_d, hologram=h_d, status_emoji="🟢" if can_drive else "🔴", status_title="SÍ CIRCULA" if can_drive else "NO CIRCULA", status_message="", reason=r_short, footer=cards.BOT_FOOTER)
+                                send_telegram(chat_id, card_day, markup=cards.get_hnc_buttons())
+                                # 🚩 AGREGADO "visual" para silenciador
+                                r = f"Éxito: Veredicto visual para {label} enviado."
 
                     #-----
                     elif fn == "consultar_calidad_aire":
