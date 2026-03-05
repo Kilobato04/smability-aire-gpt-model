@@ -1885,7 +1885,7 @@ def lambda_handler(event, context):
                     # 🛑 BLOQUEO: Enviamos Paywall y cortamos esta tool específica
                     texto_pw, botones_pw = stripeairegpt.get_paywall_response(tier, days_left, action_to_check, str(user_id))
                     send_telegram(chat_id, texto_pw, markup=botones_pw)
-                    r = f"ERROR: Acción bloqueada. Suscripción Premium requerida. Motivo: {reason}"
+                    r = f"ERROR_SUSCRIPCION: Requiere plan Premium. Motivo: {reason}. Tarjeta enviada."
                     print(f"🚫 [GATEKEEPER] Bloqueado: {fn} para User: {user_id}")
                 
                 else:
@@ -2033,6 +2033,13 @@ def lambda_handler(event, context):
             print(f"🔄 [GPT] Resolviendo respuesta final tras {len(ai_msg.tool_calls)} herramientas.")
             final_res = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_msgs, temperature=0.3)
             final_text = final_res.choices[0].message.content
+
+            # 🤫 REGLA DE SILENCIO (FIX: PAYWALL + VISUAL)
+            # Revisamos si en los resultados de las herramientas (gpt_msgs) 
+            # existe la palabra 'visual' o 'suscripcion'
+            if any(("visual" in str(m.get('content','')).lower() or "suscripcion" in str(m.get('content','')).lower()) for m in gpt_msgs if m.get('role') == 'tool'):
+                print("🤫 SILENCIO: Interfaz enviada. Matando texto redundante de GPT.")
+                final_text = ""
 
         else:
             # Si GPT no usó herramientas, usamos su respuesta directa
