@@ -452,17 +452,11 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
 
     # 🛡️ FIX: Detección binaria ultra-estricta
     # Forzamos string y mayúsculas para que no haya fallos por 'Free' vs 'FREE'
-    safe_plan = str(plan_status).upper()
-    is_premium = "PREMIUM" in safe_plan or "TRIAL" in safe_plan
+    plan_clean = str(plan_status).upper()
+    is_premium = "PREMIUM" in safe_plan or "TRIAL" in plan_clean
 
     estado_candados = "🔓 ABIERTO (Premium)" if is_premium else "🔒 BLOQUEADO (Free)"
     print(f"DEBUG_CARDS: Generando tarjeta para {user_name} | Plan: {plan_clean} | Estado: {estado_candados}")
-    
-    # 🔍 DEBUG: Esto aparecerá en CloudWatch para auditoría
-    print(f"DEBUG_CARDS: Generando tarjeta para {user_name}. Plan: {safe_plan} | Premium: {is_premium}")
-
-    safe_plan = clean(plan_status)
-    is_premium = any(x in safe_plan.upper() for x in ["PREMIUM", "TRIAL"])
     
     # 1. Lógica de Contingencia
     if is_premium:
