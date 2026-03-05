@@ -1808,6 +1808,7 @@ def lambda_handler(event, context):
                 r = ""
 
                 # --- 🛡️ PASO 1: EVALUACIÓN DE TIER Y PERMISOS ---
+                user_fresco = get_user_profile(user_id)
                 tier, days_left = stripeairegpt.evaluate_user_tier(user_profile)
                 is_prem_val = tier in ['PREMIUM', 'TRIAL']
                 
@@ -1829,7 +1830,7 @@ def lambda_handler(event, context):
                 print(f"DEBUG: GPT llamó a la función '{fn}'. Mapeada a la acción: '{action_to_check}'.")
                 
                 # Preguntamos a business_logic si se permite la acción
-                allowed, reason = business_logic.is_action_allowed(user_profile, action_to_check)
+                allowed, reason = business_logic.is_action_allowed(user_fresco, action_to_check)
 
                 if not allowed:
                     # 🛡️ SOLO ENVIAMOS UN PAYWALL POR TURNO (Evita el "metralleo")
