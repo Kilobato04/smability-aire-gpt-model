@@ -1860,6 +1860,9 @@ def lambda_handler(event, context):
             # =========================================================
             # 🛠️ ORQUESTADOR MODULAR UNIFICADO (CON GATEKEEPER)
             # =========================================================
+            
+            paywall_enviado = False
+            
             for tc in ai_msg.tool_calls:
                 fn = tc.function.name
                 args = json.loads(tc.function.arguments)
