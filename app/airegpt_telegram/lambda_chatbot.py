@@ -1927,14 +1927,14 @@ def lambda_handler(event, context):
                                 lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
                                 multa_cdmx="$2,171", multa_edomex="$2,171", footer=cards.BOT_FOOTER
                             )
-                            send_telegram(chat_id, card_mes, card_v, markup=cards.get_hnc_buttons())
+                            send_telegram(chat_id, card_mes, markup=cards.get_hnc_buttons())
                             # 🚩 AGREGADO "visual" para silenciador
                             r = "Éxito: Calendario mensual visual enviado."
                         
                         # B. Verificación
                         elif "verifi" in u_ask or fn == "consultar_verificacion":
                             card_v = cards.CARD_VERIFICATION.format(plate_info=p_d, engomado=veh.get('engomado','N/A'), period_txt=cards.get_verification_period(p_d, h_d), deadline=get_verification_deadline(cards.get_verification_period(p_d, h_d)), fine_amount="2,457", footer=cards.BOT_FOOTER)
-                            send_telegram(chat_id, card_v)
+                            send_telegram(chat_id, card_v, markup=cards.get_hnc_buttons())
                             # 🚩 AGREGADO "visual" para silenciador
                             r = "Éxito: Tarjeta visual de verificación enviada."
                         
