@@ -596,13 +596,13 @@ def generar_grafica_tetris(user_id):
         fig.text(0.5, 0.625, f"{promedio_ias_mes} puntos de IAS promedio al mes", fontsize=12, color='#FFFF00', ha='center', va='center', fontweight='bold', fontname='monospace', zorder=5)
 
         # --- AJUSTE POSICIÓN DEL GRÁFICO (Para que no tape las redes) ---
-        ax.set_position([0.2, 0.08, 0.6, 0.48])
+        ax.set_position([0.2, 0.08, 0.6, 0.45])
 
         # --- REDES SOCIALES (FIX Z-ORDER Y POSICIÓN) ---
-        fig.text(0.5, 0.58, "IG: @airegpt.ai  |  TikTok: @airegpt", 
+        fig.text(0.5, 0.61, "IG: @airegpt.ai  |  TikTok: @airegpt", 
                  color='#08F7FE', fontsize=11, ha='center', va='center', 
                  fontname='monospace', fontweight='bold', zorder=10,
-                 bbox=dict(facecolor='#1c1c28', edgecolor='#FF00FF', boxstyle='round,pad=0.4', alpha=0.9, lw=1.5))
+                 bbox=dict(facecolor='#1c1c28', edgecolor='#FF00FF', boxstyle='round,pad=0.3', alpha=0.9, lw=1.5))
 
         # --- CINTILLO SUPERIOR ---
         texto_viral = "Mi partida de Tetris Tóxico en CDMX/EDOMEX\n¡Juega la tuya en AIreGPT!"
