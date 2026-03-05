@@ -518,12 +518,18 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
     # 6. Alertas Umbral (🔒 Candado + Valor Default si es FREE)
     if is_premium:
         threshold_list = []
-        thresholds = alerts.get('threshold', {})
-        if isinstance(thresholds, dict):
-            for k, v in thresholds.items():
-                if v.get('active') and k in locations: 
+        # Buscamos en ambas llaves por si acaso, priorizando la real de tu DB
+        thresholds_data = alerts.get('threshold', alerts.get('thresholds', {}))
+        
+        if isinstance(thresholds_data, dict):
+            for k, v in thresholds_data.items():
+                # 🚩 VALIDACIÓN CRÍTICA: v debe ser un dict para usar .get('active')
+                if isinstance(v, dict) and v.get('active') and k in locations: 
                     safe_k = clean(locations[k].get('display_name', k)).capitalize()
-                    threshold_list.append(f"• {safe_k}: > {v.get('umbral')} pts")
+                    # Manejo de Decimal o Int para el umbral
+                    val_umbral = v.get('umbral', '100')
+                    threshold_list.append(f"• {safe_k}: > {val_umbral} pts")
+        
         threshold_str = "\n".join(threshold_list) if threshold_list else "• *Sin alertas de umbral*"
     else:
         threshold_str = "• Casa: > 100 pts (Default) 🔒"
