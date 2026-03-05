@@ -1251,6 +1251,10 @@ def lambda_handler(event, context):
                 tier, _ = stripeairegpt.evaluate_user_tier(user)
                 is_prem = tier in ['PREMIUM', 'TRIAL']
 
+                print(f"🔘 [AUDIT_BUTTON] Generando para: {user_id}")
+                print(f"🔘 [AUDIT_BUTTON] Tier: {tier}")
+                print(f"🔘 [AUDIT_BUTTON] Alertas Raw: {user.get('alerts')}")
+
                 # 2. Extraer sub-objetos (Usando tus llaves reales de DB)
                 alerts = user.get('alerts', {})
                 vehicle = user.get('vehicle', {})
@@ -1883,6 +1887,10 @@ def lambda_handler(event, context):
 
                         print(f"🕵️ FUGA CHECK: User {user_id} pidiendo resumen. Tier Real: {tier_real}")
                         print(f"🕵️ DATA CHECK: Salud en DB: {user_fresh.get('health_profile')} | Transp en DB: {user_fresh.get('profile_transport')}")
+                        print(f"🔍 [AUDIT_TEXT] Generando para: {user_id}")
+                        print(f"🔍 [AUDIT_TEXT] Tier: {tier_real}")
+                        print(f"🔍 [AUDIT_TEXT] Alertas Raw: {user_fresh.get('alerts')}") # Veremos si 'threshold' existe aquí
+                        print(f"🔍 [AUDIT_TEXT] Locations: {user_fresh.get('locations')}")
 
                         # 2. Invocamos a cards.py pasándole el Tier real detectado
                         card_res = cards.generate_summary_card(
