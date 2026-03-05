@@ -408,8 +408,11 @@ Pideme *ver mi resumen* o dime qué quieres configurar ahora. 🚀
 
 # --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
 def get_exposure_button():
-    # Usamos 💨🚬 como combo, o si prefieres solo la cajita 🚬
-    return {"inline_keyboard": [[{"text": "💨🚬 ¿Cuántos cigarros respiré ayer?", "callback_data": "CHECK_EXPOSURE"}]]}
+    """Botón para calcular exposición + Retorno al resumen"""
+    return {"inline_keyboard": [
+        [{"text": "💨🚬 ¿Cuántos cigarros respiré?", "callback_data": "CHECK_EXPOSURE"}],
+        [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}] # <--- Añadido aquí
+    ]}
 
 def get_transport_buttons():
     # UX Ajustada: Consolidamos Auto, agregamos Metrobús
@@ -774,6 +777,6 @@ def get_hnc_buttons():
     """Agrega el botón interactivo a las consultas de movilidad"""
     return {
         "inline_keyboard": [
-            [{"text": "📊 Mi Resumen", "callback_data": "ver_resumen"}]
+            [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]
         ]
     }
