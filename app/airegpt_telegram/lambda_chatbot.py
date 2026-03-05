@@ -1870,12 +1870,12 @@ def lambda_handler(event, context):
 
                     # --- 2. CONSULTAS VISUALES (Ubicaciones, Movilidad, Resumen) ---
                     elif fn in ["consultar_resumen_configuracion", "consultar_perfil"]: 
-                        # 1. Re-validamos el Tier real para evitar fugas legacy
+                        # 1. 🛡️ FORZAR LECTURA FRESCA (Ignoramos variables previas de la Lambda)
                         user_fresh = get_user_profile(user_id)
                         tier_real, _ = stripeairegpt.evaluate_user_tier(user_fresh)
                         is_prem_real = tier_real in ['PREMIUM', 'TRIAL']
 
-                        # 2. Invocamos a cards.py (Garantiza los candados 🔒 si tier_real == 'FREE')
+                        # 2. Invocamos a cards.py pasándole el Tier real detectado
                         card_res = cards.generate_summary_card(
                             user_name=first_name, 
                             alerts=user_fresh.get('alerts', {}), 
@@ -1886,7 +1886,7 @@ def lambda_handler(event, context):
                             health_data=user_fresh.get('health_profile', {})
                         )
                         
-                        # 3. Mandamos la tarjeta con los botones correctos (Go Premium si aplica)
+                        # 3. Mandamos la tarjeta con los botones (Go Premium si es FREE)
                         send_telegram(chat_id, card_res, markup=cards.get_summary_buttons(user_fresh.get('locations', {}), is_premium=is_prem_real))
                         
                         # 4. Señal para el silenciador
