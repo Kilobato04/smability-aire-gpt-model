@@ -1526,19 +1526,25 @@ def lambda_handler(event, context):
                 return {'statusCode': 200, 'body': 'OK'}
 
             # =========================================================
-            # ⚡ FAST-PATH: Interceptor de Onboarding, Menús y Reglas
+            # ⚡ FAST-PATH: Interceptor de Comandos (CONSOLIDADO)
+            # FIX: KeyError 'user_name' + Navegabilidad de Resumen
             # =========================================================
             import re
             
-            # 1. Limpiamos signos de interrogación, admiración y puntos
-            text_clean = re.sub(r'[¿?¡!.,]', '', user_content.strip().lower())
-            # 2. Quitamos acentos para hacer un match a prueba de balas
+            # 1. Normalización a prueba de balas (acentos, mayúsculas y caracteres)
+            text_clean = user_content.strip().lower()
             text_clean = text_clean.replace('á','a').replace('é','e').replace('í','i').replace('ó','o').replace('ú','u')
+            text_clean = re.sub(r'[^a-z0-9\s/]', '', text_clean) 
+
+            # Diccionario base para todas las tarjetas (Evita el crash de user_name)
+            card_args = {"user_name": first_name, "footer": cards.BOT_FOOTER}
+            
+            # Determinamos estatus para botones dinámicos
+            tier_eval, _ = stripeairegpt.evaluate_user_tier(user_profile)
+            is_prem_eval = tier_eval in ['PREMIUM', 'TRIAL']
 
             if text_clean in ["/start", "start", "hola", "empezar"]:
                 print(f"🆕 [START] User: {user_id}")
-                
-                # --- FIX ÍTEM 7: MANDAMOS EL BOTÓN DE GPS A SU TECLADO ---
                 send_persistent_gps_button(chat_id)
                 
                 markup_onboarding = {
@@ -1547,62 +1553,53 @@ def lambda_handler(event, context):
                         [{"text": "🚗 Registrar mi Auto", "callback_data": "SET_VEHICLE_start"}]
                     ]
                 }
-                msg_envio = cards.CARD_ONBOARDING.format(user_name=first_name, footer=cards.BOT_FOOTER)
+                msg_envio = cards.CARD_ONBOARDING.format(**card_args)
                 send_telegram(chat_id, msg_envio, markup=markup_onboarding)
                 return {'statusCode': 200, 'body': 'OK'}
                 
             elif text_clean in ["ayuda", "menu", "que puedes hacer", "opciones", "/menu", "/ayuda"]:
-                msg_envio = cards.CARD_MENU.format(footer=cards.BOT_FOOTER)
-                send_telegram(chat_id, msg_envio)
+                msg_envio = cards.CARD_MENU.format(**card_args)
+                # UX: Inyectamos botones de consulta rápida de sus ubicaciones
+                markup_menu = cards.get_summary_buttons(user_profile.get('locations', {}), is_prem_eval)
+                send_telegram(chat_id, msg_envio, markup=markup_menu)
                 return {'statusCode': 200, 'body': 'OK'}
                 
             elif text_clean in ["reglas", "limitaciones", "como funciona", "alcance", "restricciones"]:
-                msg_envio = cards.CARD_RULES.format(footer=cards.BOT_FOOTER)
-                send_telegram(chat_id, msg_envio)
+                msg_envio = cards.CARD_RULES.format(**card_args)
+                markup_rules = {"inline_keyboard": [[{"text": "📊 Ver mi Resumen", "callback_data": "ver_resumen"}]]}
+                send_telegram(chat_id, msg_envio, markup=markup_rules)
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            # --- FIX ROBUSTO: PROMPTS (Detecta la frase aunque haya palabras extra) ---
-            elif any(k in text_clean for k in [
-                "que te pregunto", "que te puedo preguntar", "que me puedes responder", 
-                "como te hablo", "como hablarte", "ejemplos", "dame ejemplos", "prompts",
-                "que mas haces", "que me puedes decir", "que sabes hacer", "dame opciones",
-                "para que sirves", "como funcionas"
-            ]):
-                msg_envio = cards.CARD_PROMPTS.format(footer=cards.BOT_FOOTER)
-                send_telegram(chat_id, msg_envio)
+            elif any(k in text_clean for k in ["que te pregunto", "que te puedo preguntar", "ejemplos", "prompts"]):
+                msg_envio = cards.CARD_PROMPTS.format(**card_args)
+                markup_prompts = {"inline_keyboard": [[{"text": "📊 Ver mi Resumen", "callback_data": "ver_resumen"}]]}
+                send_telegram(chat_id, msg_envio, markup=markup_prompts)
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            # --- FIX TAREA 9 (NUEVO): COMANDO DE PRIVACIDAD / BORRADO TOTAL ---
-            elif text_clean in ["/borrar_mis_datos", "borrar mis datos", "borrar todo", "/reset_perfil", "reset_perfil"]:
+            elif text_clean in ["/borrar_mis_datos", "borrar mis datos", "borrar todo", "/reset_perfil"]:
                 markup_borrado = {
                     "inline_keyboard": [
                         [{"text": "⚠️ Sí, borrar todos mis datos", "callback_data": "CONFIRM_RESET_ALL"}],
                         [{"text": "❌ Cancelar", "callback_data": "RESET"}]
                     ]
                 }
-                send_telegram(chat_id, "⚠️ **¿Estás seguro?**\n\nEsto eliminará permanentemente de nuestra base de datos tus:\n• Ubicaciones\n• Vehículos\n• Perfil de Salud\n• Rutinas de Transporte\n\n*(Si tienes una suscripción activa, tus pagos y estatus Premium se mantendrán intactos).* ", markup=markup_borrado)
+                send_telegram(chat_id, "⚠️ **¿Estás seguro?**\n\nEsto eliminará permanentemente tus ubicaciones, vehículos, salud y rutinas.\n\n*(Suscripciones activas se mantienen)*.", markup=markup_borrado)
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            # --- NUEVO: VÍA RÁPIDA PARA COMPRAR PREMIUM ---
-            elif text_clean in ["/premium", "premium", "pagar", "comprar", "suscribirse", "planes", "precio", "precios"]:
-                user = get_user_profile(user_id)
-                tier, days_left = stripeairegpt.evaluate_user_tier(user)
-                
+            elif text_clean in ["/premium", "premium", "pagar", "comprar", "planes", "precio"]:
+                tier, days_left = stripeairegpt.evaluate_user_tier(user_profile)
                 if tier == 'PREMIUM':
-                    send_telegram(chat_id, "💎 ¡Ya eres parte de la familia **Premium**! Disfruta de todos tus superpoderes.")
+                    send_telegram(chat_id, "💎 ¡Ya eres parte de la familia **Premium**!")
                 else:
-                    # Forzamos el Paywall pasándole 'FREE' para que escupa los botones, aunque esté en Trial
                     texto_venta, botones_venta = stripeairegpt.get_paywall_response("FREE", 0, "premium", str(user_id))
-                    
-                    # Cambiamos un poquito el texto para que suene a venta directa y no a "te bloqueé"
-                    texto_venta = texto_venta.replace("🔒 *Función Bloqueada*", "💎 *AIreGPT Premium*").replace("Tu periodo de prueba ha concluido. Para premium, necesitas activar", "Activa")
-                    
+                    texto_venta = texto_venta.replace("🔒 *Función Bloqueada*", "💎 *AIreGPT Premium*")
                     send_telegram(chat_id, texto_venta, markup=botones_venta)
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            elif any(k in text_clean for k in ["que es el ias", "que es ias", "que significa ias", "que es el imeca", "que es imeca", "como mides el aire", "como se mide", "escala ias"]) or text_clean in ["ias", "imeca"]:
-                msg_envio = cards.CARD_IAS_INFO.format(footer=cards.BOT_FOOTER)
-                send_telegram(chat_id, msg_envio)
+            elif any(k in text_clean for k in ["que es el ias", "que es ias", "imeca"]):
+                msg_envio = cards.CARD_IAS_INFO.format(**card_args)
+                markup_ias = {"inline_keyboard": [[{"text": "📊 Ver mi Resumen", "callback_data": "ver_resumen"}]]}
+                send_telegram(chat_id, msg_envio, markup=markup_ias)
                 return {'statusCode': 200, 'body': 'OK'}
                 
             # =========================================================
