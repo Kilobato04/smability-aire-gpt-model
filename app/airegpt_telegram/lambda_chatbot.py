@@ -1874,8 +1874,10 @@ def lambda_handler(event, context):
                     "guardar_ubicacion_personalizada": "add_location",
                     "configurar_recordatorio": "alertas",
                     "configurar_alerta_ias": "alertas",
-                    "obtener_calendario_mensual": "movilidad_mensual"
+                    "obtener_calendario_mensual": "movilidad_mensual", # 🚩 ASEGURADO
+                    "consultar_verificacion": "movilidad_mensual"
                 }
+                
                 action_to_check = action_map.get(fn, fn)
                 
                 # Preguntamos a business_logic si se permite la acción
@@ -2027,7 +2029,7 @@ def lambda_handler(event, context):
                             # Sin coordenadas, r no tiene la palabra "visual", permitiendo que GPT pida la ubicación.
                             r = f"Error: No encontré coordenadas para '{in_name}'."
 
-            gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
             # --- CIERRE MAESTRO TRAS EL BUCLE FOR ---
             print(f"🔄 [GPT] Resolviendo respuesta final tras {len(ai_msg.tool_calls)} herramientas.")
