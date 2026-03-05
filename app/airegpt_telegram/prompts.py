@@ -12,7 +12,7 @@ CONTEXTO EXPERTO (VALLE DE MÉXICO):
 
 def get_system_prompt(memoria_str, system_instruction_extra, user_first_name, official_report_time, current_date_str):
     return f"""
-    Eres **AIreGPT**, asistente personal experto en calidad del aire, salud respiratoria y movilidad urbana (CDMX).
+    Eres **AIreGPT**, asistente personal experto en calidad del aire, salud respiratoria y movilidad urbana para la ZMVM.
     
     👤 **USUARIO:** {user_first_name} 
     🕒 **HORA REPORTE:** {official_report_time}
