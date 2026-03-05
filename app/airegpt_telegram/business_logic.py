@@ -51,34 +51,30 @@ def is_action_allowed(user_profile, action_type):
     Retorna (Allowed: bool, Reason: str)
     """
     config = get_tier_config(user_profile)
-    # Obtenemos el tier directamente del config para comparaciones
     user_tier = config.get("tier", "FREE")
     
-    # 1. Validación de Ubicaciones
+    # 1. Ubicaciones (Límite dinámico)
     if action_type == "add_location":
         locs = user_profile.get('locations', {})
         active_count = len([k for k, v in locs.items() if isinstance(v, dict) and v.get('active')])
         if active_count >= config["max_locations"]:
             return False, f"Límite de {config['max_locations']} ubicaciones alcanzado."
             
-    # 2. Validación de Movilidad Activa (Sincronizado con action_map de la Lambda)
+    # 2. Movilidad Activa (Calendario y Verificación)
     if action_type in ["movilidad_mensual", "get_monthly_calendar", "consultar_verificacion"]:
         if not config["can_mobility_active"]:
-            return False, "Las consultas de calendario mensual y periodos de verificación son funciones Premium."
+            return False, "Las consultas de calendario mensual y periodos de verificación son funciones Premium."    
 
-    # 3. Validación de Gráficas
+    # 3. Gráficas y Gamificación
     if action_type in ["get_graphic", "get_tetris", "tetris", "serpiente"]:
         if not config["can_gamification"]:
             return False, "Las gráficas avanzadas de exposición son exclusivas para usuarios Premium."
 
-    # 4. Validación de Rutina y Alertas (AQUÍ ESTABA EL FIX)
-    if action_type == 'alertas':
-        # Usamos user_tier en lugar de tier
+    # 4. Personalización Pro (Salud, Transporte, Alertas y Rutina)
+    # UNIFICADO: Si es FREE, todo esto rebota.
+    pro_actions = ["guardar_salud", "configurar_transporte", "configure_routine", "alertas", "configurar_recordatorio"]
+    if action_type in pro_actions:
         if user_tier == 'FREE':
-            return False, "Las alertas personalizadas (horarios u umbrales específicos) son funciones Premium. Por defecto tienes alertas a las 9:00 AM y a los 100 IAS."
-
-    if action_type == "configure_routine":
-        if not config["can_custom_routine"]:
-            return False, "La personalización profunda de rutina es Premium."
+            return False, "La personalización de salud, transporte, alertas horarias y umbrales de IAS es exclusiva de AIreGPT Premium."
 
     return True, "OK"
