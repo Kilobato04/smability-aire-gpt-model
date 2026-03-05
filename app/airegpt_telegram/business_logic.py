@@ -60,7 +60,7 @@ def is_action_allowed(user_profile, action_type):
 
     # Si llegamos aquí, el usuario es FREE (o falló la detección)
     config = get_tier_config(user_profile)
-    user_tier = config.get("tier", "FREE")
+    user_tier = config.get("tier_name", "FREE")
     
     # 1. Ubicaciones (Límite dinámico)
     if action_type == "add_location":
