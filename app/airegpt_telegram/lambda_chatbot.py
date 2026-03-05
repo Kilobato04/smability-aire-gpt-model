@@ -2034,11 +2034,18 @@ def lambda_handler(event, context):
             final_res = client.chat.completions.create(model="gpt-4o-mini", messages=gpt_msgs, temperature=0.3)
             final_text = final_res.choices[0].message.content
 
-            # 🤫 REGLA DE SILENCIO (FIX: PAYWALL + VISUAL)
-            # Revisamos si en los resultados de las herramientas (gpt_msgs) 
-            # existe la palabra 'visual' o 'suscripcion'
-            if any(("visual" in str(m.get('content','')).lower() or "suscripcion" in str(m.get('content','')).lower()) for m in gpt_msgs if m.get('role') == 'tool'):
-                print("🤫 SILENCIO: Interfaz enviada. Matando texto redundante de GPT.")
+            # 🤫 REGLA DE SILENCIO (FIXED: Evita el error 'ChatCompletionMessage' has no attribute 'get')
+            silenciar = False
+            for m in gpt_msgs:
+                # Solo procesamos diccionarios (nuestras respuestas de tools)
+                if isinstance(m, dict) and m.get('role') == 'tool':
+                    contenido = str(m.get('content', '')).lower()
+                    if "visual" in contenido or "suscripcion" in contenido:
+                        silenciar = True
+                        break
+            
+            if silenciar:
+                print("🤫 SILENCIO: Interfaz enviada. Matando texto redundante.")
                 final_text = ""
 
         else:
