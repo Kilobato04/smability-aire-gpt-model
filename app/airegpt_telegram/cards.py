@@ -450,6 +450,14 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         if text is None: return ""
         return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
 
+    # 🛡️ FIX: Detección binaria ultra-estricta
+    # Forzamos string y mayúsculas para que no haya fallos por 'Free' vs 'FREE'
+    safe_plan = str(plan_status).upper()
+    is_premium = "PREMIUM" in safe_plan or "TRIAL" in safe_plan
+    
+    # 🔍 DEBUG: Esto aparecerá en CloudWatch para auditoría
+    print(f"DEBUG_CARDS: Generando tarjeta para {user_name}. Plan: {safe_plan} | Premium: {is_premium}")
+
     safe_plan = clean(plan_status)
     is_premium = any(x in safe_plan.upper() for x in ["PREMIUM", "TRIAL"])
     
