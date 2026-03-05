@@ -1809,7 +1809,7 @@ def lambda_handler(event, context):
 
                 # --- 🛡️ PASO 1: EVALUACIÓN DE TIER Y PERMISOS ---
                 user_fresco = get_user_profile(user_id)
-                tier, days_left = stripeairegpt.evaluate_user_tier(user_profile)
+                tier, days_left = stripeairegpt.evaluate_user_tier(user_fresco)
                 is_prem_val = tier in ['PREMIUM', 'TRIAL']
                 
                 # Mapeo de herramientas a acciones de negocio (Cerebro Maestro)
