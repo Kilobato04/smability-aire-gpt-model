@@ -1,3 +1,4 @@
+import stripeairegpt  # 🚩 IMPORT NECESARIO
 # business_logic.py - El Cerebro de AIreGPT
 # Centraliza las reglas de suscripción para Chatbot y Scheduler
 
@@ -50,6 +51,14 @@ def is_action_allowed(user_profile, action_type):
     Validador de seguridad para el Orquestador y Tools.
     Retorna (Allowed: bool, Reason: str)
     """
+    # --- 💎 LA REGLA DE ORO (PREMIUM FIRST) ---
+    # Evaluamos el tier real. Si es Premium o Trial, no hay restricciones.
+    tier_real, _ = stripeairegpt.evaluate_user_tier(user_profile)
+    if tier_real in ['PREMIUM', 'TRIAL']:
+        return True, "Acceso total Premium."
+    # ------------------------------------------
+
+    # Si llegamos aquí, el usuario es FREE (o falló la detección)
     config = get_tier_config(user_profile)
     user_tier = config.get("tier", "FREE")
     
