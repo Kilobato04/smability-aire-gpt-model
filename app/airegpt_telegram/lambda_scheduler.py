@@ -19,22 +19,6 @@ lambda_client = boto3.client('lambda')
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
 
-# --- 🧠 REGLAS DE NEGOCIO (LOGICA COMPARTIDA) ---
-def get_user_permissions(user_item):
-    """
-    Determina qué tiene permitido el usuario según su suscripción.
-    Retorna: (can_alerts, can_contingency)
-    """
-    sub = user_item.get('subscription', {})
-    status = sub.get('status', 'FREE').upper()
-    
-    # Lógica permisiva: Si dice PREMIUM (Manual, Mensual, Dev), tiene todo.
-    if "PREMIUM" in status:
-        return True, True
-    
-    # Lógica FREE (Default)
-    return False, False
-
 # --- HELPERS ---
 def get_cdmx_time(): return datetime.utcnow() - timedelta(hours=6)
 def get_maps_url(lat, lon): return f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
