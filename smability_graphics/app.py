@@ -220,7 +220,7 @@ def generar_grafica_serpiente(user_id):
     # --- LÓGICA DINÁMICA DE TRANSPORTE ---
     transp = user.get('profile_transport', {'medio': 'auto_ventana', 'tiempo_traslado_horas': 2})
     medio_transporte = transp.get('medio', 'transito').upper().replace('_', ' ')
-    duracion_traslado = float(transp.get('tiempo_traslado_horas', 2))
+    duracion_traslado = float(transp.get('tiempo_traslado_horas', transp.get('horas', 2)))
     es_ho = (transp.get('medio') == 'home_office')
 
     if es_ho or not destino_key:
@@ -411,7 +411,7 @@ def generar_grafica_serpiente(user_id):
                 if end_x - start_x >= 2: ax1.text(mid_x, y_base, " CASA ", fontsize=11, fontweight='bold', ha='center', color='white', bbox=estilos['casa'])
             elif current_state == 'trabajo':
                 ax1.axvspan(start_x, end_x, color='white', alpha=0.02)
-                if end_x - start_x >= 2: 
+                if end_x - start_x >= 1: 
                     # Usamos la variable 'nombre_destino_visual' que calculamos al inicio
                     ax1.text(mid_x, y_base, f" {nombre_destino_visual} ", fontsize=11, fontweight='bold', ha='center', color='white', bbox=estilos['trabajo'])
             elif current_state == 'transito':
