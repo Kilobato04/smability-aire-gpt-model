@@ -66,7 +66,7 @@ def lambda_handler(event, context):
                     "reply_markup": json.dumps({ # <--- AQUÍ SE AGREGA EL BOTÓN
                         "inline_keyboard": [
                             [
-                                {"text": "👤 Ver mi Perfil Premium", "callback_data": "menu_perfil"}
+                                {"text": "👤 Ver mi Perfil Premium", "callback_data": "ver_resumen"}
                             ]
                         ]
                     })
