@@ -1303,25 +1303,35 @@ def lambda_handler(event, context):
                 send_telegram(chat_id, card_resumen, markup=botones)
                 return {'statusCode': 200, 'body': 'OK'}
                 
-            elif data in ["CONFIG_ADVANCED", "GO_PREMIUM"]:
+            elif data == "CONFIG_ADVANCED":
+                # Invocamos la tarjeta dinámica que ya tiene Stripe y Borrado
+                texto_adv, markup_adv = cards.generate_advanced_settings_card(user_id)
+                send_telegram(chat_id, texto_adv, markup=markup_adv)
+                return {'statusCode': 200, 'body': 'OK'}
+
+            elif data == "GO_PREMIUM":
+                # Lógica de ventas limpia usando el motor de paywall
                 user = get_user_profile(user_id)
                 tier, days_left = stripeairegpt.evaluate_user_tier(user)
-                
-                if tier == 'PREMIUM':
-                    resp = "💎 **Suscripción Activa**\n\nEres usuario Premium. Gracias por apoyar a AIreGPT.\n\n*(Pronto habilitaremos aquí el portal para cambiar tu método de pago o cancelar tu plan).* "
-                    send_telegram(chat_id, resp)
-                else:
-                    # Si es FREE o TRIAL, le vendemos
-                    estado = f"*(Te quedan {days_left} días de prueba)*" if tier == 'TRIAL' else "*(Prueba terminada)*"
-                    
-                    texto_venta, botones_venta = stripeairegpt.get_paywall_response("FREE", 0, "premium", str(user_id))
-                    texto_venta = texto_venta.replace("🔒 *Función Bloqueada*", f"💎 *Suscripciones* {estado}").replace("Tu periodo de prueba ha concluido. Para premium, necesitas activar", "Activa")
-                    
-                    send_telegram(chat_id, texto_venta, markup=botones_venta)
+                texto_venta, botones_venta = stripeairegpt.get_paywall_response(tier, days_left, "premium", str(user_id))
+                send_telegram(chat_id, texto_venta, markup=botones_venta)
+                return {'statusCode': 200, 'body': 'OK'}
+
+            elif data == "CONFIRM_HARD_DELETE":
+                # Paso de seguridad para el borrado total
+                resp = "🛑 **¿ESTÁS TOTALMENTE SEGURO?**\n\nEsta acción borrará toda tu cuenta de AIreGPT de forma irreversible.\n\n_Tu suscripción de Stripe debe cancelarse por separado en el portal._"
+                markup = {"inline_keyboard": [[{"text": "🗑️ SÍ, BORRAR TODO", "callback_data": "EXECUTE_HARD_DELETE"}], [{"text": "❌ CANCELAR", "callback_data": "ver_resumen"}]]}
+                send_telegram(chat_id, resp, markup)
+                return {'statusCode': 200, 'body': 'OK'}
+
+            elif data == "EXECUTE_HARD_DELETE":
+                # Acción final
+                table.delete_item(Key={'user_id': str(user_id)})
+                send_telegram(chat_id, "💨 Tus datos han sido eliminados correctamente.")
                 return {'statusCode': 200, 'body': 'OK'}
 
             elif data == "SAVE_OTHER":
-                resp = "✍️ **¿Qué nombre le ponemos?**\n\nEscribe el nombre que quieras (Ej. *'Escuela'*, *'Gym'*, *'Casa Mamá'*)."
+                resp = "✍️ **¿Qué nombre le ponemos?**\n\nEscribe el nombre que quieras (Ej. Ponle *'Escuela'*, *'Gym'*, *'Casa Mamá'*)."
 
             # =========================================================
             # 🚬 FLUJO GAMIFICACIÓN: CIGARROS, EDAD URBANA Y ONBOARDING
