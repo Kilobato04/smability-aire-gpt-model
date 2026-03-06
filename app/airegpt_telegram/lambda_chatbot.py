@@ -1319,7 +1319,15 @@ def lambda_handler(event, context):
 
             elif data == "CONFIRM_HARD_DELETE":
                 # Paso de seguridad para el borrado total
-                resp = "🛑 **¿ESTÁS TOTALMENTE SEGURO?**\n\nEsta acción borrará toda tu cuenta de AIreGPT de forma irreversible.\n\n_Tu suscripción de Stripe debe cancelarse por separado en el portal._"
+                resp = (
+                    "🧨 *ZONA DE PELIGRO: BORRADO TOTAL* 🧨\n\n"
+                    "¿Estás totalmente seguro? Esta acción eliminará permanentemente tu "
+                    "historial de exposición, ubicaciones y perfil de salud de nuestra base de datos. "
+                    "*No hay marcha atrás.*\n\n"
+                    "⚠️ *NOTA IMPORTANTE:* Si tienes una suscripción activa, debes cancelarla "
+                    "primero en el **Portal de Suscripciones** para detener los cargos, ya que "
+                    "al borrar tu cuenta perderemos el vínculo con tu ID de Stripe."
+                )
                 markup = {"inline_keyboard": [[{"text": "🗑️ SÍ, BORRAR TODO", "callback_data": "EXECUTE_HARD_DELETE"}], [{"text": "❌ CANCELAR", "callback_data": "ver_resumen"}]]}
                 send_telegram(chat_id, resp, markup)
                 return {'statusCode': 200, 'body': 'OK'}
