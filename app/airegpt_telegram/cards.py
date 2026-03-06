@@ -489,6 +489,10 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
 
     # 4. Transporte (🔒 Candado si es FREE)
     if is_premium:
+        # Buscamos el nombre del lugar marcado como destino
+        dest_item = next((v for k, v in locations.items() if v.get('is_destination')), None)
+        nombre_dest = dest_item.get('display_name', 'Destino') if dest_item else "No definido"
+
         if transport_data and transport_data.get('medio'):
             medio_raw = transport_data.get('medio')
             horas = transport_data.get('horas', 0)
@@ -497,11 +501,13 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
                 "metro": "🚇 Metro/Tren", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
                 "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
             }
-            medio_str = nombres_medios.get(medio_raw, clean(medio_raw).capitalize())
+            medio_str = nombres_medios.get(medio_raw, str(medio_raw).capitalize())
+            
             if medio_raw == "home_office":
                 trans_str = f"• Modalidad: **{medio_str}**"
             else:
-                trans_str = f"• Ruta: **Casa ↔ Trabajo**\n• Modo: **{medio_str}**\n• Tiempo: **{horas} hrs/día**"
+                # AQUÍ LA MAGIA: Casa ↔ [Nombre Dinámico]
+                trans_str = f"• Ruta: **Casa ↔ {nombre_dest}**\n• Modo: **{medio_str}**\n• Tiempo: **{horas} hrs/día**"
         else:
             trans_str = "• *Sin configurar*"
     else:
@@ -633,10 +639,12 @@ def get_locations_buttons(locations_dict):
 
 #Helper para confirmación de borrado
 def get_delete_confirmation_buttons(location_key):
+    """Helper para confirmación de borrado de una ubicación"""
+    # Usamos la key normalizada para evitar fallos de matching
     return {"inline_keyboard": [
         [
             {"text": "✅ Sí, borrar todo", "callback_data": f"CONFIRM_DEL_{location_key.upper()}"},
-            {"text": "❌ Cancelar", "callback_data": "CANCEL_DELETE"}
+            {"text": "❌ Cancelar", "callback_data": "ver_resumen"}
         ]
     ]}
 
@@ -660,6 +668,30 @@ def get_share_contingency_button():
     return {"inline_keyboard": [
         [{"text": "📢 Avisar a mis contactos", "url": link_share}]
     ]}
+
+def generate_advanced_settings_card(user_id):
+    """Genera la tarjeta de privacidad y gestión de suscripción"""
+    text = (
+        "⚙️ **CONFIGURACIÓN AVANZADA**\n\n"
+        "Gestiona tu privacidad y tu relación con AIreGPT.\n\n"
+        "💳 **Suscripción:**\n"
+        "Para cambiar tu método de pago, descargar facturas o cancelar tu plan Premium, toca el botón de abajo para ir al portal seguro de Stripe.\n\n"
+        "🗑️ **Zona de Peligro:**\n"
+        "Puedes eliminar permanentemente todos tus datos (ubicaciones, salud, vehículos). Esta acción es irreversible."
+    )
+    
+    # Obtenemos el link dinámico desde tu lógica de Stripe
+    import stripeairegpt
+    stripe_url = stripeairegpt.get_customer_portal_url(user_id)
+    
+    markup = {
+        "inline_keyboard": [
+            [{"text": "💳 Gestionar Suscripción", "url": stripe_url}],
+            [{"text": "⚠️ Borrar Perfil Definitivo", "callback_data": "CONFIRM_HARD_DELETE"}],
+            [{"text": "🔙 Volver al Perfil", "callback_data": "ver_resumen"}]
+        ]
+    }
+    return text, markup
 
 # =====================================================================
 # 🚗 MOTOR HNC V2, SALUD Y PRONÓSTICO (COMPARTIDO BOT Y SCHEDULER)
