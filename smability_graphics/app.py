@@ -72,10 +72,22 @@ def ejecutar_job_nocturno():
             lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
             resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}", timeout=5).json()
             vector_c = resp_c.get("vectores", {}).get("ayer")
+
+            # --- 🎯 FIX: IDENTIFICACIÓN DINÁMICA DEL DESTINO ---
+            # Buscamos la llave que no es casa, priorizando 'is_destination'
+            dest_key = next((k for k, v in locs.items() if v.get('is_destination')), None)
+            if not dest_key:
+                dest_key = next((k for k in locs.keys() if k != 'casa'), None)
             
             # 2. API Call Trabajo (Si aplica)
             vector_t = None
             es_ho = (transp.get('medio') == 'home_office')
+
+            if dest_key and not es_ho:
+                lat_t, lon_t = locs[dest_key]['lat'], locs[dest_key]['lon']
+                resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}", timeout=5).json()
+                vector_t = resp_t.get("vectores", {}).get("ayer")
+                
             if 'trabajo' in locs and not es_ho:
                 lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
                 resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}", timeout=5).json()
@@ -190,6 +202,20 @@ def generar_grafica_serpiente(user_id):
         return {"status": "error", "error": "Usuario no tiene casa configurada"}
 
     locs = user['locations']
+
+    # --- 🎯 IDENTIFICACIÓN DINÁMICA DEL DESTINO ---
+    # Buscamos la primera ubicación que NO sea 'casa'
+    # Priorizamos la que el usuario haya marcado como destino principal
+    destino_key = next((k for k, v in locs.items() if v.get('is_destination')), None)
+    
+    # Si no hay ninguna marcada, tomamos la primera llave que no sea 'casa' (compatibilidad)
+    if not destino_key:
+        destino_key = next((k for k in locs.keys() if k != 'casa'), None)
+
+    # Nombre que aparecerá en la etiqueta rosa de la gráfica
+    nombre_destino_visual = "DESTINO"
+    if destino_key:
+        nombre_destino_visual = locs[destino_key].get('display_name', destino_key).upper()
     
     # --- LÓGICA DINÁMICA DE TRANSPORTE ---
     transp = user.get('profile_transport', {'medio': 'auto_ventana', 'tiempo_traslado_horas': 2})
@@ -210,6 +236,12 @@ def generar_grafica_serpiente(user_id):
     # 2. Traer Vectores de API Ligera (CASA)
     lat_c, lon_c = locs['casa']['lat'], locs['casa']['lon']
     resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}", timeout=20).json()
+
+    # 2b. Traer Vectores (DESTINO DETECTADO)
+    resp_t = resp_c 
+    if destino_key and not es_ho: # <--- Usar destino_key en lugar de 'trabajo'
+        lat_t, lon_t = locs[destino_key]['lat'], locs[destino_key]['lon']
+        resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}", timeout=20).json()
     
     # Traer Vectores (TRABAJO - Si aplica)
     resp_t = resp_c 
@@ -378,7 +410,9 @@ def generar_grafica_serpiente(user_id):
                 if end_x - start_x >= 2: ax1.text(mid_x, y_base, " CASA ", fontsize=11, fontweight='bold', ha='center', color='white', bbox=estilos['casa'])
             elif current_state == 'trabajo':
                 ax1.axvspan(start_x, end_x, color='white', alpha=0.02)
-                if end_x - start_x >= 2: ax1.text(mid_x, y_base, " TRABAJO ", fontsize=11, fontweight='bold', ha='center', color='white', bbox=estilos['trabajo'])
+                if end_x - start_x >= 2: 
+                    # Usamos la variable 'nombre_destino_visual' que calculamos al inicio
+                    ax1.text(mid_x, y_base, f" {nombre_destino_visual} ", fontsize=11, fontweight='bold', ha='center', color='white', bbox=estilos['trabajo'])
             elif current_state == 'transito':
                 ax1.axvspan(start_x, end_x, color='#08F7FE', alpha=0.05)
                 # Ponemos dinámicamente el medio de transporte del usuario
