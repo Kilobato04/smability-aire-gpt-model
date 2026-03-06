@@ -487,9 +487,9 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
     else:
         health_str = "• 🔒 **Perfil Salud (Premium)**"
 
-    # 4. Transporte (🔒 Candado si es FREE)
+    # 4. Transporte (🔒 Candado si es FREE - Destino Flexible)
     if is_premium:
-        # Buscamos el nombre del lugar marcado como destino
+        # Buscamos dinámicamente cuál es el destino configurado
         dest_item = next((v for k, v in locations.items() if v.get('is_destination')), None)
         nombre_dest = dest_item.get('display_name', 'Destino') if dest_item else "No definido"
 
@@ -501,12 +501,12 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
                 "metro": "🚇 Metro/Tren", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
                 "combi": "🚐 Combi/Micro", "caminar": "🚶 Caminar", "bicicleta": "🚲 Bici", "home_office": "🏠 Home Office"
             }
-            medio_str = nombres_medios.get(medio_raw, str(medio_raw).capitalize())
+            medio_str = nombres_medios.get(medio_raw, clean(medio_raw).capitalize())
             
             if medio_raw == "home_office":
                 trans_str = f"• Modalidad: **{medio_str}**"
             else:
-                # AQUÍ LA MAGIA: Casa ↔ [Nombre Dinámico]
+                # 🎯 FIX APLICADO: Casa ↔ [Nombre dinámico]
                 trans_str = f"• Ruta: **Casa ↔ {nombre_dest}**\n• Modo: **{medio_str}**\n• Tiempo: **{horas} hrs/día**"
         else:
             trans_str = "• *Sin configurar*"
@@ -680,9 +680,12 @@ def generate_advanced_settings_card(user_id):
         "Puedes eliminar permanentemente todos tus datos (ubicaciones, salud, vehículos). Esta acción es irreversible."
     )
     
-    # Obtenemos el link dinámico desde tu lógica de Stripe
-    import stripeairegpt
-    stripe_url = stripeairegpt.get_customer_portal_url(user_id)
+    # Paracaídas para el link de Stripe
+    try:
+        import stripeairegpt
+        stripe_url = stripeairegpt.get_customer_portal_url(user_id)
+    except:
+        stripe_url = "https://billing.stripe.com/p/login/airegpt_placeholder" # Fallback manual
     
     markup = {
         "inline_keyboard": [
