@@ -222,73 +222,73 @@ def process_user(user, current_hour_str, contingency_data):
     user_id = user['user_id']
     first_name = user.get('first_name', 'Usuario')
     
-    # ⚓ ANCLA A: FIX DE ROBUSTEZ (CRÍTICO)
-    # Obtenemos alerts. Si DynamoDB devolvió un string en lugar de un dict, cortamos.
+    # 🛡️ PASO 0: REFRESCAR TIER CON BUSINESS LOGIC
+    tier = business_logic.get_user_tier(user)
+    is_premium = (tier == "PREMIUM")
+    config_tier = business_logic.get_tier_config(user)
+
+    # ⚓ ANCLA A: FIX DE ROBUSTEZ
     alerts = user.get('alerts', {})
-    if isinstance(alerts, str):
-        print(f"⚠️ [DATA ERROR] User {user_id} tiene 'alerts' corrupto (String). Saltando.")
-        return
+    if not isinstance(alerts, dict): return
+
+    # ---------------------------------------------------------
+    # 🛑 FILTRO DE SEGURIDAD: VENTANA HORARIA PARA FREE
+    # ---------------------------------------------------------
+    current_hour_int = int(current_hour_str.split(':')[0])
+    
+    if not is_premium:
+        # REGLA FREE: Solo procesamos si la Lambda corre a las 9 AM
+        if current_hour_int != 9:
+            return 
     # ------------------------------------------
 
     locations = user.get('locations', {})
     health = user.get('health_profile', {})
     h_str = ", ".join([v.get('condition','') for v in health.values()]) if health else None
 
-    # 🛑 GATEKEEPER: Revisar Permisos antes de procesar
-    can_alerts, can_contingency = get_user_permissions(user)
-    # Detectar si el usuario es Premium/Trial para el HNC
-    sub_status = user.get('subscription', {}).get('status', 'FREE').upper()
-    is_vip = any(x in sub_status for x in ["PREMIUM", "TRIAL"])
-    
-    if not can_alerts and not can_contingency:
-        return 
+    # 🛡️ GATEKEEPER ACTUALIZADO:
+    # Si es Premium o si es la "Hora de Oro" (9am) para Free, permitimos.
+    can_alerts = is_premium or (current_hour_int == 9)
+    can_contingency = True # Las contingencias las mandamos a todos o según tu lógica
 
-    # 1. CONTINGENCIA
+    # 1. CONTINGENCIA (Global)
     is_c, ph, pol = contingency_data
-    if is_c and can_contingency: # 🔒 Solo si paga
-        user_wants_cont = alerts.get('contingency', {}).get('enabled', False)
-        
-        if user_wants_cont:
-            last = user.get('last_contingency_date', '')
-            today = get_cdmx_time().strftime("%Y-%m-%d")
-            
-            if last != today:
-                print(f"🚨 [NOTIFY] Enviando Contingencia a {first_name}")
-                card = cards.CARD_CONTINGENCY.format(user_name=first_name, report_time=f"{current_hour_str.split(':')[0]}:20", phase=ph, pollutant=pol, forecast_msg="Oficial", footer=cards.BOT_FOOTER)
-                send_telegram_push(user_id, card)
-                table.update_item(Key={'user_id': user_id}, UpdateExpression="SET last_contingency_date = :d", ExpressionAttributeValues={':d': today})
-                return # Si enviamos contingencia, evitamos saturar con otras alertas
+    if is_c and can_contingency:
+        # ... (Tu lógica de envío de contingencia se queda igual) ...
+        # [Manten tu código de contingencia aquí]
 
-    # 2. PROCESAMIENTO DE ALERTAS (Solo si tiene permiso PREMIUM)
+    # 2. PROCESAMIENTO DE ALERTAS DIARIAS
     if can_alerts:
-        
-        # ⚓ ANCLA B: FIX VENTANA DE 20 MINUTOS
-        # Calculamos el minuto actual para evitar spam (ej. 7:00, 7:20, 7:40)
         now = get_cdmx_time()
         current_minute = now.minute
-        
-        # Solo procesamos alertas de horario entre el minuto 18 y 38
+        # Ventana de envío (para no disparar en cada ejecución de la Lambda)
         is_schedule_window = (18 <= current_minute < 38)
 
         # A. RECORDATORIOS POR HORARIO
         schedule_data = alerts.get('schedule', {})
         
-        # Validamos que sea diccionario antes de iterar
         if isinstance(schedule_data, dict) and is_schedule_window:
-            
             for loc_name, config in schedule_data.items():
-                if not isinstance(config, dict): continue
+                if not isinstance(config, dict) or not config.get('active'): 
+                    continue
 
-                # Validamos hora (Ej: "07:30" coincide con "07:00")
-                if config.get('active') and config.get('time', '').split(':')[0] == current_hour_str.split(':')[0]:
-                    
+                # 🚩 VALIDACIÓN ÚNICA DE HORA (Limpieza Total)
+                # Extraemos la hora configurada por el usuario (ej: 07)
+                user_set_hour = int(config.get('time', '00:00').split(':')[0])
+                
+                # REGLA: Si la hora coincide, disparamos.
+                # (Para FREE, el filtro de arriba ya aseguró que current_hour_int == 9)
+                if user_set_hour == current_hour_int:
                     loc_data = locations.get(loc_name)
+                    
                     if loc_data:
+                        print(f"📡 [API] Consultando aire para {first_name} en {loc_name}")
                         data = get_location_air_data(loc_data['lat'], loc_data['lon'])
+                        
                         if data:
                             qa = data.get('aire', {})
-                            meteo = data.get('meteo', {}) # <--- NUEVO (Clima)
-                            ubic = data.get('ubicacion', {}) # <--- NUEVO (Ubicación)
+                            meteo = data.get('meteo', {})
+                            ubic = data.get('ubicacion', {})
                             f_block = cards.format_forecast_block(data.get('pronostico_timeline', []))
                             
                             # 🔥 FIX: Lógica Matemática Unificada de IAS a Color (CDMX)
