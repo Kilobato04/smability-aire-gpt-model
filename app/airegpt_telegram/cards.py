@@ -209,8 +209,8 @@ Tu *reporte* de 📍 **[{location_name}]({maps_url})**:
 
 {footer}"""
 
-CARD_ALERT_IAS = """🚨 *¡ALERTA DE CALIDAD DEL AIRE!* 🚨
-Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** a las 🕒 {report_time} ha superado tu límite de seguridad.
+CARD_ALERT_IAS = """🚨 *¡ALERTA DE AIRE!* 🚨
+👋 ¡Hola {user_name}!, la contaminación en 📍 **[{location_name}]({maps_url})** a las 🕒 {report_time} ha superado tu límite de seguridad.
 
 {risk_circle} *Calidad {risk_category} ({ias_value} pts)* | ☣️ {pollutant}
 *Tu umbral configurado es: {threshold} pts*
@@ -222,7 +222,7 @@ Hola {user_name}, la contaminación en 📍 **[{location_name}]({maps_url})** a 
 {footer}"""
 
 CARD_REMINDER = """⏰ *{greeting}, {user_name}!*
-Tu *reporte* de 📍 **[{location_name}]({maps_url})**:
+Tu *Reporte* de 📍 **[{location_name}]({maps_url})**:
 🗺️ {region} • 🕒 {report_time}
 
 {risk_circle} *Calidad {risk_category} ({ias_value} pts)* | ☣️ {pollutant}
