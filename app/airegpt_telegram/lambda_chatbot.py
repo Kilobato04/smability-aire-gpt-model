@@ -1797,14 +1797,26 @@ def lambda_handler(event, context):
                     # ✅ PASO 2: EJECUCIÓN PERMITIDA
                     print(f"🔧 [EXEC] Tool: {fn} | Tier: {tier}")
 
-                    # --- CONECTOR ÚNICO HOMOLOGADO ---
+                    # --- 🎯 CONECTOR ÚNICO HOMOLOGADO (AJUSTE A) ---
                     if fn == "guardar_ubicacion_personalizada":
                         r = tools_logic.ejecutar_guardar_ubicacion(
                             user_id, 
                             args.get('nombre'), 
                             lat=args.get('lat'), 
                             lon=args.get('lon'), 
-                            is_premium=is_prem_val # Usamos el tier real detectado
+                            is_premium=is_prem_val # Sello de destino flexible activado
+                        )
+
+                    elif fn == "eliminar_ubicacion":
+                        # Forzamos el borrado radical en DynamoDB
+                        r = tools_logic.ejecutar_borrar_ubicacion(user_id, args.get('nombre_ubicacion'))
+
+                    elif fn == "renombrar_ubicacion":
+                        # Activamos el renombrado con lógica de destino flexible
+                        r = tools_logic.ejecutar_renombrar_ubicacion(
+                            user_id, 
+                            args.get('nombre_actual'), 
+                            args.get('nombre_nuevo')
                         )
                         
                     # --- 1. ESCRITURA Y CONFIGURACIÓN ---
