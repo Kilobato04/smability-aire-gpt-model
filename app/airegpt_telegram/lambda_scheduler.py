@@ -251,11 +251,38 @@ def process_user(user, current_hour_str, contingency_data):
     can_alerts = is_premium or (current_hour_int == 9)
     can_contingency = True # Las contingencias las mandamos a todos o según tu lógica
 
-    # 1. CONTINGENCIA (Global)
+    # 1. CONTINGENCIA (Filtro por Tier de Business Logic)
     is_c, ph, pol = contingency_data
-    if is_c and can_contingency:
-        # ... (Tu lógica de envío de contingencia se queda igual) ...
-        # [Manten tu código de contingencia aquí]
+    if is_c:
+        # 🔒 REGLA DE ORO: ¿Su plan permite esta alerta?
+        if config_tier.get("can_contingency", False): 
+            user_wants_cont = alerts.get('contingency', {}).get('enabled', False)
+            
+            if user_wants_cont:
+                last = user.get('last_contingency_date', '')
+                today = get_cdmx_time().strftime("%Y-%m-%d")
+                
+                if last != today:
+                    print(f"🚨 [NOTIFY] Enviando Contingencia a {first_name} (Premium)")
+                    card = cards.CARD_CONTINGENCY.format(
+                        user_name=first_name, 
+                        report_time=f"{current_hour_str.split(':')[0]}:20", 
+                        phase=ph, 
+                        pollutant=pol, 
+                        forecast_msg="Oficial", 
+                        footer=cards.BOT_FOOTER
+                    )
+                    send_telegram_push(user_id, card)
+                    table.update_item(
+                        Key={'user_id': user_id}, 
+                        UpdateExpression="SET last_contingency_date = :d", 
+                        ExpressionAttributeValues={':d': today}
+                    )
+                    return # Si hay contingencia, es prioridad; salimos del flujo.
+        else:
+            # Si es FREE, simplemente logueamos que se bloqueó el envío
+            print(f"🔒 [LIMIT] Contingencia bloqueada para usuario FREE: {user_id}")
+            
 
     # 2. PROCESAMIENTO DE ALERTAS DIARIAS
     if can_alerts:
@@ -268,9 +295,21 @@ def process_user(user, current_hour_str, contingency_data):
         schedule_data = alerts.get('schedule', {})
         
         if isinstance(schedule_data, dict) and is_schedule_window:
+            # --- 🛡️ LÓGICA DE CONVERSIÓN (NUEVO) ---
+            sent_this_run = 0 
+            # Contamos cuántas alertas TIENE activas el usuario en total
+            total_active_configs = len([v for v in schedule_data.values() if isinstance(v, dict) and v.get('active')])
+            # Leemos el límite del plan desde el bloque 1 (Cerebro)
+            max_allowed = config_tier.get("max_schedule_reports", 1)
+            
             for loc_name, config in schedule_data.items():
                 if not isinstance(config, dict) or not config.get('active'): 
                     continue
+
+                # 🚩 EL FILTRO: ¿Ya alcanzó el límite de su plan (Ej: 1 para Free)?
+                if sent_this_run >= max_allowed:
+                    print(f"🔒 [LIMIT] {first_name} alcanzó límite de reportes ({tier})")
+                    break # Deja de procesar más ubicaciones
 
                 # 🚩 VALIDACIÓN ÚNICA DE HORA (Limpieza Total)
                 # Extraemos la hora configurada por el usuario (ej: 07)
@@ -321,6 +360,15 @@ def process_user(user, current_hour_str, contingency_data):
                             # --- NUEVO: Extraer tendencia de la API ---
                             tendencia_actual = qa.get('tendencia', 'Estable 📊')
 
+                            # 2. 🚩 BLOQUE DE CONVERSIÓN (INSERTAR AQUÍ)
+                            limit_notice = ""
+                            if not is_premium and total_active_configs > max_allowed:
+                                limit_notice = f"\n\n⚠️ *Aviso:* Recibes {max_allowed} de {total_active_configs} reportes. ¡Hazte Premium para activarlos todos! 🚀"
+                            
+                            # 3. Generar Píldora HNC y Footer
+                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_vip)
+                            combined_footer = f"{hnc_text}{limit_notice}\n\n{cards.BOT_FOOTER}" # <-- IMPORTANTE: Inyectamos el notice
+
                             card = cards.CARD_REMINDER.format(
                                 greeting=get_time_greeting(),
                                 user_name=first_name, location_name=loc_data.get('display_name', loc_name),
@@ -351,6 +399,7 @@ def process_user(user, current_hour_str, contingency_data):
                             markup_reporte = {
                                 "inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]
                             }
+                            
                             send_telegram_photo_local(user_id, ruta_imagen, card, markup=markup_reporte)
                             # ---------------------------------------------
 
