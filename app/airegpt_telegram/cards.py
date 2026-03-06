@@ -684,9 +684,12 @@ def generate_advanced_settings_card(user_id):
     # Paracaídas para el link de Stripe
     try:
         import stripeairegpt
-        stripe_url = stripeairegpt.get_customer_portal_url(user_id)
-    except:
-        stripe_url = "https://billing.stripe.com/p/login/airegpt_placeholder" # Fallback manual
+        # Usamos la nueva función que definimos (que ya tiene tu link test_7sI8...)
+        stripe_url = stripeairegpt.get_management_portal_link() 
+    except Exception as e:
+        print(f"Error cargando link de Stripe: {e}")
+        # Tu link real de test como fallback final
+        stripe_url = "https://billing.stripe.com/p/login/test_7sI8A319ddOI7S0288"
     
     markup = {
         "inline_keyboard": [
