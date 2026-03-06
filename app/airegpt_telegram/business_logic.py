@@ -23,6 +23,8 @@ def get_tier_config(user_profile):
         return {
             "tier_name": "PREMIUM",
             "max_locations": 3,
+            "max_schedule_reports": 99,
+            "max_threshold_alerts": 99,
             "can_custom_alerts": True,      # Alertas a cualquier hora
             "can_contingency": True,       # Recibe avisos de contingencia
             "can_gamification": True,      # Acceso a Serpiente y Tetris
@@ -35,6 +37,8 @@ def get_tier_config(user_profile):
         return {
             "tier_name": "FREE",
             "max_locations": 2,            # Solo Casa y Trabajo
+            "max_schedule_reports": 1,
+            "max_threshold_alerts": 2,
             "fixed_reminder_hour": "09:00",# Única hora permitida para recordatorio
             "fixed_threshold": 100,        # Único umbral de emergencia permitido
             "can_custom_alerts": False,
