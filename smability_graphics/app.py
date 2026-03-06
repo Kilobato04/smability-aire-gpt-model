@@ -86,12 +86,7 @@ def ejecutar_job_nocturno():
             if dest_key and not es_ho:
                 lat_t, lon_t = locs[dest_key]['lat'], locs[dest_key]['lon']
                 resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}", timeout=5).json()
-                vector_t = resp_t.get("vectores", {}).get("ayer")
-                
-            if 'trabajo' in locs and not es_ho:
-                lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
-                resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}", timeout=5).json()
-                vector_t = resp_t.get("vectores", {}).get("ayer")
+                vector_t = resp_t.get("vectores", {}).get("ayer")               
 
             # 3. Calcular si hay datos
             if vector_c:
