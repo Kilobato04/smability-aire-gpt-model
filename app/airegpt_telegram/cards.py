@@ -673,11 +673,11 @@ def get_share_contingency_button():
 def generate_advanced_settings_card(user_id):
     """Genera la tarjeta de privacidad y gestión de suscripción"""
     text = (
-        "⚙️ **CONFIGURACIÓN AVANZADA**\n\n"
+        "⚙️ *CONFIGURACIÓN AVANZADA*\n\n"
         "Gestiona tu privacidad y tu relación con AIreGPT.\n\n"
-        "💳 **Suscripción:**\n"
+        "💳 *Suscripción:*\n"
         "Para cambiar tu método de pago, descargar facturas o cancelar tu plan Premium, toca el botón de abajo para ir al portal seguro de Stripe.\n\n"
-        "🗑️ **Zona de Peligro:**\n"
+        "🗑️ *Zona de Peligro:*\n"
         "Puedes eliminar permanentemente todos tus datos (ubicaciones, salud, vehículos). Esta acción es irreversible."
     )
     
