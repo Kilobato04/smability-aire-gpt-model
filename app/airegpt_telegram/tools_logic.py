@@ -79,34 +79,44 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
 # --- 📍 GESTIÓN DE UBICACIONES (Soporte 3 ranuras para Premium) ---
 def ejecutar_guardar_ubicacion(user_id, nombre, lat=None, lon=None, is_premium=False):
     try:
-        # 1. Normalizar la llave (ej. 'Casa' -> 'casa')
+        # 1. Normalizar la llave
         key = normalize_key(nombre)
         if not key: return "⚠️ Nombre de ubicación no válido."
 
-        # 2. Obtener datos actuales para verificar límites y buscar el DRAFT
+        # 2. Obtener datos actuales
         user_data = table.get_item(Key={'user_id': str(user_id)}).get('Item', {})
         locs = user_data.get('locations', {})
         
-        # 🚨 RESCATE DE COORDENADAS: Si no vienen en la tool, las sacamos del PIN previo (draft)
+        # 🚨 RESCATE DE COORDENADAS
         if lat is None or lon is None:
             draft = user_data.get('draft_location')
             if draft and isinstance(draft, dict):
-                lat = draft.get('lat')
-                lon = draft.get('lon')
-            
+                lat, lon = draft.get('lat'), draft.get('lon')
             if not lat or not lon:
                 return "⚠️ No encontré coordenadas pendientes. Por favor envía primero tu ubicación con el clip 📎."
 
-        # 3. Lógica de Límites (3 para Premium, 2 para Free)
+        # --- 🎯 FIX DESTINO FLEXIBLE: DETECCIÓN Y LIMPIEZA ---
+        # Regla: Si no es 'casa', es un destino para la ruta.
+        es_destino = (key != 'casa') 
+
+        if es_destino:
+            # Quitamos el flag 'is_destination' de cualquier lugar que lo tuviera antes
+            for k, v in locs.items():
+                if v.get('is_destination'):
+                    table.update_item(
+                        Key={'user_id': str(user_id)},
+                        UpdateExpression=f"REMOVE locations.{k}.is_destination"
+                    )
+        # ----------------------------------------------------
+
+        # 3. Lógica de Límites
         activas = [k for k, v in locs.items() if isinstance(v, dict) and v.get('active')]
         limite = 3 if is_premium else 2
-        
         if len(activas) >= limite and key not in locs:
             plan = "Premium" if is_premium else "Gratis"
             return f"🛑 Límite de {limite} lugares alcanzado para tu plan {plan}. Borra uno para agregar '{nombre}'."
 
-        # 4. Guardado Atómico en DynamoDB + LIMPIEZA DEL DRAFT
-        # Agregamos 'REMOVE draft_location' para limpiar la memoria temporal
+        # 4. Guardado Atómico con el nuevo atributo 'is_destination'
         table.update_item(
             Key={'user_id': str(user_id)},
             UpdateExpression="SET locations.#loc = :val, alerts.threshold.#loc = :alert REMOVE draft_location",
@@ -116,30 +126,92 @@ def ejecutar_guardar_ubicacion(user_id, nombre, lat=None, lon=None, is_premium=F
                     'display_name': nombre.strip().capitalize(),
                     'lat': str(lat),
                     'lon': str(lon),
-                    'active': True
+                    'active': True,
+                    'is_destination': es_destino # <--- ESTE ES EL MOTOR DEL CAMBIO
                 },
                 ':alert': {'umbral': 100, 'active': True, 'consecutive_sent': 0}
             }
         )
         
-        return f"Éxito: Ubicación '{nombre.capitalize()}' guardada correctamente."
+        msg = f"Éxito: Ubicación '{nombre.capitalize()}' guardada correctamente."
+        if es_destino:
+            msg += f" Se ha configurado como tu destino principal para el cálculo de exposición."
+        return msg
 
     except Exception as e:
         print(f"❌ Error en guardar_ubicacion: {e}")
         return f"⚠️ Error al guardar en DB: {str(e)}"
 
+def ejecutar_renombrar_ubicacion(user_id, nombre_actual, nombre_nuevo):
+    """
+    Cambia el nombre de una ubicación existente y preserva su estatus de destino.
+    """
+    try:
+        key_old = normalize_key(nombre_actual)
+        key_new = normalize_key(nombre_nuevo)
+        
+        # 1. Obtener perfil actual
+        user_data = table.get_item(Key={'user_id': str(user_id)}).get('Item', {})
+        locs = user_data.get('locations', {})
+
+        if key_old not in locs:
+            return f"⚠️ No encontré '{nombre_actual}' en tu lista."
+        
+        if key_new in locs:
+            return f"⚠️ Ya tienes un lugar llamado '{nombre_nuevo}'. Elige otro nombre."
+
+        # 2. Extraer datos viejos y actualizar el nombre visual
+        loc_data = locs[key_old]
+        loc_data['display_name'] = nombre_nuevo.strip().capitalize()
+        
+        # --- 🎯 LOGICA DESTINO FLEXIBLE EN RENOMBRADO ---
+        # Si el nuevo nombre no es 'casa', nos aseguramos de que sea el destino
+        es_destino = (key_new != 'casa')
+        loc_data['is_destination'] = es_destino
+        
+        # Si es destino, limpiamos el flag de los demás (por si acaso)
+        if es_destino:
+            for k in locs:
+                if k != key_old and locs[k].get('is_destination'):
+                    table.update_item(
+                        Key={'user_id': str(user_id)},
+                        UpdateExpression=f"REMOVE locations.{k}.is_destination"
+                    )
+
+        # 3. Operación atómica: Crear nueva llave y borrar la vieja (con sus alertas)
+        update_expr = (
+            "SET locations.#newk = :val "
+            "REMOVE locations.#oldk, alerts.threshold.#oldk, alerts.schedule.#oldk"
+        )
+        
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression=update_expr,
+            ExpressionAttributeNames={'#newk': key_new, '#oldk': key_old},
+            ExpressionAttributeValues={':val': loc_data}
+        )
+        
+        return f"Éxito: He renombrado '{nombre_actual}' a '{nombre_nuevo.capitalize()}'."
+
+    except Exception as e:
+        print(f"❌ Error renombrando: {e}")
+        return f"⚠️ Error al renombrar en la base de datos."
+
 # --- 🗑️ BORRADO ESPECÍFICO (Refuerzo) ---
 def ejecutar_borrar_ubicacion(user_id, nombre):
     try:
         key = normalize_key(nombre)
-        # En lugar de REMOVE (que borra la llave), marcamos active: False 
-        # para mantener consistencia si hay alertas amarradas, o REMOVE si prefieres limpieza total.
+        # Verificamos si existe antes de intentar borrar
+        user_data = table.get_item(Key={'user_id': str(user_id)}).get('Item', {})
+        if key not in user_data.get('locations', {}):
+            return f"⚠️ No encontré ninguna ubicación llamada '{nombre}'."
+
         table.update_item(
             Key={'user_id': str(user_id)},
             UpdateExpression="REMOVE locations.#k, alerts.threshold.#k, alerts.schedule.#k",
             ExpressionAttributeNames={'#k': key}
         )
-        return f"Éxito: Ubicación '{nombre}' eliminada."
+        return f"Éxito: Ubicación '{nombre}' y sus alertas han sido eliminadas."
     except Exception as e:
         return f"⚠️ Error al eliminar: {str(e)}"
 
