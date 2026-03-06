@@ -327,6 +327,20 @@ def confirm_saved_location(user_id, tipo):
             if not can_proceed: 
                 send_telegram(user_id, msg, markup) # Le mandamos el Paywall con los botones
                 return "🛑 Límite alcanzado o suscripción requerida." # Mensaje interno para que GPT entienda
+
+        # --- 🎯 FIX: LÓGICA DE DESTINO FLEXIBLE ---
+        # Regla: Si NO es 'casa', es un destino potencial.
+        es_destino = (key != 'casa') 
+
+        # Si es un nuevo destino, primero quitamos el sello de destino a cualquier otra ubicación
+        if es_destino:
+            for k, v in locs.items():
+                if v.get('is_destination'):
+                    table.update_item(
+                        Key={'user_id': str(user_id)},
+                        UpdateExpression=f"REMOVE locations.{k}.is_destination"
+                    )
+        # --------------------------------------------
         
         # --- FIX ÍTEM 6: INYECTAR ALERTA DEFAULT DE 100 PTS ---
         alerta_default = {'umbral': 100, 'active': True, 'consecutive_sent': 0}
@@ -343,19 +357,28 @@ def confirm_saved_location(user_id, tipo):
             UpdateExpression=update_expr, 
             ExpressionAttributeNames={'#loc': key}, 
             ExpressionAttributeValues={
-                ':val': {'lat': draft['lat'], 'lon': draft['lon'], 'display_name': display_name, 'active': True},
-                ':alert_val': alerta_default # <--- ALERTA CREADA AUTOMÁTICAMENTE
+                ':val': {
+                    'lat': draft['lat'], 
+                    'lon': draft['lon'], 
+                    'display_name': display_name, 
+                    'active': True,
+                    'is_destination': es_destino # <--- AQUÍ SE ANCLA EL DESTINO
+                },
+                ':alert_val': alerta_default
             }
         )
         
         # 4. Confirmación
-        user = get_user_profile(user_id)
-        count = len(user.get('locations', {}))
+        user_final = get_user_profile(user_id)
+        count = len(user_final.get('locations', {}))
         
         msg = f"✅ **{display_name} guardada.**\n🚨 *Alerta de emergencia activada (>100 pts).*"
         
-        # --- FIX TAREA 12: AVISO DE "PRUEBA DE VALOR" ---
-        tier, _ = stripeairegpt.evaluate_user_tier(user)
+        # Feedback visual de la ruta
+        if es_destino:
+            msg += f"\n📍 *Tu nueva ruta de exposición es: Casa ↔ {display_name}*"
+
+        tier, _ = stripeairegpt.evaluate_user_tier(user_final)
         if tier == 'FREE':
             msg += "\n\n🎁 *Bonus:* Recibirás hasta **3 alertas automáticas gratis** para probar el servicio."
             
