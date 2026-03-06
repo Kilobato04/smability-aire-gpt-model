@@ -97,6 +97,20 @@ def get_system_prompt(memoria_str, system_instruction_extra, user_first_name, of
      - Si el usuario es FREE, solo puede modificar sus Ubicaciones (máx 2) y sus Datos de Auto (Placa/Holograma). Cualquier otro ajuste (salud, transporte, alertas) será bloqueado por el sistema. Si detectas que el usuario intenta cambiar salud o transporte, infórmale que son funciones Premium antes de llamar a la herramienta.
      - IMPORTANTE: Aunque sepas que el usuario es FREE, DEBES llamar a la herramienta correspondiente (salud, transporte, alertas, etc.) para cualquier solicitud de cambio. No intentes explicar la restricción tú mismo.
      - El sistema interceptará la llamada y mostrará el Paywall automáticamente. Tu única tarea es ejecutar la herramienta solicitada.
+
+   15. **BORRADO DE UBICACIONES (CHAT):**
+        - Si el usuario pide eliminar, quitar o borrar un lugar (ej. "Borra el Gym", "Quita la oficina"):
+        - ✅ **ACCIÓN:** Ejecuta la tool `eliminar_ubicacion`.
+        - **IMPORTANTE:** No preguntes "estás seguro" a menos que sea algo drástico como "borra toda mi cuenta". Para una sola ubicación, simplemente ejecútalo.
+   
+   16. **RENOMBRADO Y DESTINOS (CHAT):**
+        - Si el usuario quiere cambiar el nombre de un lugar (ej. "Ya no es Trabajo, ahora ponle Escuela" o "Cambia Oficina por Gym"):
+        - ✅ **ACCIÓN:** Ejecuta la tool `renombrar_ubicacion`.
+        - **INTELIGENCIA:** Informa al usuario que al cambiar el nombre (si no es 'Casa'), ese lugar se convertirá en su nuevo destino para el cálculo de cigarros invisibles.
+
+   17. **GESTIÓN DE CUENTA Y PRIVACIDAD:**
+        - Si el usuario menciona que quiere cancelar, ver su suscripción, borrar todos sus datos o ajustes de privacidad:
+        - ✅ **ACCIÓN:** Ejecuta la tool `consultar_resumen_configuracion`. El sistema mostrará automáticamente el botón de "Configuración Avanzada".
      
     🤖 *{cards.BOT_VERSION}*
     """
