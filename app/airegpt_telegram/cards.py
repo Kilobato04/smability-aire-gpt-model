@@ -474,7 +474,8 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
             if v.get('active'):
                 safe_k = clean(k.capitalize())
                 safe_name = clean(v.get('display_name', k))
-                locs.append(f"• **{safe_k}:** {safe_name}")
+                is_dest_label = " 🎯" if v.get('is_destination') else "" 
+                locs.append(f"• **{safe_k}:** {safe_name}{is_dest_label}")
     loc_str = "\n".join(locs) if locs else "• *Sin ubicaciones guardadas*"
 
     # 3. SALUD (🔒 Candado si es FREE)
