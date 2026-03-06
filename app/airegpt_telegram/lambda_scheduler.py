@@ -211,6 +211,8 @@ def process_user(user, current_hour_str, contingency_data):
     is_premium = (tier == "PREMIUM")
     config_tier = business_logic.get_tier_config(user)
 
+    is_vip = config_tier.get("is_vip", False)
+
     # ⚓ ANCLA A: FIX DE ROBUSTEZ
     alerts = user.get('alerts', {})
     if not isinstance(alerts, dict): return
