@@ -107,3 +107,22 @@ def get_paywall_response(tier, days_left, attempted_action, user_id):
         texto = cards.CARD_PAYWALL.format(action_text=action_text)
         botones = get_checkout_buttons(user_id)
         return texto, botones
+
+# ==========================================
+# 5. GENERADOR DEL PORTAL DE GESTIÓN (NUEVO)
+# ==========================================
+def get_management_portal_link(user_item):
+    """
+    Retorna el link del portal de Stripe. 
+    Si no tiene un customer_id de Stripe, mandamos al login general.
+    """
+    sub = user_item.get('subscription', {})
+    stripe_customer_id = sub.get('stripe_customer_id') # Asegúrate de guardar esto al recibir el webhook de pago
+
+    if stripe_customer_id:
+        # Si tienes habilitado el Customer Portal en el Dashboard de Stripe:
+        # Se puede generar un link dinámico, pero el "Direct Link" suele ser:
+        return "https://billing.stripe.com/p/login/3cI3cw8Uj1rM5Ikg5M2Ji00" # <--- SUSTITUYE POR TU PORTAL ID REAL
+    
+    # Fallback si no hay ID
+    return "https://billing.stripe.com/p/login/"
