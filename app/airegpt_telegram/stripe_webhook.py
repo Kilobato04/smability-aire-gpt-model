@@ -56,15 +56,23 @@ def lambda_handler(event, context):
                     user_name=safe_name
                 )
                 
-                # Enviamos el Handshake a Telegram con link_preview deshabilitado
+                # 2. El payload incluye el botón (reply_markup)
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
                 payload = {
                     "chat_id": str(user_id), 
                     "text": mensaje, 
                     "parse_mode": "Markdown",
-                    "link_preview_options": {"is_disabled": True} # <--- FIX ESTÉTICO
+                    "link_preview_options": {"is_disabled": True},
+                    "reply_markup": json.dumps({ # <--- AQUÍ SE AGREGA EL BOTÓN
+                        "inline_keyboard": [
+                            [
+                                {"text": "👤 Ver mi Perfil Premium", "callback_data": "menu_perfil"}
+                            ]
+                        ]
+                    })
                 }
                 
+                # 3. Envío
                 requests.post(url, json=payload)
                 print(f"✅ Mensaje de bienvenida enviado a {safe_name} ({user_id})")
                 
