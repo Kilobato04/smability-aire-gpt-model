@@ -201,16 +201,21 @@ def generar_grafica_serpiente(user_id):
     # --- 🎯 IDENTIFICACIÓN DINÁMICA DEL DESTINO ---
     # Buscamos la primera ubicación que NO sea 'casa'
     # Priorizamos la que el usuario haya marcado como destino principal
+    # 1. Identificamos la llave (técnica) del destino
     destino_key = next((k for k, v in locs.items() if v.get('is_destination')), None)
     
-    # Si no hay ninguna marcada, tomamos la primera llave que no sea 'casa' (compatibilidad)
+    # 2. Si no hay marcada, tomamos la primera que no sea casa
     if not destino_key:
         destino_key = next((k for k in locs.keys() if k != 'casa'), None)
 
-    # Nombre que aparecerá en la etiqueta rosa de la gráfica
-    nombre_destino_visual = "DESTINO"
-    if destino_key:
-        nombre_destino_visual = locs[destino_key].get('display_name', destino_key).upper()
+    # 3. Asignación del nombre visual (El que se dibuja en la gráfica)
+    if destino_key and destino_key in locs:
+        # Priorizamos display_name, si no existe usamos la llave, si no "DESTINO"
+        raw_name = locs[destino_key].get('display_name', destino_key)
+        nombre_destino_visual = str(raw_name).upper()
+    else:
+        # Este es el 'else' que mencionas por si no encuentra absolutamente nada
+        nombre_destino_visual = "DESTINO"
     
     # --- LÓGICA DINÁMICA DE TRANSPORTE ---
     transp = user.get('profile_transport', {'medio': 'auto_ventana', 'tiempo_traslado_horas': 2})
@@ -218,9 +223,10 @@ def generar_grafica_serpiente(user_id):
     duracion_traslado = float(transp.get('tiempo_traslado_horas', 2))
     es_ho = (transp.get('medio') == 'home_office')
 
-    if es_ho or 'trabajo' not in locs:
-        hora_salida, hora_llegada_casa = 25, 25 # Nunca ocurre en un día de 24h
+    if es_ho or not destino_key:
+        hora_salida, hora_llegada_casa = 25, 25 # Se queda en casa
         hora_llegada_trabajo, hora_salida_trabajo = 25, 25
+
     else:
         hora_salida = 7  # Sale de casa a las 7 AM
         mitad_traslado = math.ceil(duracion_traslado / 2.0)
@@ -236,12 +242,6 @@ def generar_grafica_serpiente(user_id):
     resp_t = resp_c 
     if destino_key and not es_ho: # <--- Usar destino_key en lugar de 'trabajo'
         lat_t, lon_t = locs[destino_key]['lat'], locs[destino_key]['lon']
-        resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}", timeout=20).json()
-    
-    # Traer Vectores (TRABAJO - Si aplica)
-    resp_t = resp_c 
-    if 'trabajo' in locs and not es_ho:
-        lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
         resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}", timeout=20).json()
 
     # 3. MOTOR DE MEZCLA
@@ -264,19 +264,22 @@ def generar_grafica_serpiente(user_id):
         h = base_dt.hour + offset
         h_norm = h % 24
         
-        # --- APLICACIÓN DE LA RUTINA DEL USUARIO ---
-        if es_ho or 'trabajo' not in locs:
+        # --- APLICACIÓN DE LA RUTINA DEL USUARIO (FIX DESTINO FLEXIBLE) ---
+        # Si es Home Office o NO hay ningún destino configurado (ni trabajo ni otro)
+        if es_ho or not destino_key:
             estado = 'casa'
             val = casa_full[i]
         else:
+            # El usuario sí tiene un destino (ej. IBERO) y no es HO
             if h_norm < hora_salida or h_norm >= hora_llegada_casa:
                 estado = 'casa'
                 val = casa_full[i]
             elif hora_salida <= h_norm < hora_llegada_trabajo:
                 estado = 'transito'
+                # Usamos trabajo_full que ya contiene los datos del destino_key
                 val = max(casa_full[i], trabajo_full[i]) + 15 
             elif hora_llegada_trabajo <= h_norm < hora_salida_trabajo:
-                estado = 'trabajo'
+                estado = 'trabajo' # Se queda como llave técnica para el color rosa
                 val = trabajo_full[i]
             elif hora_salida_trabajo <= h_norm < hora_llegada_casa:
                 estado = 'transito'
