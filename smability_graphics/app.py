@@ -62,7 +62,14 @@ def ejecutar_job_nocturno():
     for user in usuarios:
         user_id = user.get('user_id')
         locs = user.get('locations', {})
+        # 1. Traemos el objeto (con valores por defecto)
         transp = user.get('profile_transport', {'medio': 'auto_ventana', 'horas': 2})
+        
+        # 2. Normalizamos la duración (buscamos en ambas llaves posibles)
+        duracion = float(transp.get('tiempo_traslado_horas', transp.get('horas', 2)))
+        
+        # 3. Aseguramos que la llave que usa la Calculadora esté presente
+        transp['tiempo_traslado_horas'] = duracion
         
         # Saltamos a los que no han configurado su casa
         if not isinstance(locs, dict) or 'casa' not in locs: continue
