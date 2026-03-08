@@ -3,7 +3,7 @@ import os
 import requests
 import boto3
 from datetime import datetime
-import cards # <--- Importamos nuestro UI centralizado
+import cards 
 
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 DYNAMODB_TABLE = 'SmabilityUsers'
@@ -15,10 +15,11 @@ def lambda_handler(event, context):
     
     try:
         body = json.loads(event.get('body', '{}'))
+        event_type = body.get('type')
         
-        if body.get('type') == 'checkout.session.completed':
+        # --- CASO 1: PAGO COMPLETADO ---
+        if event_type == 'checkout.session.completed':
             session = body['data']['object']
-            
             user_id = session.get('client_reference_id')
             customer_id = session.get('customer')
             sub_id = session.get('subscription', 'pago_unico') 
@@ -26,7 +27,6 @@ def lambda_handler(event, context):
             print(f"💰 Pago exitoso detectado. Telegram ID: {user_id}")
             
             if user_id:
-                # Actualizamos y pedimos que nos devuelva el registro completo (ALL_NEW)
                 response = table.update_item(
                     Key={'user_id': str(user_id)},
                     UpdateExpression="SET subscription = :sub",
@@ -41,20 +41,13 @@ def lambda_handler(event, context):
                     },
                     ReturnValues="ALL_NEW" 
                 )
-                print("✅ DynamoDB actualizado a PREMIUM.")
                 
-                # Extraemos el nombre del usuario para el mensaje personalizado
                 user_data = response.get('Attributes', {})
                 first_name = user_data.get('first_name', 'Usuario')
-                
-                # --- FIX AJUSTE 2: BIENVENIDA LIMPIA ---
-                # Definimos una función rápida de limpieza para el nombre
                 safe_name = str(first_name).replace("_", " ").replace("*", "")
                 
-                # Uso de la tarjeta desde cards.py (Limpio)
                 mensaje = cards.CARD_WELCOME_PREMIUM.format(user_name=safe_name)
                 
-                # Envío a Telegram
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
                 payload = {
                     "chat_id": str(user_id), 
@@ -67,12 +60,48 @@ def lambda_handler(event, context):
                         ]
                     })
                 }
-                
-                
-                # Envío
                 requests.post(url, json=payload)
-                print(f"✅ Mensaje de bienvenida enviado a {safe_name} ({user_id})")
+                print(f"✅ Bienvenida enviada a {safe_name}")
+
+        # --- CASO 2: SUSCRIPCIÓN CANCELADA ---
+        elif event_type == 'customer.subscription.deleted':
+            session = body['data']['object']
+            customer_id = session.get('customer')
+            
+            print(f"📉 Evento de cancelación para customer: {customer_id}")
+            
+            # Buscamos al usuario por su stripe_customer_id
+            scan_res = table.scan(
+                FilterExpression=boto3.dynamodb.conditions.Attr('subscription.stripe_customer_id').eq(customer_id)
+            )
+            items = scan_res.get('Items', [])
+            
+            if items:
+                user = items[0]
+                user_id = user['user_id']
+                safe_name = user.get('first_name', 'Usuario').replace("_", " ").replace("*", "")
                 
+                # Degradamos a FREE
+                table.update_item(
+                    Key={'user_id': user_id},
+                    UpdateExpression="SET subscription.status = :s, subscription.tier = :t",
+                    ExpressionAttributeValues={':s': 'FREE', ':t': 'FREE'}
+                )
+                
+                mensaje = cards.CARD_GOODBYE_PREMIUM.format(user_name=safe_name)
+                
+                url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+                payload = {
+                    "chat_id": str(user_id),
+                    "text": mensaje,
+                    "parse_mode": "Markdown",
+                    "reply_markup": json.dumps({
+                        "inline_keyboard": [[{"text": "💎 Reactivar Premium", "callback_data": "GO_PREMIUM"}]]
+                    })
+                }
+                requests.post(url, json=payload)
+                print(f"📉 Suscripción cancelada y mensaje enviado a {safe_name}")
+
         return {'statusCode': 200, 'body': 'Webhook procesado con éxito'}
         
     except Exception as e:
