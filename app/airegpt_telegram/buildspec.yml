@@ -6,6 +6,7 @@ env:
     LAMBDA_BOT_NAME: "Smability-Chatbot"
     LAMBDA_SCHEDULER_NAME: "Smability-Scheduler"
     LAMBDA_SCRAPER_NAME: "Smability-CAMe-Scraper" # <--- NUEVA LAMBDA
+    LAMBDA_STRIPE_NAME: "Smability-Stripe-Webhook"
     AWS_REGION: "us-east-1"
 
 phases:
@@ -52,5 +53,6 @@ phases:
       aws lambda update-function-code --function-name $LAMBDA_BOT_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG
       aws lambda update-function-code --function-name $LAMBDA_SCHEDULER_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG
       aws lambda update-function-code --function-name $LAMBDA_SCRAPER_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG # <--- NUEVA ACTUALIZACIÓN
+      aws lambda update-function-code --function-name $LAMBDA_STRIPE_NAME --image-uri $REPOSITORY_URI:$IMAGE_TAG
       
       echo "✅ Despliegue completado."
