@@ -406,6 +406,28 @@ Pideme *ver mi resumen* o dime qué quieres configurar ahora. 🚀
 
 💎 *¡Gracias por apoyarnos!* Tu cuenta Premium ya está activa."""
 
+# --- TARJETAS DE CIERRE Y DESPEDIDA ---
+
+CARD_GOODBYE_PREMIUM = """👋 *¡HASTA PRONTO!* {user_name} 🍃
+
+Tu suscripción *Premium* ha finalizado y tus funciones avanzadas han sido pausadas. 
+
+*¿Qué significa esto?*
+🔒 Reportes horarios por ubicación desactivados.
+🔒 Alertas de umbral o nivel pausadas.
+🔒 Verificación de No Circula bloqueada.
+🔒 Gráficas de exposisicón y edad urbanas bloquedas.
+
+A partir de ahora, solo recibirás un máximo de 3 alertas o reportes de una sola ubicación. 
+
+✨ *¡Gracias por habernos permitido cuidarte!* Estaré aquí si decides volver a activar tus superpoderes. 🚀"""
+
+CARD_DELETE_ACCOUNT = """🗑️ *PERFIL ELIMINADO*
+
+He borrado todos tus datos y configuraciones de mi base de datos de forma permanente. 
+
+🌬️ *¡Cuídate mucho!* {user_name} Si alguna vez necesitas volver a consultar la calidad del aire o configurar alertas, solo dime *Hola*."""
+
 # --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
 def get_exposure_button():
     """Botón para calcular exposición + Retorno al resumen"""
