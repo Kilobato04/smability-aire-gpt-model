@@ -415,10 +415,11 @@ Tu suscripción *Premium* ha finalizado y tus funciones avanzadas han sido pausa
 *¿Qué significa esto?*
 🔒 Reportes horarios por ubicación desactivados.
 🔒 Alertas de umbral o nivel pausadas.
-🔒 Verificación de No Circula bloqueada.
+🔒 Alertas de Contingencia desactivada.
+🔒 Verificación de Hoy No Circula bloqueada.
 🔒 Gráficas de exposisicón y edad urbanas bloquedas.
 
-A partir de ahora, solo recibirás un máximo de 3 alertas o reportes de una sola ubicación. 
+A partir de ahora, solo recibirás un máximo de 3 alertas o reportes para una sola ubicación. 
 
 ✨ *¡Gracias por habernos permitido cuidarte!* Estaré aquí si decides volver a activar tus superpoderes. 🚀"""
 
