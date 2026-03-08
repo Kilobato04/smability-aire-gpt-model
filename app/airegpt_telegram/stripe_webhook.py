@@ -51,36 +51,25 @@ def lambda_handler(event, context):
                 # Definimos una función rápida de limpieza para el nombre
                 safe_name = str(first_name).replace("_", " ").replace("*", "")
                 
-                TEXTO_BIENVENIDA = (
-                                    "🎉 *¡PAGO CONFIRMADO!* 💎\n\n"
-                                    "Bienvenido a *AIreGPT Premium*, {user_name}. Tu cuenta ha sido desbloqueada exitosamente.\n\n"
-                                    "*Tus nuevos superpoderes están listos:*\n"
-                                    "✅ Alertas automáticas reactivadas.\n"
-                                    "✅ Cálculo de exposición diario desbloqueado.\n"
-                                    "✅ Soporte para 3 ubicaciones y reportes programados.\n\n"
-                                    "Pídeme *ver mi resumen* o dime qué quieres configurar ahora. 🚀\n\n"
-                                    "💎 *¡Gracias por apoyarnos!* Tu cuenta Premium ya está activa."
-                                )
+                # Uso de la tarjeta desde cards.py (Limpio)
+                mensaje = cards.CARD_WELCOME_PREMIUM.format(user_name=safe_name)
                 
-                mensaje = TEXTO_BIENVENIDA.format(user_name=safe_name)
-                
-                # 2. El payload incluye el botón (reply_markup)
+                # Envío a Telegram
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
                 payload = {
                     "chat_id": str(user_id), 
                     "text": mensaje, 
                     "parse_mode": "Markdown",
                     "link_preview_options": {"is_disabled": True},
-                    "reply_markup": json.dumps({ # <--- AQUÍ SE AGREGA EL BOTÓN
+                    "reply_markup": json.dumps({
                         "inline_keyboard": [
-                            [
-                                {"text": "👤 Ver mi Perfil Premium", "callback_data": "ver_resumen"}
-                            ]
+                            [{"text": "👤 Ver mi Perfil Premium", "callback_data": "ver_resumen"}]
                         ]
                     })
                 }
                 
-                # 3. Envío
+                
+                # Envío
                 requests.post(url, json=payload)
                 print(f"✅ Mensaje de bienvenida enviado a {safe_name} ({user_id})")
                 
