@@ -84,8 +84,15 @@ def lambda_handler(event, context):
                 # Degradamos a FREE
                 table.update_item(
                     Key={'user_id': user_id},
-                    UpdateExpression="SET subscription.status = :s, subscription.tier = :t",
-                    ExpressionAttributeValues={':s': 'FREE', ':t': 'FREE'}
+                    UpdateExpression="SET subscription.#s = :s, subscription.#t = :t",
+                    ExpressionAttributeNames={
+                        "#s": "status",
+                        "#t": "tier"
+                    },
+                    ExpressionAttributeValues={
+                        ":s": "FREE",
+                        ":t": "FREE"
+                    }
                 )
                 
                 mensaje = cards.CARD_GOODBYE_PREMIUM.format(user_name=safe_name)
