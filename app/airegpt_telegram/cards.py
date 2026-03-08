@@ -393,7 +393,7 @@ Para {action_text}, necesitas activar *AIreGPT Premium*.
 
 👇 *Elige tu plan para desbloquear tu cuenta inmediatamente:*"""
 
-CARD_WELCOME_PREMIUM = """🎉 *¡PAGO CONFIRMADO!* 💎
+CARD_WELCOME_PREMIUM = """🎉 *¡PAGO CONFIRMADO-TEST!* 💎
         
 Bienvenido a *AIreGPT Premium*, {user_name}. Tu cuenta ha sido desbloqueada exitosamente.
 
