@@ -51,10 +51,18 @@ def lambda_handler(event, context):
                 # Definimos una función rápida de limpieza para el nombre
                 safe_name = str(first_name).replace("_", " ").replace("*", "")
                 
-                # Ya no pasamos footer=cards.BOT_FOOTER porque la nueva card no lo pide
-                mensaje = cards.CARD_WELCOME_PREMIUM.format(
-                    user_name=safe_name
-                )
+                TEXTO_BIENVENIDA = (
+                                    "🎉 *¡PAGO CONFIRMADO!* 💎\n\n"
+                                    "Bienvenido a *AIreGPT Premium*, {user_name}. Tu cuenta ha sido desbloqueada exitosamente.\n\n"
+                                    "*Tus nuevos superpoderes están listos:*\n"
+                                    "✅ Alertas automáticas reactivadas.\n"
+                                    "✅ Cálculo de exposición diario desbloqueado.\n"
+                                    "✅ Soporte para 3 ubicaciones y reportes programados.\n\n"
+                                    "Pídeme *ver mi resumen* o dime qué quieres configurar ahora. 🚀\n\n"
+                                    "💎 *¡Gracias por apoyarnos!* Tu cuenta Premium ya está activa."
+                                )
+                
+                mensaje = TEXTO_BIENVENIDA.format(user_name=safe_name)
                 
                 # 2. El payload incluye el botón (reply_markup)
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
