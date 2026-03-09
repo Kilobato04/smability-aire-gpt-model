@@ -1958,7 +1958,7 @@ def lambda_handler(event, context):
                             report_text, calidad = generate_report_card(
                                 first_name, in_name, in_lat, in_lon, 
                                 vehicle=veh, contingency_phase=current_phase,
-                                user_profile=user_profile, is_premium=is_premium_user
+                                user_profile=user_profile, is_premium=is_prem_val
                             )
                             
                             # --- SELECCIÓN DINÁMICA DE BANNER ---
