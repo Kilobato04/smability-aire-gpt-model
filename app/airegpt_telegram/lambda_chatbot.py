@@ -318,9 +318,11 @@ def confirm_saved_location(user_id, tipo):
         # Validación de seguridad: Si no hay mapa, no guardamos nada.
         if not draft: return "⚠️ No encontré coordenadas recientes. Por favor toca el clip 📎 y envía la ubicación de nuevo."
         
-        # 1. Normalización Robusta (Zócalo -> zocalo)
+        # 1. Normalización y LÍMITE DE CARACTERES (Máx 15 para la DB)
         key = normalize_key(tipo)
-        display_name = tipo.strip().capitalize() # Mantiene tilde visualmente (Zócalo)
+        raw_name = tipo.strip().capitalize()
+        # 🚀 FIX: Cortamos el nombre a 15 letras para que no rompa las gráficas ni las tarjetas
+        display_name = raw_name if len(raw_name) <= 15 else raw_name[:13] + ".."
 
         locs = user.get('locations', {})
         is_new = key not in locs
@@ -376,7 +378,7 @@ def confirm_saved_location(user_id, tipo):
         user_final = get_user_profile(user_id)
         count = len(user_final.get('locations', {}))
         
-        msg = f"✅ **{display_name} guardada.**\n🚨 *Alerta de emergencia activada (>100 pts).*"
+        msg = f"✅ **'{display_name}' guardada exitosamente.**\n🚨 *Alerta de emergencia activada (>100 pts).*"
         
         # Feedback visual de la ruta
         if es_destino:
@@ -661,12 +663,13 @@ def generate_report_card(user_name, location_name, lat, lon, vehicle=None, conti
 # --- SENDING ---
 def get_inline_markup(tag):
     if tag == "CONFIRM_HOME": return {"inline_keyboard": [[{"text": "✅ Sí, es Casa", "callback_data": "SAVE_HOME"}], [{"text": "🔄 Cambiar", "callback_data": "RESET"}]]}
-    if tag == "CONFIRM_WORK": return {"inline_keyboard": [[{"text": "✅ Sí, es Trabajo", "callback_data": "SAVE_WORK"}], [{"text": "🔄 Cambiar", "callback_data": "RESET"}]]}
+    if tag == "CONFIRM_WORK": return {"inline_keyboard": [[{"text": "✅ Sí, es mi Destino Principal", "callback_data": "SAVE_WORK"}], [{"text": "🔄 Cambiar", "callback_data": "RESET"}]]}
     
-    # --- UPDATE: MENÚ DE 3 OPCIONES ---
+    # --- UPDATE: MENÚ DE 3 OPCIONES PARA DESTINO FLEXIBLE ---
     if tag == "SELECT_TYPE": return {"inline_keyboard": [
-        [{"text": "🏠 Casa", "callback_data": "SAVE_HOME"}, {"text": "🏢 Trabajo", "callback_data": "SAVE_WORK"}],
-        [{"text": "📍 Guardar con otro nombre", "callback_data": "SAVE_OTHER"}], # <--- NUEVO BOTÓN
+        [{"text": "🏠 Es mi Casa", "callback_data": "SAVE_HOME"}],
+        [{"text": "🏢 Trabajo (Destino)", "callback_data": "SAVE_WORK"}],
+        [{"text": "📍 Otro nombre (Ej. Gym)", "callback_data": "SAVE_OTHER"}],
         [{"text": "❌ Cancelar", "callback_data": "RESET"}]
     ]}
     return None
