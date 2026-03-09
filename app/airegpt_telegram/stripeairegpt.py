@@ -10,11 +10,14 @@ STRIPE_LINK_MONTHLY = "https://buy.stripe.com/test_3cI3cw8Uj1rM5Ikg5M2Ji00"
 STRIPE_LINK_SEMESTRAL = "https://buy.stripe.com/test_9B6bJ20nNb2meeQg5M2Ji02"
 STRIPE_LINK_ANNUAL = "https://buy.stripe.com/test_fZuaEY3zZ8Uec6IbPw2Ji01"
 
-TRIAL_DAYS = 5
+TRIAL_DAYS = 2
 
 def get_mexico_time():
     return datetime.utcnow() - timedelta(hours=6)
 
+# ==========================================
+# 2. EL GATEKEEPER (Evaluador de Estatus con Trial)
+# ==========================================
 # ==========================================
 # 2. EL GATEKEEPER (Evaluador de Estatus con Trial)
 # ==========================================
@@ -31,14 +34,14 @@ def evaluate_user_tier(user_item):
     if "PREMIUM" in current_status or "MANUAL" in current_status:
         return 'PREMIUM', 0
         
-    # 2. Evaluar Trial de 5 Días (Solo si es FREE)
+    # 2. Evaluar Trial Dinámico (Solo si es FREE)
     if "FREE" in current_status:
-        # Buscamos la fecha de creación. Si es usuario viejo, usamos last_interaction como salvavidas
+        # Buscamos la fecha de creación o su última interacción como salvavidas
         created_at_str = user_item.get('created_at', user_item.get('last_interaction'))
         
         if created_at_str:
             try:
-                # Formato ISO (maneja strings con o sin microsegundos)
+                # Formato ISO
                 created_dt = datetime.fromisoformat(created_at_str.split('.')[0]) 
                 
                 # Obtenemos hora actual (restamos 6 horas para CDMX)
@@ -47,16 +50,15 @@ def evaluate_user_tier(user_item):
                 # Calculamos cuántos días han pasado
                 delta_days = (now - created_dt).days
                 
-                # Si está dentro de los 5 días
-                if delta_days <= 5: # TRIAL_DAYS = 5
-                    days_left = 5 - delta_days
-                    # Evitamos decir "0 días", si es su último día decimos 1
+                # 🚀 FIX: Usamos la variable TRIAL_DAYS (ahora vale 2)
+                if delta_days <= TRIAL_DAYS:
+                    days_left = TRIAL_DAYS - delta_days
                     return 'TRIAL', max(1, days_left)
             except Exception as e:
                 print(f"Error calculando Trial: {e}")
-                pass # Si falla el cálculo de fecha, cae a FREE
+                pass 
                 
-    # 3. Fallback: El usuario es FREE y ya se le acabó su prueba (o hubo error)
+    # 3. Fallback: El usuario es FREE y ya se le acabó su prueba
     return 'FREE', 0
 
 # ==========================================
