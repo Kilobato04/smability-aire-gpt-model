@@ -1688,19 +1688,22 @@ def lambda_handler(event, context):
             sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
             current_phase = sys_state.get('last_contingency_phase', 'None')
             
+            # 🚀 FIX ANTI-CRASHEO: Calculamos la variable premium localmente 
+            tier_gps, _ = stripeairegpt.evaluate_user_tier(user_profile)
+            es_premium_gps = tier_gps in ['PREMIUM', 'TRIAL']
+            
             # 1. Generamos la tarjeta visual del lugar exacto
-            report_text, calidad = generate_report_card(first_name, "Ubicación Actual", lat, lon, vehicle=veh, contingency_phase=current_phase, user_profile=user_profile, is_premium=is_premium_user)
+            report_text, calidad = generate_report_card(
+                first_name, "Ubicación Actual", lat, lon, 
+                vehicle=veh, contingency_phase=current_phase, 
+                user_profile=user_profile, 
+                is_premium=es_premium_gps # <--- ADIÓS CRASHEO, ADIÓS CANDADO
+            )
             
-            # 2. Le agregamos la pregunta de retención al final
-            report_text += "\n\n💾 **¿Quieres guardar este lugar para recibir alertas?**"
+            # 2. Interfaz limpia: Quitamos la pregunta de guardar y dejamos solo Mi Perfil
+            markup_guardado = {"inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]}
             
-            # 3. Calculamos qué botones mostrar
-            if not has_casa: forced_tag = "CONFIRM_HOME"
-            elif not has_trabajo: forced_tag = "CONFIRM_WORK"
-            else: forced_tag = "SELECT_TYPE"
-            markup_guardado = get_inline_markup(forced_tag)
-            
-            # 4. Seleccionamos el banner local basado en la calidad efímera
+            # 3. Seleccionamos el banner local basado en la calidad efímera
             mapa_archivos = {
                 "Buena": "banner_buena.png", "Regular": "banner_regular.png", "Mala": "banner_mala.png",
                 "Muy Mala": "banner_muy_mala.png", "Extremadamente Mala": "banner_extrema.png"
@@ -1712,7 +1715,7 @@ def lambda_handler(event, context):
             directorio_actual = os.path.dirname(os.path.abspath(__file__))
             ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
             
-            # 5. Enviamos Foto + Reporte + Botones de Guardado y CORTAMOS (no va a GPT)
+            # 4. Enviamos Foto + Reporte y CORTAMOS (no va a GPT)
             send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=markup_guardado)
             return {'statusCode': 200, 'body': 'OK'}
         
