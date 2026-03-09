@@ -16,7 +16,7 @@ def get_mexico_time():
     return datetime.utcnow() - timedelta(hours=6)
 
 # ==========================================
-# 2. EL GATEKEEPER (Evaluador de Estatus)
+# 2. EL GATEKEEPER (Evaluador de Estatus con Trial)
 # ==========================================
 def evaluate_user_tier(user_item):
     """
@@ -27,28 +27,37 @@ def evaluate_user_tier(user_item):
     sub = user_item.get('subscription', {})
     current_status = sub.get('status', 'FREE').upper()
     
-    # 1. Si ya es Premium, pase VIP
-    if "PREMIUM" in current_status:
+    # 1. Si ya es Premium o admin, pase VIP
+    if "PREMIUM" in current_status or "MANUAL" in current_status:
         return 'PREMIUM', 0
         
-    # 2. Evaluar Trial
-    created_at_str = user_item.get('created_at')
-    if not created_at_str:
-        return 'FREE', 0 # Fallback por si acaso
+    # 2. Evaluar Trial de 5 Días (Solo si es FREE)
+    if "FREE" in current_status:
+        # Buscamos la fecha de creación. Si es usuario viejo, usamos last_interaction como salvavidas
+        created_at_str = user_item.get('created_at', user_item.get('last_interaction'))
         
-    try:
-        # Formato ISO (maneja strings con o sin microsegundos)
-        created_dt = datetime.fromisoformat(created_at_str.split('.')[0]) 
-    except:
-        return 'FREE', 0
-        
-    now = get_mexico_time()
-    delta_days = (now - created_dt).days
-    
-    if delta_days <= TRIAL_DAYS:
-        return 'TRIAL', (TRIAL_DAYS - delta_days)
-    else:
-        return 'FREE', 0
+        if created_at_str:
+            try:
+                # Formato ISO (maneja strings con o sin microsegundos)
+                created_dt = datetime.fromisoformat(created_at_str.split('.')[0]) 
+                
+                # Obtenemos hora actual (restamos 6 horas para CDMX)
+                now = datetime.utcnow() - timedelta(hours=6)
+                
+                # Calculamos cuántos días han pasado
+                delta_days = (now - created_dt).days
+                
+                # Si está dentro de los 5 días
+                if delta_days <= 5: # TRIAL_DAYS = 5
+                    days_left = 5 - delta_days
+                    # Evitamos decir "0 días", si es su último día decimos 1
+                    return 'TRIAL', max(1, days_left)
+            except Exception as e:
+                print(f"Error calculando Trial: {e}")
+                pass # Si falla el cálculo de fecha, cae a FREE
+                
+    # 3. Fallback: El usuario es FREE y ya se le acabó su prueba (o hubo error)
+    return 'FREE', 0
 
 # ==========================================
 # 3. GENERADOR DE CHECKOUT (Magia de Tracking)
