@@ -1061,13 +1061,7 @@ def lambda_handler(event, context):
                 table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport.horas = :h", ExpressionAttributeValues={':h': horas_db})
                 send_telegram(chat_id, "✅ **¡Perfil completado!**\n\n⏳ *Calculando tu desgaste celular...*")
                 
-                # 2. Simulamos el clic de CHECK_EXPOSURE forzando el dato
-                # Al cambiar el valor de 'data', el bloque de abajo (CHECK_EXPOSURE) 
-                # NO se ejecutará automáticamente porque ya pasamos por los 'elif'.
-                # La forma correcta es volver a llamar a la función internamente o copiar el código.
-                # Para evitar código duplicado o recursión riesgosa en Lambda, usaremos la vía segura:
-                
-                # RECONSTRUCCIÓN RÁPIDA DEL CÁLCULO
+                # 2. RECONSTRUCCIÓN RÁPIDA DEL CÁLCULO
                 try:
                     user = get_user_profile(user_id)
                     locs = user.get('locations', {})
@@ -1077,27 +1071,38 @@ def lambda_handler(event, context):
                     resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
                     vector_c = resp_c.get("vectores", {}).get("ayer")
                     
+                    # 🚀 FIX: Detección dinámica del destino para cálculo y texto
+                    dest_key = next((k for k, v in locs.items() if isinstance(v, dict) and v.get('is_destination')), None)
+                    if not dest_key and 'trabajo' in locs: dest_key = 'trabajo'
+                    
+                    nombre_destino = locs[dest_key].get('display_name', dest_key.capitalize()) if dest_key in locs else "Destino"
+                    
                     vector_t = None
-                    es_ho = False
-                    if 'trabajo' in locs:
-                        lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
+                    es_ho = (transp.get('medio') == 'home_office')
+                    
+                    # Llamada a la API de calidad de aire con el destino dinámico
+                    if dest_key and dest_key != 'casa' and not es_ho:
+                        lat_t, lon_t = locs[dest_key]['lat'], locs[dest_key]['lon']
                         resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}").json()
                         vector_t = resp_t.get("vectores", {}).get("ayer")
 
                     if vector_c:
                         calc = CalculadoraRiesgoSmability()
                         perfil = {"transporte_default": transp.get('medio', 'auto_ventana'), "tiempo_traslado_horas": transp.get('horas', 2)}
+                        
                         res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
                         
+                        if not res:
+                            send_telegram(chat_id, "⚠️ Hubo un error interno calculando tu exposición.")
+                            return {'statusCode': 200, 'body': 'OK'}
+
                         cigs, dias = res['cigarros'], res['dias_perdidos']
 
-                        # 1. Calcular fecha de ayer en texto
                         ahora_cdmx = datetime.utcnow() - timedelta(hours=6)
                         ayer = ahora_cdmx - timedelta(days=1)
                         meses = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
                         fecha_ayer_str = f"{ayer.day} de {meses[ayer.month]}"
 
-                        # 2. Generación de la Rutina Visual
                         nombres_medios = {
                             "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
                             "metro": "🚇 Metro/Tren", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
@@ -1108,25 +1113,25 @@ def lambda_handler(event, context):
                         horas_val = transp.get('horas', 2)
                         medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
                         
+                        # 🚀 FIX: TEXTO DINÁMICO
                         if es_ho: 
                             rutina_txt = "🏠 **Tu rutina:** Modalidad Home Office"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
                         else:
                             emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
-                            # Inyectamos la aclaración de Casa ↔ Trabajo
-                            rutina_txt = f"{emoji_rut} **Tu rutina:** Casa ↔ Trabajo\n⏱️ **Tiempo:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
+                            # Magia visual aquí
+                            rutina_txt = f"{emoji_rut} **Tu rutina:** Casa ↔ {nombre_destino}\n⏱️ **Tiempo:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* en tu recorrido y estancia."
                         
                         grafico_humo = "🌫️" * int(cigs) if cigs >= 1 else "🌫️"
 
-                        # 3. Armar la tarjeta con las nuevas variables
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
                             fecha_ayer=fecha_ayer_str, 
                             emoji_alerta="⚠️" if cigs >= 0.5 else "ℹ️", 
                             rutina_str=rutina_txt,
-                            calidad_ias=res['calidad_ias'],    # <--- NUEVO
-                            promedio_ias=res['promedio_ias'],  # <--- NUEVO
+                            calidad_ias=res['calidad_ias'],    
+                            promedio_ias=res['promedio_ias'],  
                             emoji_cigarro=grafico_humo, 
                             texto_cigarros=cigs_txt,
                             cigarros=cigs, 
@@ -1136,17 +1141,18 @@ def lambda_handler(event, context):
                             footer=cards.BOT_FOOTER
                         )
                         
-                        # Generamos botón para compartir
                         markup_viral = cards.get_share_exposure_button(cigs, dias)
-                        # --- INYECCIÓN DEL BOTÓN DE GRÁFICA ---
                         if markup_viral and "inline_keyboard" in markup_viral:
                             markup_viral["inline_keyboard"].insert(0, [{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}])
+                            markup_viral["inline_keyboard"].insert(1, [{"text": "🧱 Ver mi Tetris semanal", "callback_data": "GET_TETRIS"}])
                         else:
-                            markup_viral = {"inline_keyboard": [[{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}]]}
-                        # --------------------------------------
+                            markup_viral = {"inline_keyboard": [
+                                [{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}],
+                                [{"text": "🧱 Ver mi Tetris semanal", "callback_data": "GET_TETRIS"}]
+                            ]}
                         
-                        if 'trabajo' not in locs and not es_ho: 
-                            card += "\n\n💡 *Tip: Guarda la ubicación de tu 'Trabajo' para un cálculo más exacto.*"
+                        if not dest_key and not es_ho: 
+                            card += "\n\n💡 *Tip: Guarda un destino principal para un cálculo más exacto.*"
                         
                         send_telegram(chat_id, card, markup=markup_viral)
                     else:
@@ -1379,11 +1385,18 @@ def lambda_handler(event, context):
                     resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
                     vector_c = resp_c.get("vectores", {}).get("ayer")
                     
+                    # 🚀 FIX: Detección dinámica del destino para cálculo y texto
+                    dest_key = next((k for k, v in locs.items() if isinstance(v, dict) and v.get('is_destination')), None)
+                    if not dest_key and 'trabajo' in locs: dest_key = 'trabajo'
+                    
+                    nombre_destino = locs[dest_key].get('display_name', dest_key.capitalize()) if dest_key in locs else "Destino"
+                    
                     vector_t = None
                     es_ho = (transp.get('medio') == 'home_office')
                     
-                    if 'trabajo' in locs and not es_ho:
-                        lat_t, lon_t = locs['trabajo']['lat'], locs['trabajo']['lon']
+                    # Llamada a la API de calidad de aire con el destino dinámico
+                    if dest_key and dest_key != 'casa' and not es_ho:
+                        lat_t, lon_t = locs[dest_key]['lat'], locs[dest_key]['lon']
                         resp_t = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_t}&lon={lon_t}").json()
                         vector_t = resp_t.get("vectores", {}).get("ayer")
 
@@ -1391,7 +1404,6 @@ def lambda_handler(event, context):
                         calc = CalculadoraRiesgoSmability()
                         perfil = {"transporte_default": transp.get('medio', 'auto_ventana'), "tiempo_traslado_horas": transp.get('horas', 2)}
                         
-                        # 🔥🔥🔥 AQUÍ ESTÁ LA LÍNEA MÁGICA QUE SE HABÍA BORRADO 🔥🔥🔥
                         res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
                         
                         if not res:
@@ -1400,13 +1412,11 @@ def lambda_handler(event, context):
 
                         cigs, dias = res['cigarros'], res['dias_perdidos']
 
-                        # 1. Calcular fecha de ayer en texto
                         ahora_cdmx = datetime.utcnow() - timedelta(hours=6)
                         ayer = ahora_cdmx - timedelta(days=1)
                         meses = ["", "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
                         fecha_ayer_str = f"{ayer.day} de {meses[ayer.month]}"
 
-                        # 2. Generación de la Rutina Visual
                         nombres_medios = {
                             "auto_ac": "🚗 Auto (A/C)", "suburbano": "🚆 Tren Suburbano", "cablebus": "🚡 Cablebús",
                             "metro": "🚇 Metro/Tren", "metrobus": "🚌 Metrobús", "auto_ventana": "🚗 Auto (Ventanillas)",
@@ -1417,17 +1427,18 @@ def lambda_handler(event, context):
                         horas_val = transp.get('horas', 2)
                         medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
                         
+                        # 🚀 FIX: TEXTO DINÁMICO
                         if es_ho: 
                             rutina_txt = "🏠 **Tu rutina:** Modalidad Home Office"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
                         else:
                             emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
-                            rutina_txt = f"{emoji_rut} **Tu rutina:** Casa ↔ Trabajo\n⏱️ **Tiempo:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
+                            # ¡Aquí ocurre la magia visual! Adiós a la palabra Trabajo fija.
+                            rutina_txt = f"{emoji_rut} **Tu rutina:** Casa ↔ {nombre_destino}\n⏱️ **Tiempo:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* en tu recorrido y estancia."
                         
                         grafico_humo = "🌫️" * int(cigs) if cigs >= 1 else "🌫️"
 
-                        # 3. Armar la tarjeta con las nuevas variables
                         card = cards.CARD_EXPOSICION.format(
                             user_name=first_name, 
                             fecha_ayer=fecha_ayer_str, 
@@ -1445,7 +1456,6 @@ def lambda_handler(event, context):
                         )
                         
                         markup_viral = cards.get_share_exposure_button(cigs, dias)
-                        # --- INYECCIÓN DEL BOTÓN DE GRÁFICA (REEMPLAZA ESTE BLOQUE) ---
                         if markup_viral and "inline_keyboard" in markup_viral:
                             markup_viral["inline_keyboard"].insert(0, [{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}])
                             markup_viral["inline_keyboard"].insert(1, [{"text": "🧱 Ver mi Tetris semanal", "callback_data": "GET_TETRIS"}])
@@ -1454,10 +1464,9 @@ def lambda_handler(event, context):
                                 [{"text": "🚇 Ver exposición de hoy", "callback_data": "GET_GRAPHIC"}],
                                 [{"text": "🧱 Ver mi Tetris semanal", "callback_data": "GET_TETRIS"}]
                             ]}
-                        # --------------------------------------
                         
-                        if 'trabajo' not in locs and not es_ho: 
-                            card += "\n\n💡 *Tip: Guarda la ubicación de tu 'Trabajo' para un cálculo más exacto.*"
+                        if not dest_key and not es_ho: 
+                            card += "\n\n💡 *Tip: Guarda un destino principal para un cálculo más exacto.*"
                         
                         send_telegram(chat_id, card, markup=markup_viral)
                     else:
