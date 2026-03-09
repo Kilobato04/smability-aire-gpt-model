@@ -938,9 +938,9 @@ def lambda_handler(event, context):
                 # 2. Obtener datos
                 user = get_user_profile(user_id)
                 
-                # 👇 [NUEVO AJUSTE C] - Calculamos si es premium aquí mismo 👇
-                status_user = user.get('subscription', {}).get('status', 'FREE')
-                is_prem_user = "PREMIUM" in status_user.upper() or "TRIAL" in status_user.upper()
+                # 👇 [NUEVO AJUSTE C] - Calculamos si es premium aquí mismo de forma SEGURA 👇
+                tier_eval_btn, _ = stripeairegpt.evaluate_user_tier(user)
+                es_premium_seguro = tier_eval_btn in ['PREMIUM', 'TRIAL']
                 
                 locs = user.get('locations', {})
                 
@@ -955,13 +955,13 @@ def lambda_handler(event, context):
                     sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                     current_phase = sys_state.get('last_contingency_phase', 'None')
                     
-                    # Generamos reporte - 👇 PASAMOS is_premium=is_prem_user 👇
+                    # Generamos reporte - 👇 PASAMOS is_premium=es_premium_seguro 👇
                     report_text, calidad = generate_report_card(
                         first_name, disp_name, lat, lon, 
                         vehicle=veh, 
                         contingency_phase=current_phase, 
                         user_profile=user,
-                        is_premium=is_premium_user  # <--- AGREGADO AQUÍ
+                        is_premium=es_premium_seguro  # <--- CORREGIDO Y BLINDADO
                     )
                     
                     # Selección de Banner
