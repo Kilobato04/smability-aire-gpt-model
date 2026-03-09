@@ -338,7 +338,7 @@ def process_user(user, current_hour_str, contingency_data):
                             sys_phase = db_item.get('last_contingency_phase', 'None')
                             
                             # IMPORTANTE: Pasamos 'is_vip' a la función
-                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_vip)
+                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_premium=is_vip)
                             
                             # Armar footer combinado
                             combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
@@ -352,7 +352,7 @@ def process_user(user, current_hour_str, contingency_data):
                                 limit_notice = f"\n\n⚠️ *Aviso:* Recibes {max_allowed} de {total_active_configs} reportes. ¡Hazte Premium para activarlos todos! 🚀"
                             
                             # 3. Generar Píldora HNC y Footer
-                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_vip)
+                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_premium=is_vip)
                             combined_footer = f"{hnc_text}{limit_notice}\n\n{cards.BOT_FOOTER}" # <-- IMPORTANTE: Inyectamos el notice
 
                             card = cards.CARD_REMINDER.format(
@@ -365,7 +365,7 @@ def process_user(user, current_hour_str, contingency_data):
                                 pollutant=qa.get('dominante', 'N/A'), 
                                 trend=tendencia_actual, # <--- INYECTAMOS TENDENCIA AQUÍ
                                 forecast_block=f_block,
-                                health_recommendation=cards.get_health_advice(cat, h_str),
+                                health_recommendation=cards.get_health_advice(cat, h_str, is_premium=is_premium),
                                 temp=meteo.get('tmp', 0), humidity=meteo.get('rh', 0), wind_speed=meteo.get('wsp', 0),
                                 footer=combined_footer
                             )
@@ -511,7 +511,7 @@ def process_user(user, current_hour_str, contingency_data):
                                         user_name=first_name, location_name=loc_data.get('display_name', loc_name), maps_url=get_maps_url(loc_data['lat'], loc_data['lon']),
                                         risk_category=cat, risk_circle=info['emoji'], ias_value=cur_ias_val,
                                         report_time=f"{current_hour_str.split(':')[0]}:20", forecast_msg=tendencia_final,
-                                        threshold=umbral, pollutant=qa.get('dominante', 'N/A'), health_recommendation=cards.get_health_advice(cat, h_str),
+                                        threshold=umbral, pollutant=qa.get('dominante', 'N/A'), health_recommendation=cards.get_health_advice(cat, h_str, is_premium=is_premium),
                                         footer=combined_footer
                                     )
                                     
