@@ -1276,8 +1276,10 @@ def lambda_handler(event, context):
                 
                 # 1. Cargar perfil fresco y evaluar Tier
                 user = get_user_profile(user_id)
-                tier, _ = stripeairegpt.evaluate_user_tier(user)
+                tier, days_left = stripeairegpt.evaluate_user_tier(user)
                 is_prem = tier in ['PREMIUM', 'TRIAL']
+
+                texto_plan = f"TRIAL ({days_left} días restantes)" if tier == 'TRIAL' else tier
 
                 print(f"🔘 [AUDIT_BUTTON] Generando para: {user_id}")
                 print(f"🔘 [AUDIT_BUTTON] Tier: {tier}")
@@ -1296,7 +1298,7 @@ def lambda_handler(event, context):
                     alerts=alerts,
                     vehicle=vehicle,
                     locations=locations,
-                    plan_status=tier, # 'PREMIUM', 'TRIAL' o 'FREE'
+                    plan_status=texto_plan,
                     transport_data=transport,
                     health_data=health
                 )
@@ -1591,8 +1593,10 @@ def lambda_handler(event, context):
                 
                 # 1. Cargar perfil fresco y evaluar Tier
                 user = get_user_profile(user_id)
-                tier, _ = stripeairegpt.evaluate_user_tier(user)
+                tier, days_left = stripeairegpt.evaluate_user_tier(user)
                 is_prem = tier in ['PREMIUM', 'TRIAL']
+
+                texto_plan = f"TRIAL ({days_left} días restantes)" if tier == 'TRIAL' else tier
 
                 # 2. 🚩 LLAMADA ÚNICA AL MOTOR DE TARJETAS (Sin lógica duplicada)
                 card_resumen = cards.generate_summary_card(
@@ -1600,7 +1604,7 @@ def lambda_handler(event, context):
                     alerts=user.get('alerts', {}),
                     vehicle=user.get('vehicle', {}),
                     locations=user.get('locations', {}),
-                    plan_status=tier,
+                    plan_status=texto_plan,
                     transport_data=user.get('profile_transport', {}),
                     health_data=user.get('health_profile', {})
                 )
