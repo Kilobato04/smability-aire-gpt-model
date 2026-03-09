@@ -18,6 +18,48 @@ def normalize_key(text):
         text = text.replace(a, b)
     return text
 
+# --- HELPER TRADUCTOR DE DÍAS ---
+def parse_days_input(dias_str):
+    """Traduce texto natural de GPT a lista de días [0-6]"""
+    if not dias_str: return [0, 1, 2, 3, 4, 5, 6]
+    txt = dias_str.lower()
+    
+    if any(x in txt for x in ["diario", "todos", "siempre", "cada dia"]): return [0, 1, 2, 3, 4, 5, 6]
+    if "fin" in txt and "semana" in txt: return [5, 6]
+    if "laboral" in txt or "entre semana" in txt or ("lunes" in txt and "viernes" in txt): return [0, 1, 2, 3, 4]
+
+    mapping = {"lun":0, "mar":1, "mie":2, "mié":2, "jue":3, "vie":4, "sab":5, "sáb":5, "dom":6}
+    days = {idx for word, idx in mapping.items() if word in txt}
+    return sorted(list(days)) if days else [0, 1, 2, 3, 4, 5, 6]
+
+# --- 🔔 CONFIGURACIÓN DE RECORDATORIO ---
+def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
+    """Guarda o actualiza recordatorios de aire en alerts.schedule.{ubicacion}"""
+    try:
+        key = normalize_key(nombre_ubicacion)
+        
+        # 🚀 FIX: Ahora sí traducimos lo que GPT entendió a una lista real
+        dias_list = parse_days_input(dias_str) 
+
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET alerts.schedule.#loc = :val",
+            ExpressionAttributeNames={'#loc': key},
+            ExpressionAttributeValues={
+                ':val': {
+                    'time': str(hora), 
+                    'days': dias_list, 
+                    'active': True
+                }
+            }
+        )
+        
+        return f"Éxito: Recordatorio para {nombre_ubicacion.capitalize()} a las {hora} guardado."
+
+    except Exception as e:
+        print(f"❌ Error en configure_schedule_alert: {e}")
+        return f"⚠️ Error al guardar horario: {str(e)}"
+
 # --- 🧪 RUTINA Y TRANSPORTE ---
 def ejecutar_configurar_transporte(user_id, medio, horas_raw):
     try:
