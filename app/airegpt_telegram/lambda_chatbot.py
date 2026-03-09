@@ -1053,7 +1053,7 @@ def lambda_handler(event, context):
                     table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET profile_transport = :p", ExpressionAttributeValues={':p': {'medio': medio, 'horas': 2}})
                     send_telegram(chat_id, "📍 **¡Entendido!**\n\nPor último, ¿cuántas horas en total pasas al día en ese transporte? (Ida y vuelta).", markup=cards.get_time_buttons())
                 return {'statusCode': 200, 'body': 'OK'}
-
+            #------
             elif data.startswith("SET_TIME_"):
                 horas_str = data.replace("SET_TIME_", "")
                 horas_db = Decimal(horas_str) # Boto3 exige Decimal
@@ -1071,11 +1071,13 @@ def lambda_handler(event, context):
                     resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
                     vector_c = resp_c.get("vectores", {}).get("ayer")
                     
-                    # 🚀 FIX: Detección dinámica del destino para cálculo y texto
+                    # 🚀 FIX: Detección dinámica PURA (Igual que en CHECK_EXPOSURE)
                     dest_key = next((k for k, v in locs.items() if isinstance(v, dict) and v.get('is_destination')), None)
-                    if not dest_key and 'trabajo' in locs: dest_key = 'trabajo'
+                    if not dest_key: 
+                        # Fallback: el primer lugar que no sea casa
+                        dest_key = next((k for k in locs.keys() if k != 'casa'), None)
                     
-                    nombre_destino = locs[dest_key].get('display_name', dest_key.capitalize()) if dest_key in locs else "Destino"
+                    nombre_destino = locs[dest_key].get('display_name', dest_key.capitalize()) if dest_key and dest_key in locs else "Destino"
                     
                     vector_t = None
                     es_ho = (transp.get('medio') == 'home_office')
@@ -1090,7 +1092,10 @@ def lambda_handler(event, context):
                         calc = CalculadoraRiesgoSmability()
                         perfil = {"transporte_default": transp.get('medio', 'auto_ventana'), "tiempo_traslado_horas": transp.get('horas', 2)}
                         
-                        res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
+                        # Si no hay vector_t, pasamos el de casa (Home Office Forzado)
+                        v_destino_final = vector_t if vector_t else vector_c
+                        
+                        res = calc.calcular_usuario(vector_c, perfil, v_destino_final, es_home_office=es_ho)
                         
                         if not res:
                             send_telegram(chat_id, "⚠️ Hubo un error interno calculando tu exposición.")
@@ -1113,13 +1118,13 @@ def lambda_handler(event, context):
                         horas_val = transp.get('horas', 2)
                         medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
                         
-                        # 🚀 FIX: TEXTO DINÁMICO
-                        if es_ho: 
+                        # 🚀 FIX: TEXTO DINÁMICO REFORZADO
+                        if es_ho or not dest_key: 
                             rutina_txt = "🏠 **Tu rutina:** Modalidad Home Office"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
                         else:
                             emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
-                            # Magia visual aquí
+                            # ¡Magia visual aquí! Adiós a la palabra Trabajo fija.
                             rutina_txt = f"{emoji_rut} **Tu rutina:** Casa ↔ {nombre_destino}\n⏱️ **Tiempo:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* en tu recorrido y estancia."
                         
@@ -1385,11 +1390,13 @@ def lambda_handler(event, context):
                     resp_c = requests.get(f"{API_LIGHT_URL}?mode=live&lat={lat_c}&lon={lon_c}").json()
                     vector_c = resp_c.get("vectores", {}).get("ayer")
                     
-                    # 🚀 FIX: Detección dinámica del destino para cálculo y texto
+                    # 🚀 FIX: Detección dinámica PURA
                     dest_key = next((k for k, v in locs.items() if isinstance(v, dict) and v.get('is_destination')), None)
-                    if not dest_key and 'trabajo' in locs: dest_key = 'trabajo'
+                    if not dest_key: 
+                        # Fallback por si acaso: el primer lugar que no sea casa
+                        dest_key = next((k for k in locs.keys() if k != 'casa'), None)
                     
-                    nombre_destino = locs[dest_key].get('display_name', dest_key.capitalize()) if dest_key in locs else "Destino"
+                    nombre_destino = locs[dest_key].get('display_name', dest_key.capitalize()) if dest_key and dest_key in locs else "Destino"
                     
                     vector_t = None
                     es_ho = (transp.get('medio') == 'home_office')
@@ -1404,7 +1411,10 @@ def lambda_handler(event, context):
                         calc = CalculadoraRiesgoSmability()
                         perfil = {"transporte_default": transp.get('medio', 'auto_ventana'), "tiempo_traslado_horas": transp.get('horas', 2)}
                         
-                        res = calc.calcular_usuario(vector_c, perfil, vector_t, es_home_office=es_ho)
+                        # Si no hay vector_t, pasamos el de casa (Home Office Forzado)
+                        v_destino_final = vector_t if vector_t else vector_c
+                        
+                        res = calc.calcular_usuario(vector_c, perfil, v_destino_final, es_home_office=es_ho)
                         
                         if not res:
                             send_telegram(chat_id, "⚠️ Hubo un error interno calculando tu exposición.")
@@ -1427,13 +1437,13 @@ def lambda_handler(event, context):
                         horas_val = transp.get('horas', 2)
                         medio_str = nombres_medios.get(medio_raw, medio_raw.capitalize())
                         
-                        # 🚀 FIX: TEXTO DINÁMICO
-                        if es_ho: 
+                        # 🚀 FIX: TEXTO DINÁMICO REFORZADO
+                        if es_ho or not dest_key: 
                             rutina_txt = "🏠 **Tu rutina:** Modalidad Home Office"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
                         else:
                             emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
-                            # ¡Aquí ocurre la magia visual! Adiós a la palabra Trabajo fija.
+                            # ¡Magia visual aquí!
                             rutina_txt = f"{emoji_rut} **Tu rutina:** Casa ↔ {nombre_destino}\n⏱️ **Tiempo:** {horas_val} hrs en {medio_str.replace(emoji_rut, '').strip()}"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* en tu recorrido y estancia."
                         
