@@ -122,25 +122,29 @@ def update_user_status(user_id, new_status):
         print(f"❌ [DB UPDATE ERROR]: {e}")
         return False
 
-# --- FIX: PERSISTENCIA DEL DRAFT (Sustituye tu función actual por esta) ---
+# --- FIX: PERSISTENCIA DEL DRAFT Y SELLO DE TRIAL ---
 def save_interaction_and_draft(user_id, first_name, lat=None, lon=None):
-    update_expr = "SET first_name=:n, last_interaction=:t, locations=if_not_exists(locations,:e), alerts=if_not_exists(alerts,:al), subscription=if_not_exists(subscription,:sub)"
+    now_iso = datetime.now().isoformat()
+    
+    # 🚀 FIX TRIAL: Agregamos created_at con if_not_exists para fijar el "Día 1" del usuario para siempre
+    update_expr = "SET first_name=:n, last_interaction=:t, created_at=if_not_exists(created_at, :t), locations=if_not_exists(locations,:e), alerts=if_not_exists(alerts,:al), subscription=if_not_exists(subscription,:sub)"
     vals = {
         ':n': first_name, 
-        ':t': datetime.now().isoformat(), 
+        ':t': now_iso, 
         ':e': {}, 
         ':al': {'threshold': {}, 'schedule': {}},
         ':sub': {'status': 'FREE'}
     }
     
     # OJO: Solo tocamos 'draft_location' si realmente recibimos coordenadas nuevas
-    # Esto evita que un mensaje de texto ("Gym") borre las coordenadas pendientes.
     if lat and lon:
         update_expr += ", draft_location = :d"
-        vals[':d'] = {'lat': str(lat), 'lon': str(lon), 'ts': datetime.now().isoformat()}
+        vals[':d'] = {'lat': str(lat), 'lon': str(lon), 'ts': now_iso}
     
-    try: table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=update_expr, ExpressionAttributeValues=vals)
-    except Exception as e: print(f"❌ [DB SAVE ERROR]: {e}")
+    try: 
+        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=update_expr, ExpressionAttributeValues=vals)
+    except Exception as e: 
+        print(f"❌ [DB SAVE ERROR]: {e}")
 
 def delete_location_from_db(user_id, location_name):
     """
