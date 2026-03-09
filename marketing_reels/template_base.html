@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&family=Roboto+Mono:wght@400;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+/* AQUÍ PYTHON INYECTA EL COLOR DE FONDO */
+background:radial-gradient(circle at 30% 20%,__BG_GRADIENT__);
+background-size:400% 400%;
+animation:gradientShift 8s ease infinite;
+min-height:100vh;width:100vw;
+display:flex;flex-direction:column;align-items:center;
+font-family:'Poppins',sans-serif;
+overflow-x:hidden;position:relative;
+padding:90px 0 20px;
+}
+@keyframes gradientShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+.smog-wrap{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.smog{position:absolute;bottom:-60px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,0.15) 0%,transparent 70%);animation:smogRise linear infinite}
+@keyframes smogRise{0%{transform:translateY(0) scale(1);opacity:0}10%{opacity:1}90%{opacity:.5}100%{transform:translateY(-110vh) scale(2.5);opacity:0}}
+
+.banner-led{width:100%;height:45px;background:#000;overflow:hidden;position:fixed;top:45px;left:0;background-image:linear-gradient(90deg,#333 2px,transparent 2px),linear-gradient(0deg,#333 2px,transparent 2px);background-size:4px 4px;z-index:400;box-shadow:0 2px 10px rgba(0,0,0,0.5)}
+.banner-content{position:absolute;top:0;left:0;height:100%;white-space:nowrap;display:flex;align-items:center;animation:scrollBanner 20s linear infinite}
+.banner-text{font-family:'Roboto Mono',monospace;font-size:18px;font-weight:700;color:#fff;letter-spacing:2px;text-transform:uppercase;padding:0 40px}
+.banner-text.hl{background:#FFD700;color:#000;padding:5px 16px;border-radius:3px;}
+.banner-dots{color:#fff;font-size:14px;margin:0 16px;animation:dotsBlink 1s ease-in-out infinite}
+@keyframes scrollBanner{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+@keyframes dotsBlink{0%,100%{opacity:.2}50%{opacity:1}}
+
+.tg-badge{position:fixed;top:96px;right:16px;width:58px;height:58px;background:linear-gradient(135deg,#2AABEE,#1a7bbf);border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:600;box-shadow:0 0 22px rgba(0,0,0,.5);animation:logoPulse 3s ease-in-out infinite;border:3px solid #fff}
+.tg-badge svg{width:34px;height:34px;fill:white}
+@keyframes logoPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+
+.user-counter{position:fixed;bottom:24px;left:16px;background:rgba(0,0,0,.8);border:2px solid rgba(255,255,255,0.5);border-radius:20px;padding:6px 14px;z-index:600;display:flex;align-items:center;gap:8px;backdrop-filter:blur(6px);}
+.pulse-dot{width:8px;height:8px;background:#fff;border-radius:50%;animation:pulseDot 1s ease-in-out infinite;flex-shrink:0}
+@keyframes pulseDot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.6);opacity:.5}}
+.counter-text{font-size:11px;font-weight:700;color:#fff;white-space:nowrap;line-height:1.2}
+.counter-num{color:#fff;font-family:'Roboto Mono',monospace;font-size:13px;font-weight:800}
+
+.main-content{flex:1;width:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:20px;position:relative;z-index:1;gap:16px}
+.floating-emoji{position:absolute;font-size:38px;animation:floatEmoji 6s ease-in-out infinite;z-index:1;filter:drop-shadow(2px 2px 6px rgba(0,0,0,.8))}
+.emoji1{top:12%;left:12%;animation-delay:0s}.emoji2{top:18%;right:8%;animation-delay:2s}.emoji3{bottom:28%;left:8%;animation-delay:4s}.emoji4{bottom:18%;right:18%;animation-delay:1s}.emoji5{top:55%;left:4%;animation-delay:3s}
+@keyframes floatEmoji{0%,100%{transform:translateY(0) rotate(0deg) scale(1);opacity:.8}50%{transform:translateY(-28px) rotate(8deg) scale(1.1);opacity:1}}
+
+.smartphone{width:360px;height:620px;background:linear-gradient(160deg,#1c1c1e,#2c2c2e);border:6px solid #fff;border-radius:35px;position:relative;z-index:10;box-shadow:0 0 0 1px #3a3a3c,0 30px 80px rgba(0,0,0,.7),0 0 80px rgba(0,0,0,.5);animation:phoneGlow 2s ease-in-out infinite,phoneSwing 5s ease-in-out infinite}
+@keyframes phoneGlow{0%,100%{box-shadow:0 0 0 1px #3a3a3c,0 30px 80px rgba(0,0,0,.7),0 0 60px rgba(0,0,0,.4)}50%{box-shadow:0 0 0 1px #3a3a3c,0 30px 80px rgba(0,0,0,.7),0 0 100px rgba(255,255,255,.2)}}
+@keyframes phoneSwing{0%,100%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateY(0) rotateZ(0)}25%{transform:perspective(1000px) rotateY(-8deg) rotateX(2deg) translateY(-12px) rotateZ(-2deg)}50%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateY(0) rotateZ(0)}75%{transform:perspective(1000px) rotateY(-2deg) rotateX(2deg) translateY(12px) rotateZ(2deg)}}
+@keyframes alertShake{0%,100%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(0)}15%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(-6px)}30%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(6px)}45%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(-5px)}60%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(5px)}75%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(-3px)}90%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(3px)}}
+.phone-shake{animation:alertShake .55s ease !important}
+
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:160px;height:30px;background:#1c1c1e;border-radius:0 0 20px 20px;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:0 14px}
+.notch-time{font-family:'Poppins',sans-serif;font-size:10px;font-weight:700;color:#fff}
+.notch-cam{width:10px;height:10px;background:#111;border-radius:50%;border:1.5px solid #333}
+
+.screen{width:100%;height:100%;border-radius:30px;overflow:hidden;display:flex;flex-direction:column;background:#17212b}
+/* AQUÍ PYTHON INYECTA EL COLOR DEL HEADER */
+.chat-header{background:linear-gradient(135deg,__HEADER_GRADIENT__);height:80px;display:flex;align-items:center;padding:0 14px;gap:10px;position:relative;overflow:hidden;flex-shrink:0;padding-top:36px}
+.chat-header::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:linear-gradient(45deg,transparent,rgba(255,255,255,.2),transparent);animation:headerShine 2.5s ease-in-out infinite}
+@keyframes headerShine{0%{transform:translateX(-100%) translateY(-100%) rotate(45deg)}50%{transform:translateX(100%) translateY(100%) rotate(45deg)}100%{transform:translateX(200%) translateY(200%) rotate(45deg)}}
+.avatar-wrap{position:relative;flex-shrink:0;z-index:2}
+.h-avatar{width:38px;height:38px;background:rgba(0,0,0,.3);border:3px solid rgba(255,255,255,.7);border-radius:50%;display:flex;align-items:center;justify-content:center}
+.h-avatar svg{width:20px;height:20px;fill:white}
+.notif-badge{position:absolute;top:-4px;right:-4px;width:18px;height:18px;background:#fff;border:2px solid #333;border-radius:50%;font-size:9px;font-weight:800;color:#333;display:flex;align-items:center;justify-content:center;z-index:5}
+.h-info{z-index:2}
+.h-name{color:#fff;font-size:14px;font-weight:800;line-height:1;text-shadow:1px 1px 3px rgba(0,0,0,.4)}
+.h-status{color:rgba(255,255,255,.85);font-size:10px;margin-top:2px;animation:statusBlink 1s steps(1) infinite}
+@keyframes statusBlink{0%,100%{opacity:1}50%{opacity:.4}}
+
+.chat-area{flex:1;overflow:hidden;position:relative;background:#17212b}
+.msgs{position:absolute;top:0;left:0;right:0;bottom:0;padding:12px 10px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.msg{opacity:0;transform:translateY(16px);animation:fadeIn .3s ease forwards}
+.msg.user{text-align:right}
+@keyframes fadeIn{to{opacity:1;transform:translateY(0)}}
+.bubble{display:inline-block;padding:10px 13px;border-radius:14px;font-size:12px;line-height:1.5;max-width:84%;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.msg.bot .bubble{background:#2b2b2b;color:#e8e8e8;border-bottom-left-radius:3px;border:1px solid #444}
+.msg.user .bubble{background:#2b5278;color:white;border-bottom-right-radius:3px;border:1px solid #3a6a99}
+.msg.bot .bubble strong{color:#fff}
+.msg.alert .bubble{background:linear-gradient(135deg,#3a1010,#500000);border-color:#FF3B30;box-shadow:0 2px 16px rgba(255,59,48,.5)}
+.msg.alert .bubble strong{color:#FF6B6B}
+.msg.hl .bubble{background:linear-gradient(135deg,#1a3a5c,#1e4d7a);border-color:#2AABEE;box-shadow:0 2px 12px rgba(42,171,238,.3)}
+.msg.hl .bubble strong{color:#00fbff}
+.msg.cta .bubble{background:linear-gradient(135deg,#1a2a00,#223a00);border:2px solid #FFD700;animation:ctaFlash .5s ease-in-out infinite}
+@keyframes ctaFlash{0%,100%{border-color:#FFD700;box-shadow:0 0 16px rgba(255,215,0,.5)}50%{border-color:#fff;box-shadow:0 0 28px rgba(255,215,0,.9)}}
+.msg.cta .bubble strong{color:#FFD700}
+.handle{display:inline-block;background:#FFD700;color:#000;font-weight:800;border-radius:7px;padding:2px 8px;margin-top:4px;font-size:12px}
+.bname{font-size:9px;color:#fff;font-weight:800;margin-bottom:3px;letter-spacing:.5px;text-transform:uppercase}
+.bname.blue{color:#2AABEE}
+.bname.gold{color:#FFD700}
+.mtime{font-size:9px;color:rgba(255,255,255,.3);margin-top:3px;display:block}
+.paloma{font-size:9px;color:rgba(255,255,255,.35);margin-top:3px;display:block;text-align:right}
+
+.typing-wrap{display:none;align-items:center;gap:4px;padding:8px 12px;background:#2b2b2b;border-radius:14px;border-bottom-left-radius:3px;width:fit-content;border:1px solid #444;margin-top:6px}
+.typing-wrap span{width:6px;height:6px;background:#fff;border-radius:50%;animation:bounce 1.2s infinite}
+.typing-wrap span:nth-child(2){animation-delay:.2s}.typing-wrap span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+.push-notif{position:absolute;top:36px;left:8px;right:8px;background:rgba(20,20,22,0.97);border-radius:14px;padding:10px 12px;z-index:50;display:flex;align-items:flex-start;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.1);backdrop-filter:blur(12px);transform:translateY(-90px);opacity:0;transition:transform .45s cubic-bezier(.34,1.56,.64,1),opacity .35s ease}
+.push-notif.show{transform:translateY(0);opacity:1}
+.push-notif.hide{transform:translateY(-90px);opacity:0;transition:transform .35s ease,opacity .25s ease}
+/* AQUÍ PYTHON INYECTA EL COLOR DEL ICONO PUSH */
+.push-icon{width:32px;height:32px;background:linear-gradient(135deg,__HEADER_GRADIENT__);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:iconPulse 1s ease-in-out infinite}
+@keyframes iconPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}50%{box-shadow:0 0 0 6px rgba(255,255,255,0)}}
+.push-icon svg{width:18px;height:18px;fill:#fff}
+.push-body{flex:1;min-width:0}
+.push-app{font-size:9px;color:rgba(255,255,255,.45);font-weight:600;letter-spacing:.5px;text-transform:uppercase;margin-bottom:2px}
+.push-title{font-size:11px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:2px}
+.push-msg{font-size:10px;color:rgba(255,255,255,.8);line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.push-time{font-size:9px;color:rgba(255,255,255,.3);flex-shrink:0;margin-top:2px}
+
+.multa-pop{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);background:rgba(0,0,0,.94);border:3px solid #FFD700;border-radius:12px;padding:16px 22px;text-align:center;z-index:20;box-shadow:0 0 50px rgba(255,215,0,.6);animation:multaAppear .4s cubic-bezier(.68,-.55,.265,1.55) forwards;pointer-events:none}
+@keyframes multaAppear{to{transform:translate(-50%,-50%) scale(1)}}
+.multa-label{font-size:9px;color:#FFD700;font-weight:700;letter-spacing:1px;margin-bottom:6px}
+.multa-number{font-family:'Roboto Mono',monospace;font-size:28px;font-weight:800;color:#fff;text-shadow:0 0 10px rgba(255,255,255,.5);letter-spacing:2px}
+.multa-sub{font-size:8px;color:rgba(255,255,255,.5);margin-top:4px}
+.home-btn{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:120px;height:4px;background:rgba(255,255,255,.25);border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="smog-wrap" id="smogWrap"></div>
+
+<div class="banner-led">
+  <div class="banner-content">
+    <span class="banner-text hl">AIREGPT · INFO VITAL</span><span class="banner-dots">●●●</span>
+    <span class="banner-text">MÁS RÁPIDO QUE LAS NOTICIAS</span><span class="banner-dots">●●●</span>
+    <span class="banner-text hl">5 DÍAS GRATIS</span><span class="banner-dots">●●●</span>
+    <span class="banner-text">@airegptcdmx_bot</span><span class="banner-dots">●●●</span>
+    <span class="banner-text hl">AIREGPT · INFO VITAL</span><span class="banner-dots">●●●</span>
+    <span class="banner-text">MÁS RÁPIDO QUE LAS NOTICIAS</span><span class="banner-dots">●●●</span>
+    <span class="banner-text hl">5 DÍAS GRATIS</span><span class="banner-dots">●●●</span>
+    <span class="banner-text">@airegptcdmx_bot</span><span class="banner-dots">●●●</span>
+  </div>
+</div>
+
+<div class="tg-badge"><svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.19 13.98 4.23 13.07c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.836.944z"/></svg></div>
+<div class="user-counter"><div class="pulse-dot"></div><div><div class="counter-num" id="counterNum">1,247</div><div class="counter-text">personas conectadas</div></div></div>
+
+<div class="main-content">
+  <div class="floating-emoji emoji1">📱</div><div class="floating-emoji emoji2">⚡</div><div class="floating-emoji emoji3">🛡️</div><div class="floating-emoji emoji4">📍</div><div class="floating-emoji emoji5">🤖</div>
+
+  <div class="smartphone" id="phone">
+    <div class="notch"><span class="notch-time" id="notchTime"></span><div class="notch-cam"></div></div>
+    <div class="screen">
+      <div class="chat-header">
+        <div class="avatar-wrap">
+          <div class="h-avatar"><svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.19 13.98 4.23 13.07c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.836.944z"/></svg></div>
+          <div class="notif-badge" id="notifBadge" style="display:none">1</div>
+        </div>
+        <div class="h-info"><div class="h-name">AIreGPT ⚡</div><div class="h-status">● conectado</div></div>
+      </div>
+      <div class="chat-area" id="chatArea">
+        <div class="push-notif" id="pushNotif">
+          <div class="push-icon"><svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.19 13.98 4.23 13.07c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.836.944z"/></svg></div>
+          <div class="push-body"><div class="push-app">Telegram · AIreGPT</div><div class="push-title" id="pushTitleTxt"></div><div class="push-msg" id="pushBodyTxt"></div></div>
+          <div class="push-time" id="pushTimeTxt"></div>
+        </div>
+        <div class="msgs" id="msgContainer"><div class="typing-wrap" id="typingEl"><span></span><span></span><span></span></div></div>
+      </div>
+    </div>
+    <div class="home-btn"></div>
+  </div>
+</div>
+
+<script>
+// AQUÍ PYTHON INYECTA LOS MENSAJES DEL JSON
+const msgs = __JSON_MESSAGES__;
+
+const phone = document.getElementById('phone'), msgCont = document.getElementById('msgContainer'), typingEl = document.getElementById('typingEl');
+const badge = document.getElementById('notifBadge'), chatArea = document.getElementById('chatArea'), pushNotif = document.getElementById('pushNotif');
+
+function updateClock(){
+  const n=new Date(); const t=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('notchTime').textContent=t; document.getElementById('pushTimeTxt').textContent=t;
+}
+updateClock();setInterval(updateClock,10000);
+
+const sw=document.getElementById('smogWrap');
+for(let i=0;i<20;i++){const d=document.createElement('div');d.className='smog';const s=80+Math.random()*200;d.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;animation-duration:${12+Math.random()*18}s;animation-delay:${Math.random()*16}s`;sw.appendChild(d);}
+
+let userCount=1200+Math.floor(Math.random()*200);
+setInterval(()=>{userCount=Math.max(1100,userCount+(Math.random()<.7?1:(Math.random()<.5?2:-1)));document.getElementById('counterNum').textContent=userCount.toLocaleString('es-MX');},2800);
+
+let msgIdx=0, badgeCount=0;
+const PAUSE=1500; 
+
+function showMultaPop(){
+  const pop=document.createElement('div');pop.className='multa-pop';
+  pop.innerHTML=`<div class="multa-label">⚠️ DATO REVELADO</div><div class="multa-number">ANALIZANDO</div><div class="multa-sub">AIREGPT ENGINE</div>`;
+  chatArea.appendChild(pop);
+  setTimeout(()=>{pop.style.transition='opacity .4s';pop.style.opacity='0';setTimeout(()=>pop.remove(),400);},2200);
+}
+
+function showPush(title, body){
+  if(title) document.getElementById('pushTitleTxt').innerHTML = title;
+  if(body) document.getElementById('pushBodyTxt').innerHTML = body;
+  pushNotif.classList.remove('hide'); pushNotif.classList.add('show');
+  phone.classList.add('phone-shake');setTimeout(()=>phone.classList.remove('phone-shake'),600);
+  setTimeout(()=>{pushNotif.classList.remove('show');pushNotif.classList.add('hide');},3000);
+}
+
+function buildMsg(m,idx){
+  let cls = m.style === 'highlight' ? 'hl' : (m.style === 'alert_red' ? 'alert' : m.style);
+  const div=document.createElement('div');div.className=`msg ${m.side} ${cls}`;
+  const n=new Date();n.setMinutes(n.getMinutes()+parseInt(idx*2));
+  const ts=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  div.innerHTML=m.side==='bot'
+    ?`<div class="bname ${cls==='hl'?'blue':cls==='cta'?'gold':''}">${m.label}</div><div class="bubble">${m.text}</div><span class="mtime">${ts}</span>`
+    :`<div class="bubble">${m.text}</div><span class="paloma">✓✓ ${ts}</span>`;
+  return div;
+}
+
+function next(){
+  if(msgIdx>=msgs.length){ typingEl.style.display='none'; return; }
+  const m=msgs[msgIdx];
+  if(m.side==='bot') { msgCont.appendChild(typingEl); typingEl.style.display='flex'; chatArea.scrollTop=chatArea.scrollHeight; }
+  
+  setTimeout(()=>{
+    typingEl.style.display='none';
+    const el=buildMsg(m,msgIdx);
+    msgCont.insertBefore(el,typingEl);
+    chatArea.scrollTop=chatArea.scrollHeight;
+    
+    if(m.side==='bot') {
+      badgeCount++;badge.style.display='flex';badge.textContent=badgeCount;
+      badge.style.animation='none';void badge.offsetWidth;badge.style.animation='badgePop .3s cubic-bezier(.68,-.55,.265,1.55)';
+    }
+    if(m.shake){phone.classList.add('phone-shake');setTimeout(()=>phone.classList.remove('phone-shake'),600);}
+    if(m.push_notification && m.push_notification.active) setTimeout(()=>showPush(m.push_notification.title, m.push_notification.body), 400);
+    if(m.slot_machine) setTimeout(showMultaPop, 600);
+    
+    msgIdx++;
+    setTimeout(next, m.slot_machine?PAUSE+1500:PAUSE);
+  }, m.side==='bot'?700:200);
+}
+setTimeout(next,600);
+</script>
+</body>
+</html>
