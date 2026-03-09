@@ -610,6 +610,7 @@ def get_maps_url(lat, lon): return f"https://www.google.com/maps/search/?api=1&q
 
 # --- REPORTE DIARIO CON PÍLDORA HNC Y VERIFICACIÓN INTEGRADAS ---
 def generate_report_card(user_name, location_name, lat, lon, vehicle=None, contingency_phase="None", user_profile=None, is_premium=False):
+
     try:
         url = f"{API_LIGHT_URL}?lat={lat}&lon={lon}"
         r = requests.get(url, timeout=10)
@@ -960,7 +961,7 @@ def lambda_handler(event, context):
                         vehicle=veh, 
                         contingency_phase=current_phase, 
                         user_profile=user,
-                        is_premium=is_prem_user  # <--- AGREGADO AQUÍ
+                        is_premium=is_premium_user  # <--- AGREGADO AQUÍ
                     )
                     
                     # Selección de Banner
@@ -1688,7 +1689,7 @@ def lambda_handler(event, context):
             current_phase = sys_state.get('last_contingency_phase', 'None')
             
             # 1. Generamos la tarjeta visual del lugar exacto
-            report_text, calidad = generate_report_card(first_name, "Ubicación Actual", lat, lon, vehicle=veh, contingency_phase=current_phase, user_profile=user_profile)
+            report_text, calidad = generate_report_card(first_name, "Ubicación Actual", lat, lon, vehicle=veh, contingency_phase=current_phase, user_profile=user_profile, is_premium=is_premium_user)
             
             # 2. Le agregamos la pregunta de retención al final
             report_text += "\n\n💾 **¿Quieres guardar este lugar para recibir alertas?**"
@@ -1758,10 +1759,6 @@ def lambda_handler(event, context):
         if ai_msg.tool_calls:
             print(f"🛠️ [TOOL] GPT wants to call: {len(ai_msg.tool_calls)} tools")
             gpt_msgs.append(ai_msg)
-            
-            # --- 💉 INYECCIÓN MAESTRA: Calculamos status UNA VEZ para todo el bucle ---
-            status_str = user_profile.get('subscription', {}).get('status', 'FREE').upper()
-            is_prem = any(x in status_str for x in ["PREMIUM", "TRIAL"])
 
             # =========================================================
             # 🛠️ ORQUESTADOR MODULAR UNIFICADO (CON GATEKEEPER)
@@ -1958,7 +1955,7 @@ def lambda_handler(event, context):
                             report_text, calidad = generate_report_card(
                                 first_name, in_name, in_lat, in_lon, 
                                 vehicle=veh, contingency_phase=current_phase,
-                                user_profile=user_profile, is_premium=is_prem
+                                user_profile=user_profile, is_premium=is_premium_user
                             )
                             
                             # --- SELECCIÓN DINÁMICA DE BANNER ---
