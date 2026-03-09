@@ -170,9 +170,11 @@ Para protegerte, necesito saber dónde te mueves.
 CARD_ONBOARDING_WORK = """✅ *¡Tu Casa está protegida!*
 
 🚀 *PASO 2: Tu destino principal.*
-Para calcular cuánto humo te *"fumas"* en en tu rutina, necesito saber a dónde vas todos los días.
+Para calcular cuánto humo te *"fumas"* en en tu rutina, necesito saber a dónde vas todos los días (Trabajo, Universidad, Gimnasio, Consultorio).
 
-👇 *Por favor, toca el clip 📎 (abajo a la izquierda), selecciona "Ubicación" y envíame la ubicación de tu TRABAJO o escuela.*
+👇 *Por favor, toca el clip 📎 (abajo a la izquierda), selecciona "Ubicación" y envíame ese lugar.*
+
+_(En el siguiente paso podrás decirle a AIreGPT cómo quieres nombrar este lugar)._
 
 {footer}"""
 
