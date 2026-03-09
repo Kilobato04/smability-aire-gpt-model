@@ -44,19 +44,18 @@ def evaluate_user_tier(user_item):
                 # Formato ISO
                 created_dt = datetime.fromisoformat(created_at_str.split('.')[0]) 
                 
-                # Obtenemos hora actual (restamos 6 horas para CDMX)
-                now = datetime.utcnow() - timedelta(hours=6)
+                # 🚀 FIX: Usamos UTC directo para coincidir con la BD
+                now = datetime.utcnow() 
                 
                 # Calculamos cuántos días han pasado
                 delta_days = (now - created_dt).days
                 
-                # 🚀 FIX: Usamos la variable TRIAL_DAYS (ahora vale 2)
                 if delta_days <= TRIAL_DAYS:
                     days_left = TRIAL_DAYS - delta_days
                     return 'TRIAL', max(1, days_left)
             except Exception as e:
                 print(f"Error calculando Trial: {e}")
-                pass 
+                pass
                 
     # 3. Fallback: El usuario es FREE y ya se le acabó su prueba
     return 'FREE', 0
