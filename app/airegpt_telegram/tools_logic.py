@@ -38,15 +38,20 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     try:
         key = normalize_key(nombre_ubicacion)
         
-        # 🕵️‍♂️ LOG PARA VER QUÉ CARAJO MANDA GPT
-        print(f"🤖 [DEBUG_GPT] GPT envió: dias_str = '{dias_str}'")
+        # 📸 CÁMARA 2: Vemos qué texto exacto llegó a la función
+        print(f"🕵️ [CÁMARA 2 - ENTRADA TOOLS]: dias_str = '{dias_str}'")
         
+        # Pasamos por el traductor
         dias_list = parse_days_input(dias_str) 
         
-        # Convertimos a int puros para que Boto3/Dynamo no se quejen
+        # 📸 CÁMARA 3: Vemos la lista que escupió el traductor
+        print(f"🕵️ [CÁMARA 3 - TRADUCCIÓN]: Lista cruda = {dias_list}")
+
+        # Forzamos enteros para Boto3/DynamoDB
         dias_list = [int(x) for x in dias_list]
         
-        print(f"🤖 [DEBUG_GPT] Traducido a lista final: {dias_list}")
+        # 📸 CÁMARA 4: Vemos la lista final que se va a DynamoDB
+        print(f"🕵️ [CÁMARA 4 - LISTA FINAL A BD]: {dias_list}")
 
         table.update_item(
             Key={'user_id': str(user_id)},
