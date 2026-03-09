@@ -921,8 +921,22 @@ def lambda_handler(event, context):
                 else:
                     resp += "\n\n🎉 **¡Listo! Tu perfil básico está completo.**"
 
+            #---
             elif data == "RESET": 
                 resp = "🗑️ Cancelado."
+                
+            # --- 🚀 FIX: RECEPTOR DE CONFIRMACIÓN DE PIN DINÁMICO ---
+            elif data.startswith("CONFIRM_LOC_"):
+                tipo_loc = data.replace("CONFIRM_LOC_", "")
+                
+                # Ejecutamos tu función maestra de guardado/actualización
+                msg_confirmacion = confirm_saved_location(user_id, tipo_loc)
+                
+                # Enviamos el mensaje de éxito con botón de retorno
+                markup_perfil = {"inline_keyboard": [[{"text": "👤 Ver mi resumen", "callback_data": "ver_resumen"}]]}
+                send_telegram(chat_id, msg_confirmacion, markup=markup_perfil)
+                return {'statusCode': 200, 'body': 'OK'}
+            # ---------------------------------------------------------
                 
             # --- BOTONES DEL ONBOARDING INICIAL (/start) ---
             elif data == "SET_LOC_casa":
@@ -1730,8 +1744,18 @@ def lambda_handler(event, context):
                 is_premium=es_premium_gps # <--- ADIÓS CRASHEO, ADIÓS CANDADO
             )
             
-            # 2. Interfaz limpia: Quitamos la pregunta de guardar y dejamos solo Mi Perfil
-            markup_guardado = {"inline_keyboard": [[{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]]}
+            # 2. 🚀 FIX: BOTONERA DINÁMICA DE CONFIRMACIÓN DE PIN
+            botones_pin = []
+            
+            # Mapeamos los lugares que el usuario ya tiene guardados
+            for k_loc, v_loc in locs.items():
+                nombre_display = v_loc.get('display_name', k_loc.capitalize())
+                botones_pin.append([{"text": f"✅ Sí - actualizar {nombre_display}", "callback_data": f"CONFIRM_LOC_{k_loc}"}])
+                
+            # Dejamos el botón de perfil por si solo quería escanear sin guardar
+            botones_pin.append([{"text": "👤 Mi Perfil (No actualizar)", "callback_data": "ver_resumen"}])
+            
+            markup_guardado = {"inline_keyboard": botones_pin}
             
             # 3. Seleccionamos el banner local basado en la calidad efímera
             mapa_archivos = {
