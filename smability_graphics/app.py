@@ -265,8 +265,14 @@ def generar_grafica_serpiente(user_id):
     ts_str = resp_c.get("ts", get_mexico_time().strftime("%Y-%m-%d %H:20:00"))
     base_dt = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S").replace(minute=20, second=0)
 
-    print(f"DEBUG_SMABILITY: Destino: {destino_key} | Nombre: {nombre_destino_visual}")
-    print(f"DEBUG_HORARIOS: Sale: {hora_salida} | Llega: {hora_llegada_trabajo} | Regresa: {hora_llegada_casa}")
+    print(f"🐍 [DEBUG_SMABILITY] --- INICIO RUTINA ---")
+    print(f"🐍 [DEBUG_SMABILITY] Usuario: {user_id}")
+    print(f"🐍 [DEBUG_SMABILITY] Llaves en locs: {list(locs.keys())}")
+    print(f"🐍 [DEBUG_SMABILITY] Destino Detectado (Key): {destino_key}")
+    print(f"🐍 [DEBUG_SMABILITY] Nombre Visual Asignado: {nombre_destino_visual}")
+    print(f"🐍 [DEBUG_SMABILITY] Medio: {medio_transporte} | Es_HO: {es_ho}")
+    print(f"🐍 [DEBUG_SMABILITY] Sale: {hora_salida} | Llega Trabajo: {hora_llegada_trabajo} | Regresa Casa: {hora_llegada_casa}")
+    print(f"🐍 [DEBUG_SMABILITY] --- FIN RUTINA ---")
     
     for offset in range(-24, 13): 
         i = ahora_idx + offset
