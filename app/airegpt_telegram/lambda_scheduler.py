@@ -338,7 +338,7 @@ def process_user(user, current_hour_str, contingency_data):
                             sys_phase = db_item.get('last_contingency_phase', 'None')
                             
                             # IMPORTANTE: Pasamos 'is_vip' a la función
-                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_premium=is_vip)
+                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_premium=is_premium)
                             
                             # Armar footer combinado
                             combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
@@ -352,7 +352,7 @@ def process_user(user, current_hour_str, contingency_data):
                                 limit_notice = f"\n\n⚠️ *Aviso:* Recibes {max_allowed} de {total_active_configs} reportes. ¡Hazte Premium para activarlos todos! 🚀"
                             
                             # 3. Generar Píldora HNC y Footer
-                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_premium=is_vip)
+                            hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_premium=is_premium)
                             combined_footer = f"{hnc_text}{limit_notice}\n\n{cards.BOT_FOOTER}" # <-- IMPORTANTE: Inyectamos el notice
 
                             card = cards.CARD_REMINDER.format(
