@@ -1,3 +1,4 @@
 playwright==1.42.0
 nest-asyncio==1.6.0
 openai==1.14.0
+requests==2.31.0
