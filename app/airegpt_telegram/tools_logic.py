@@ -38,8 +38,15 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     try:
         key = normalize_key(nombre_ubicacion)
         
-        # 🚀 FIX APLICADO: Ahora sí traducimos la instrucción de GPT a números
+        # 🕵️‍♂️ LOG PARA VER QUÉ CARAJO MANDA GPT
+        print(f"🤖 [DEBUG_GPT] GPT envió: dias_str = '{dias_str}'")
+        
         dias_list = parse_days_input(dias_str) 
+        
+        # Convertimos a int puros para que Boto3/Dynamo no se quejen
+        dias_list = [int(x) for x in dias_list]
+        
+        print(f"🤖 [DEBUG_GPT] Traducido a lista final: {dias_list}")
 
         table.update_item(
             Key={'user_id': str(user_id)},
@@ -54,7 +61,7 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
             }
         )
         
-        return f"Éxito: Recordatorio para {nombre_ubicacion.capitalize()} a las {hora} guardado."
+        return f"Éxito: Recordatorio para {nombre_ubicacion.capitalize()} a las {hora} guardado. Días: {dias_list}"
 
     except Exception as e:
         print(f"❌ Error en configure_schedule_alert: {e}")
