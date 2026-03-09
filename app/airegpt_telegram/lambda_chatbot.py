@@ -1879,11 +1879,10 @@ def lambda_handler(event, context):
                             r = tools_logic.ejecutar_configurar_alerta_contingencia(user_id, args.get('activar', True))
                         
                         elif fn == "configurar_recordatorio": 
-                        # 📸 CÁMARA 1: Vemos el JSON crudo que manda GPT
-                        print(f"🤖 [CÁMARA 1 - GPT RAW]: {args}")
-                        
-                        dias_gpt = args.get('dias', 'diario')
-                        r = tools_logic.configure_schedule_alert(user_id, args.get('nombre_ubicacion'), args.get('hora'), dias_gpt)
+                            # 📸 CÁMARA 1: Vemos el JSON crudo que manda GPT
+                            print(f"🤖 [CÁMARA 1 - GPT RAW]: {args}")
+                            dias_gpt = args.get('dias', 'diario')
+                            r = tools_logic.configure_schedule_alert(user_id, args.get('nombre_ubicacion'), args.get('hora'), dias_gpt)
                             
                         elif fn in ["configurar_alerta_ias", "configurar_alerta_por_umbral"]:
                             r = tools_logic.ejecutar_configurar_alerta_ias(user_id, args.get('nombre_ubicacion'), args.get('umbral_ias', args.get('umbral', 100)))
