@@ -125,6 +125,10 @@ def ejecutar_guardar_ubicacion(user_id, nombre, lat=None, lon=None, is_premium=F
         key = normalize_key(nombre)
         if not key: return "⚠️ Nombre de ubicación no válido."
 
+        # 🚀 FIX: Límite de 15 caracteres para el nombre visual
+        raw_name = nombre.strip().capitalize()
+        display_name = raw_name if len(raw_name) <= 15 else raw_name[:13] + ".."
+
         # 2. Obtener datos actuales
         user_data = table.get_item(Key={'user_id': str(user_id)}).get('Item', {})
         locs = user_data.get('locations', {})
@@ -138,17 +142,12 @@ def ejecutar_guardar_ubicacion(user_id, nombre, lat=None, lon=None, is_premium=F
                 return "⚠️ No encontré coordenadas pendientes. Por favor envía primero tu ubicación con el clip 📎."
 
         # --- 🎯 FIX DESTINO FLEXIBLE: DETECCIÓN Y LIMPIEZA ---
-        # Regla: Si no es 'casa', es un destino para la ruta.
         es_destino = (key != 'casa') 
 
         if es_destino:
-            # Quitamos el flag 'is_destination' de cualquier lugar que lo tuviera antes
             for k, v in locs.items():
                 if v.get('is_destination'):
-                    table.update_item(
-                        Key={'user_id': str(user_id)},
-                        UpdateExpression=f"REMOVE locations.{k}.is_destination"
-                    )
+                    table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=f"REMOVE locations.{k}.is_destination")
         # ----------------------------------------------------
 
         # 3. Lógica de Límites
@@ -156,26 +155,26 @@ def ejecutar_guardar_ubicacion(user_id, nombre, lat=None, lon=None, is_premium=F
         limite = 3 if is_premium else 2
         if len(activas) >= limite and key not in locs:
             plan = "Premium" if is_premium else "Gratis"
-            return f"🛑 Límite de {limite} lugares alcanzado para tu plan {plan}. Borra uno para agregar '{nombre}'."
+            return f"🛑 Límite de {limite} lugares alcanzado para tu plan {plan}. Borra uno para agregar '{display_name}'."
 
-        # 4. Guardado Atómico con el nuevo atributo 'is_destination'
+        # 4. Guardado Atómico 
         table.update_item(
             Key={'user_id': str(user_id)},
             UpdateExpression="SET locations.#loc = :val, alerts.threshold.#loc = :alert REMOVE draft_location",
             ExpressionAttributeNames={'#loc': key},
             ExpressionAttributeValues={
                 ':val': {
-                    'display_name': nombre.strip().capitalize(),
+                    'display_name': display_name, # <--- Se guarda la versión corta
                     'lat': str(lat),
                     'lon': str(lon),
                     'active': True,
-                    'is_destination': es_destino # <--- ESTE ES EL MOTOR DEL CAMBIO
+                    'is_destination': es_destino 
                 },
                 ':alert': {'umbral': 100, 'active': True, 'consecutive_sent': 0}
             }
         )
         
-        msg = f"Éxito: Ubicación '{nombre.capitalize()}' guardada correctamente."
+        msg = f"Éxito: Ubicación '{display_name}' guardada correctamente."
         if es_destino:
             msg += f" Se ha configurado como tu destino principal para el cálculo de exposición."
         return msg
@@ -185,46 +184,38 @@ def ejecutar_guardar_ubicacion(user_id, nombre, lat=None, lon=None, is_premium=F
         return f"⚠️ Error al guardar en DB: {str(e)}"
 
 def ejecutar_renombrar_ubicacion(user_id, nombre_actual, nombre_nuevo):
-    """
-    Cambia el nombre de una ubicación existente y preserva su estatus de destino.
-    """
+    """Cambia el nombre de una ubicación existente y preserva su estatus de destino."""
     try:
         key_old = normalize_key(nombre_actual)
         key_new = normalize_key(nombre_nuevo)
         
-        # 1. Obtener perfil actual
         user_data = table.get_item(Key={'user_id': str(user_id)}).get('Item', {})
         locs = user_data.get('locations', {})
 
         if key_old not in locs:
             return f"⚠️ No encontré '{nombre_actual}' en tu lista."
-        
         if key_new in locs:
             return f"⚠️ Ya tienes un lugar llamado '{nombre_nuevo}'. Elige otro nombre."
 
-        # 2. Extraer datos viejos y actualizar el nombre visual
+        # 🚀 FIX: Límite de 15 caracteres en renombrado
+        raw_new = nombre_nuevo.strip().capitalize()
+        display_name = raw_new if len(raw_new) <= 15 else raw_new[:13] + ".."
+
+        # Extraer datos viejos y actualizar el nombre visual
         loc_data = locs[key_old]
-        loc_data['display_name'] = nombre_nuevo.strip().capitalize()
+        loc_data['display_name'] = display_name
         
-        # --- 🎯 LOGICA DESTINO FLEXIBLE EN RENOMBRADO ---
-        # Si el nuevo nombre no es 'casa', nos aseguramos de que sea el destino
+        # Lógica de destino
         es_destino = (key_new != 'casa')
         loc_data['is_destination'] = es_destino
         
-        # Si es destino, limpiamos el flag de los demás (por si acaso)
         if es_destino:
             for k in locs:
                 if k != key_old and locs[k].get('is_destination'):
-                    table.update_item(
-                        Key={'user_id': str(user_id)},
-                        UpdateExpression=f"REMOVE locations.{k}.is_destination"
-                    )
+                    table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=f"REMOVE locations.{k}.is_destination")
 
-        # 3. Operación atómica: Crear nueva llave y borrar la vieja (con sus alertas)
-        update_expr = (
-            "SET locations.#newk = :val "
-            "REMOVE locations.#oldk, alerts.threshold.#oldk, alerts.schedule.#oldk"
-        )
+        # Operación atómica
+        update_expr = "SET locations.#newk = :val REMOVE locations.#oldk, alerts.threshold.#oldk, alerts.schedule.#oldk"
         
         table.update_item(
             Key={'user_id': str(user_id)},
@@ -233,7 +224,7 @@ def ejecutar_renombrar_ubicacion(user_id, nombre_actual, nombre_nuevo):
             ExpressionAttributeValues={':val': loc_data}
         )
         
-        return f"Éxito: He renombrado '{nombre_actual}' a '{nombre_nuevo.capitalize()}'."
+        return f"Éxito: He renombrado '{nombre_actual}' a '{display_name}'."
 
     except Exception as e:
         print(f"❌ Error renombrando: {e}")
