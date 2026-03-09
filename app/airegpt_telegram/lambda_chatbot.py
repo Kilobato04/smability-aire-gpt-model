@@ -1865,23 +1865,28 @@ def lambda_handler(event, context):
                     elif fn in ["consultar_resumen_configuracion", "consultar_perfil"]: 
                         # 1. 🛡️ FORZAR LECTURA FRESCA (Ignoramos variables previas de la Lambda)
                         user_fresh = get_user_profile(user_id)
-                        tier_real, _ = stripeairegpt.evaluate_user_tier(user_fresh)
+                        
+                        # 🚀 FIX 1: Atrapamos days_left de la función
+                        tier_real, days_left = stripeairegpt.evaluate_user_tier(user_fresh)
                         is_prem_real = tier_real in ['PREMIUM', 'TRIAL']
+
+                        # 🚀 FIX 2: Creamos el texto dinámico para GPT
+                        texto_plan = f"TRIAL ({days_left} días restantes)" if tier_real == 'TRIAL' else tier_real
 
                         print(f"🕵️ FUGA CHECK: User {user_id} pidiendo resumen. Tier Real: {tier_real}")
                         print(f"🕵️ DATA CHECK: Salud en DB: {user_fresh.get('health_profile')} | Transp en DB: {user_fresh.get('profile_transport')}")
                         print(f"🔍 [AUDIT_TEXT] Generando para: {user_id}")
                         print(f"🔍 [AUDIT_TEXT] Tier: {tier_real}")
-                        print(f"🔍 [AUDIT_TEXT] Alertas Raw: {user_fresh.get('alerts')}") # Veremos si 'threshold' existe aquí
+                        print(f"🔍 [AUDIT_TEXT] Alertas Raw: {user_fresh.get('alerts')}") 
                         print(f"🔍 [AUDIT_TEXT] Locations: {user_fresh.get('locations')}")
 
-                        # 2. Invocamos a cards.py pasándole el Tier real detectado
+                        # 2. Invocamos a cards.py pasándole el texto formateado
                         card_res = cards.generate_summary_card(
                             user_name=first_name, 
                             alerts=user_fresh.get('alerts', {}), 
                             vehicle=user_fresh.get('vehicle', {}), 
                             locations=user_fresh.get('locations', {}), 
-                            plan_status=tier_real, 
+                            plan_status=texto_plan, # <--- 🚀 FIX 3: Variable inyectada
                             transport_data=user_fresh.get('profile_transport', {}), 
                             health_data=user_fresh.get('health_profile', {})
                         )
