@@ -38,7 +38,7 @@ def configure_schedule_alert(user_id, nombre_ubicacion, hora, dias_str=None):
     try:
         key = normalize_key(nombre_ubicacion)
         
-        # 🚀 FIX: Ahora sí traducimos lo que GPT entendió a una lista real
+        # 🚀 FIX APLICADO: Ahora sí traducimos la instrucción de GPT a números
         dias_list = parse_days_input(dias_str) 
 
         table.update_item(
