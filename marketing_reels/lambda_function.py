@@ -2,26 +2,77 @@ import json
 import os
 import asyncio
 import nest_asyncio
+import requests
 from playwright.async_api import async_playwright
 from openai import OpenAI
 
 nest_asyncio.apply()
 
+# --- 🔑 CONFIGURACIÓN DE APIS ---
+os.environ["OPENAI_API_KEY"] = "TU_API_KEY_AQUI"
+META_ACCESS_TOKEN = "TU_TOKEN_DE_META"
+INSTAGRAM_ACCOUNT_ID = "TU_IG_ACCOUNT_ID"
+AD_ACCOUNT_ID = "act_TU_CUENTA_DE_ANUNCIOS"
+
+# EL ENDPOINT OFICIAL DE TU SCHEDULER
+MASTER_API_URL = "https://y4zwdmw7vf.execute-api.us-east-1.amazonaws.com/prod/api/air-quality/current?type=reference"
+
+def verificar_contingencia_oficial():
+    """
+    Consulta la API Maestra de Smability (igual que el Scheduler) 
+    para detectar si alguna estación marca Contingencia Fase I o II.
+    """
+    print("🕵️‍♂️ [MARKETING ENGINE] Consultando API Maestra para contingencias...")
+    try:
+        r = requests.get(MASTER_API_URL, timeout=15)
+        if r.status_code != 200: 
+            print(f"❌ Error HTTP al consultar API Maestra: {r.status_code}")
+            return False
+
+        data = r.json()
+        stations = data.get('stations', [])
+        
+        if stations:
+            for st in stations:
+                cont = st.get('contingency')
+                if cont and isinstance(cont, dict):
+                    raw_phase = cont.get('phase', '')
+                    clean_phase = str(raw_phase).strip().upper()
+                    
+                    if clean_phase in ['FASE I', 'FASE 1', 'FASE II', 'FASE 2']:
+                        print(f"🚨 ¡CONTINGENCIA DETECTADA! Estación: {st.get('station_name')} | Fase: {clean_phase}")
+                        return True
+                        
+        print("🍃 Aire libre de contingencias según la API Maestra.")
+        return False
+
+    except Exception as e:
+        print(f"🔥 Error en verificar_contingencia_oficial: {e}")
+        return False
+
 def lambda_handler(event, context):
-    # En AWS Lambda, pasamos el número de flow a través del evento (ej. desde EventBridge o API Gateway)
-    # Por defecto hará el 1 si no se le pasa nada.
-    numero_de_flow = event.get("flow_number", 1)
-    
-    print(f"🚀 Iniciando generación para Flow #{numero_de_flow}")
+    numero_de_flow_normal = event.get("flow_number", 1)
     
     # 1. LEER EL JSON MAESTRO
     with open("master_flows.json", "r", encoding="utf-8") as f:
         master_data = json.load(f)
     
-    flujo_hoy = master_data["flows"][numero_de_flow - 1]
-    flow_id = flujo_hoy['flow_id']
+    # 2. LÓGICA DE OVERRIDE (EL SWITCH INTELIGENTE BASADO EN TU API)
+    hay_contingencia = verificar_contingencia_oficial()
     
-    # 2. ESTILOS
+    if hay_contingencia:
+        print("⚡ Activando OVERRIDE: Se renderizará Reel de Contingencia.")
+        flujos_contingencia = [flujo for flujo in master_data["flows"] if flujo.get("contingencia_override") == True]
+        # Tomamos el primer flujo de contingencia para este ejemplo
+        flujo_hoy = flujos_contingencia[0] 
+    else:
+        print(f"✅ Día normal. Usando flow secuencial #{numero_de_flow_normal}")
+        flujo_hoy = master_data["flows"][numero_de_flow_normal - 1]
+
+    flow_id = flujo_hoy['flow_id']
+    print(f"🎯 Flujo seleccionado final: [{flow_id}] - {flujo_hoy['theme_label']}")
+    
+    # 3. ESTILOS
     theme = flujo_hoy.get("color_theme", "red_alert")
     estilos_css = {
         "red_alert": {"bg": "#FF4444 0%,#C0392B 30%,#8B0000 60%,#3a0000 100%", "header": "#FF3B30,#c0392b"},
@@ -32,10 +83,6 @@ def lambda_handler(event, context):
     }
     tema_actual = estilos_css.get(theme, estilos_css["red_alert"])
 
-    # (Imagina que aquí pegas el string gigante de html_template que probamos en Colab)
-    # html_template = """ ... """
-    
-    # Para el ejemplo en Github, asumo que guardas el template en un archivo separado para no ensuciar Python
     with open("template_base.html", "r", encoding="utf-8") as file:
         html_template = file.read()
 
@@ -43,7 +90,6 @@ def lambda_handler(event, context):
     html_final = html_final.replace("__HEADER_GRADIENT__", tema_actual["header"])
     html_final = html_final.replace("__JSON_MESSAGES__", json.dumps(flujo_hoy["messages"]))
 
-    # ⚠️ GUARDAR EN /tmp/ (Obligatorio en AWS Lambda)
     html_path = "/tmp/render_temp.html"
     video_dir = "/tmp/videos/"
     os.system(f"rm -rf {video_dir} && mkdir -p {video_dir}")
@@ -51,19 +97,11 @@ def lambda_handler(event, context):
     with open(html_path, "w", encoding="utf-8") as f:
         f.write(html_final)
 
-    # 3. GRABAR CON PLAYWRIGHT
+    # 4. GRABAR CON PLAYWRIGHT
     async def grabar():
         async with async_playwright() as p:
-            # En AWS, Chromium necesita estos flags para correr sin interfaz gráfica de SO
-            browser = await p.chromium.launch(
-                headless=True,
-                args=["--disable-dev-shm-usage", "--disable-gpu", "--no-sandbox", "--single-process"]
-            )
-            context = await browser.new_context(
-                record_video_dir=video_dir,
-                viewport={"width": 432, "height": 768},
-                device_scale_factor=5
-            )
+            browser = await p.chromium.launch(headless=True, args=["--disable-dev-shm-usage", "--disable-gpu", "--no-sandbox", "--single-process"])
+            context = await browser.new_context(record_video_dir=video_dir, viewport={"width": 432, "height": 768}, device_scale_factor=5)
             page = await context.new_page()
             await page.goto(f"file://{html_path}")
             await page.wait_for_timeout(15000)
@@ -73,9 +111,14 @@ def lambda_handler(event, context):
             
     asyncio.run(grabar())
 
-    # 4. FFMPEG
+    # 5. FFMPEG Y AUDIO
     video_original = os.path.join(video_dir, os.listdir(video_dir)[0])
-    audio_path = f"audios/aire_{numero_de_flow:03d}.mp4"
+    
+    # 🚀 FIX: Busca por ID (contingencia_override_001) o por secuencial (aire_012.mp4)
+    # Por ahora, usamos el número formateado asumiendo que tus 40 audios son "aire_001.mp4"
+    numero_formateado = f"{numero_de_flow_normal:03d}"
+    audio_path = f"audios/aire_{numero_formateado}.mp4" 
+    
     output_mp4 = f"/tmp/reel_{flow_id}.mp4"
 
     comando_ffmpeg = f"""
@@ -88,7 +131,7 @@ def lambda_handler(event, context):
     """
     os.system(comando_ffmpeg)
 
-    # 5. OPENAI COPY
+    # 6. OPENAI COPY
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
     instr = flujo_hoy["llm_instructions"]
     prompt_armado = instr["prompt_template"].format(
@@ -101,10 +144,19 @@ def lambda_handler(event, context):
         messages=[{"role": "system", "content": "Experto en Reels."}, {"role": "user", "content": prompt_armado}]
     )
     caption_final = res.choices[0].message.content
+    print(f"📝 Caption generado: {caption_final[:50]}...")
 
-    # Aquí en el futuro agregaremos la llamada a la API de Meta para subir el output_mp4 y el caption_final
-    
+    # 7. PUBLICACIÓN ORGÁNICA (Graph API) - Concepto Fase 3
+    print("📤 Subiendo a Instagram Reels...")
+    # media_id = subir_a_instagram(output_mp4, caption_final)
+    media_id = "TEST_MEDIA_ID_12345" # Simulación
+
+    # 8. PAUTA AUTOMÁTICA DE $5,000 MXN (Meta Marketing API)
+    if hay_contingencia and media_id:
+        print("💸 Contingencia detectada: Disparando pauta de $5,000 MXN...")
+        # pautar_reel_en_meta(media_id, presupuesto=5000, ubicacion="CDMX")
+
     return {
         "statusCode": 200,
-        "body": f"Reel {flow_id} generado en /tmp. Caption: {caption_final[:50]}..."
+        "body": json.dumps({"status": "success", "flow_id": flow_id, "pauta_lanzada": hay_contingencia})
     }
