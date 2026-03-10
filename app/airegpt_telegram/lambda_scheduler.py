@@ -484,7 +484,6 @@ def process_user(user, current_hour_str, contingency_data):
                             if should_send:
                                 if is_paywall:
                                     print(f"   💸 [PAYWALL] Lanzando muro a {first_name}")
-                                    import stripeairegpt
                                     texto_venta, botones = stripeairegpt.get_paywall_response(tier, 0, "alertas", str(user_id))
                                     paywall_msg = "🚨 **El aire ha superado tu límite de peligro.**\n\nHas agotado tus 3 alertas automáticas de prueba.\n\nPara seguir recibiendo estos avisos en tiempo real, activa tu plan:\n\n" + texto_venta
                                     send_telegram_push(user_id, paywall_msg, markup=botones)
