@@ -1707,9 +1707,13 @@ def lambda_handler(event, context):
 
         alerts_cleaned = clean_decimals(alerts)
         memoria_str += f"- Configuración de Alertas: {json.dumps(alerts_cleaned)}"
+        
         # -------------------------------------------------------
         
-        has_casa, has_trabajo = 'casa' in locs, 'trabajo' in locs
+        # 0. Buscamos si tiene casa, y si tiene AL MENOS un destino guardado (no importa el nombre)
+        has_casa = 'casa' in locs
+        has_destino = any(k != 'casa' for k in locs.keys())
+        
         forced_tag = None
         system_extra = "NORMAL"
 
@@ -1723,7 +1727,7 @@ def lambda_handler(event, context):
             )
         elif not has_casa: 
             system_extra = "ONBOARDING 1: Pide CASA"
-        elif not has_trabajo: 
+        elif not has_destino:  # <--- FIX: Cambiado a has_destino para evitar crash
             system_extra = "ONBOARDING 2: Pide TRABAJO"
         
         # 1. Prioridad: Si hay mapa en este mensaje (Override total)
@@ -1750,13 +1754,13 @@ def lambda_handler(event, context):
             if not has_casa:
                 # Si no tiene casa, asumimos que está en el Paso 1 del Onboarding
                 botones_pin.append([{"text": "🏠 Guardar como Casa", "callback_data": "SAVE_HOME"}])
-            elif not has_trabajo:
-                # Si no tiene trabajo, asumimos que está en el Paso 2
+            elif not has_destino:
+                # Si no tiene ningún destino, asumimos que está en el Paso 2
                 botones_pin.append([{"text": "🏢 Guardar como Trabajo", "callback_data": "SAVE_WORK"}])
                 botones_pin.append([{"text": "📍 Otro nombre", "callback_data": "SAVE_OTHER"}])
                 
-            # Si ya tiene ambos, es un escaneo GPS "On-Demand" puro. 
-            # La tarjeta sale limpiecita.
+            # Si ya tiene Casa y un Destino (ej. Arcadis), es un On-Demand puro. 
+            # La tarjeta sale limpiecita (Solo pegamos el botón UNA vez)
             botones_pin.append([{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}])
             
             markup_guardado = {"inline_keyboard": botones_pin}
