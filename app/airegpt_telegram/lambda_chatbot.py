@@ -1744,16 +1744,20 @@ def lambda_handler(event, context):
                 is_premium=es_premium_gps # <--- ADIÓS CRASHEO, ADIÓS CANDADO
             )
             
-            # 2. 🚀 FIX: BOTONERA DINÁMICA DE CONFIRMACIÓN DE PIN
+            # 2. 🚀 FIX 4: LÓGICA SEPARADA (ON-DEMAND VS ONBOARDING)
             botones_pin = []
             
-            # Mapeamos los lugares que el usuario ya tiene guardados
-            for k_loc, v_loc in locs.items():
-                nombre_display = v_loc.get('display_name', k_loc.capitalize())
-                botones_pin.append([{"text": f"✅ Sí - actualizar {nombre_display}", "callback_data": f"CONFIRM_LOC_{k_loc}"}])
+            if not has_casa:
+                # Si no tiene casa, asumimos que está en el Paso 1 del Onboarding
+                botones_pin.append([{"text": "🏠 Guardar como Casa", "callback_data": "SAVE_HOME"}])
+            elif not has_trabajo:
+                # Si no tiene trabajo, asumimos que está en el Paso 2
+                botones_pin.append([{"text": "🏢 Guardar como Trabajo", "callback_data": "SAVE_WORK"}])
+                botones_pin.append([{"text": "📍 Otro nombre", "callback_data": "SAVE_OTHER"}])
                 
-            # Dejamos el botón de perfil por si solo quería escanear sin guardar
-            botones_pin.append([{"text": "👤 Mi Perfil (No actualizar)", "callback_data": "ver_resumen"}])
+            # Si ya tiene ambos, es un escaneo GPS "On-Demand" puro. 
+            # La tarjeta sale limpiecita.
+            botones_pin.append([{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}])
             
             markup_guardado = {"inline_keyboard": botones_pin}
             
