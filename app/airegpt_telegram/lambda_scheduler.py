@@ -206,11 +206,16 @@ def process_user(user, current_hour_str, contingency_data):
     user_id = user['user_id']
     first_name = user.get('first_name', 'Usuario')
     
-    # 🛡️ PASO 0: REFRESCAR TIER CON BUSINESS LOGIC
-    tier = business_logic.get_user_tier(user)
+    # 🛡️ PASO 0: REFRESCAR TIER (Sincronizado con la lógica del Bot)
+    tier, _ = stripeairegpt.evaluate_user_tier(user)
     is_premium = tier in ["PREMIUM", "TRIAL"]
     config_tier = business_logic.get_tier_config(user)
 
+    # OVERRIDE: Forzamos los permisos si el usuario está en TRIAL activo
+    if is_premium:
+        config_tier["can_contingency"] = True
+        config_tier["max_schedule_reports"] = 5 # Aseguramos cupo para sus recordatorios
+        
     is_vip = config_tier.get("is_vip", False)
 
     # ⚓ ANCLA A: FIX DE ROBUSTEZ
@@ -460,8 +465,8 @@ def process_user(user, current_hour_str, contingency_data):
                             should_send = False
                             is_paywall = False
                             
-                            if "PREMIUM" in tier or "TRIAL" in tier:
-                                if count < 3: should_send = True # Premium no recibe spam (max 3 seguidas)
+                            if tier in ["PREMIUM", "TRIAL"]:
+                                if count < 3: should_send = True # Premium/Trial no recibe spam
                             else:
                                 # LÓGICA FREE: 3 alertas de vida
                                 free_alerts_sent = int(user.get('free_alerts_sent', 0))
