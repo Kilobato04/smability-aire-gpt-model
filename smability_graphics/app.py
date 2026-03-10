@@ -122,11 +122,18 @@ def ejecutar_job_nocturno():
                     total_cigarros = sum(float(dia.get('cigarros', 0)) for dia in current_week) + cigarros_val
                     total_dias_edad = sum(float(dia.get('dias_edad', 0)) for dia in current_week) + dias_edad_val
                     
+                    # --- 🛠️ FIX 3A: Guardar el promedio de IAS en el histórico ---
+                    total_pm25 = sum(float(dia.get('promedio_pm25', 0)) for dia in current_week) + float(res['promedio_riesgo'])
+                    dias_totales = len(current_week) + 1
+                    ias_promedio_semana = (total_pm25 / dias_totales) * 4
+
                     resumen_semanal = {
                         "fecha_cierre": fecha_str,
                         "cigarros_totales": str(round(total_cigarros, 1)),
-                        "dias_edad_totales": str(round(total_dias_edad, 1))
+                        "dias_edad_totales": str(round(total_dias_edad, 1)),
+                        "ias_promedio_semana": str(round(ias_promedio_semana, 1)) # NUEVO DATO PERSISTENTE
                     }
+                    
                     historical_weeks.append(resumen_semanal)
                     
                     if not health_stats:
@@ -485,44 +492,45 @@ def generar_grafica_tetris(user_id):
         semanas_transcurridas = now_mx.isocalendar()[1]
 
         cigarros_float = np.zeros(semanas_totales)
-        ias_suma = np.zeros(semanas_totales)
-        dias_con_datos = np.zeros(semanas_totales)
+        
+        # --- 🛠️ FIX 3B: Suma exacta del Mes actual ---
+        suma_ias_mes_actual = 0
+        dias_ias_mes_actual = 0
 
         for log in all_logs:
-            # 1. Identificar si es un registro diario o un resumen histórico
             es_historico = 'fecha_cierre' in log
             fecha_str = log.get('fecha_cierre') if es_historico else log.get('fecha')
-            
             if not fecha_str: continue
             
             dt = datetime.strptime(fecha_str, "%Y-%m-%d")
-            if dt.year != now_mx.year: continue # Filtro año en curso
+            if dt.year != now_mx.year: continue 
             
-            w_idx = dt.isocalendar()[1] - 1 # Índice de array (0 a 51)
-            if w_idx < 0 or w_idx >= 52: continue
+            # 1. Acumulado Semanal (Cigarros)
+            w_idx = dt.isocalendar()[1] - 1 
+            if 0 <= w_idx < 52:
+                if es_historico:
+                    cigarros_float[w_idx] += float(log.get('cigarros_totales', 0))
+                else:
+                    cigarros_float[w_idx] += float(log.get('cigarros', 0))
             
-            # 2. Sumar cigarros dependiendo del tipo de registro
-            if es_historico:
-                cigarros_float[w_idx] += float(log.get('cigarros_totales', 0))
-                # (El IAS histórico no lo necesitamos sumar aquí, la tarjeta mensual ya se congeló)
-            else:
-                cigarros_float[w_idx] += float(log.get('cigarros', 0))
-                
-                # El IAS solo lo promediamos de los días activos (current_week)
-                pm25 = float(log.get('promedio_pm25', 0))
-                ias_val = float(log.get('promedio_ias', pm25 * 4)) 
-                ias_suma[w_idx] += ias_val
-                dias_con_datos[w_idx] += 1
+            # 2. Acumulado Mensual (Promedio IAS estrictamente del mes en curso)
+            if dt.month == now_mx.month:
+                if es_historico:
+                    if 'ias_promedio_semana' in log:
+                        suma_ias_mes_actual += float(log['ias_promedio_semana']) * 7
+                        dias_ias_mes_actual += 7
+                else:
+                    pm25 = float(log.get('promedio_pm25', 0))
+                    ias_val = float(log.get('promedio_ias', pm25 * 4)) 
+                    suma_ias_mes_actual += ias_val
+                    dias_ias_mes_actual += 1
 
-        # --- FIX: Mantener 1 decimal exacto sin redondear al entero ---
         cigarros_semana = np.round(cigarros_float, 1) 
         total_cigarros_ytd = round(np.sum(cigarros_semana), 1)
         anios_edad_urbana = round((total_cigarros_ytd * 2.0) / 365.0, 2)
 
-        idx_inicio = max(0, semanas_transcurridas - 4)
-        suma_ias_mes = np.sum(ias_suma[idx_inicio:semanas_transcurridas])
-        suma_dias_mes = np.sum(dias_con_datos[idx_inicio:semanas_transcurridas])
-        promedio_ias_mes = int(suma_ias_mes / suma_dias_mes) if suma_dias_mes > 0 else 0
+        # Calculamos el promedio correcto del mes calendario a la fecha
+        promedio_ias_mes = int(suma_ias_mes_actual / dias_ias_mes_actual) if dias_ias_mes_actual > 0 else 0
 
         # ==========================================
         # 3. HELPERS DE DISEÑO (Anidados)
