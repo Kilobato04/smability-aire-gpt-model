@@ -208,7 +208,7 @@ def process_user(user, current_hour_str, contingency_data):
     
     # 🛡️ PASO 0: REFRESCAR TIER CON BUSINESS LOGIC
     tier = business_logic.get_user_tier(user)
-    is_premium = (tier == "PREMIUM")
+    is_premium = tier in ["PREMIUM", "TRIAL"]
     config_tier = business_logic.get_tier_config(user)
 
     is_vip = config_tier.get("is_vip", False)
@@ -501,7 +501,7 @@ def process_user(user, current_hour_str, contingency_data):
                                     info = cards.IAS_INFO.get(cat, cards.IAS_INFO['Regular'])
                                     db_item = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
                                     sys_phase = db_item.get('last_contingency_phase', 'None')
-                                    hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase)
+                                    hnc_text = cards.build_hnc_pill(user.get('vehicle'), sys_phase, is_premium=is_premium)
                                     combined_footer = f"{hnc_text}\n\n{cards.BOT_FOOTER}" if hnc_text else cards.BOT_FOOTER
 
                                     tendencia_actual = qa.get('tendencia', 'Estable 📊')
