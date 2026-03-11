@@ -12,7 +12,7 @@ phases:
       - playwright install --with-deps chromium
   build:
     commands:
-      - if [ -z "$FLOW_ID" ]; then echo "❌ ERROR FATAL: FLOW_ID está vacío. Abortando fábrica."; exit 1; fi
+      - if [ -z "$FLOW_ID" ]; then echo "❌ ERROR FATAL - FLOW_ID esta vacio. Abortando fabrica."; exit 1; fi
       - echo "🎬 Grabando pantalla y uniendo audio..."
       - cd marketing_reels
       - python render_reel.py
