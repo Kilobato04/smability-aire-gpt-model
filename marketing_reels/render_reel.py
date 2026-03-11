@@ -58,7 +58,7 @@ async def grabar():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=["--disable-dev-shm-usage", "--disable-gpu", "--no-sandbox"])
         # 🔥 FIX: 540x960 * 2 = 1080x1920 EXACTOS (El tamaño nativo perfecto de Instagram)
-        context = await browser.new_context(record_video_dir=video_dir, viewport={"width": 540, "height": 960}, device_scale_factor=2)
+        context = await browser.new_context(record_video_dir=video_dir, viewport={"width": 432, "height": 768}, device_scale_factor=2.5)
         page = await context.new_page()
         await page.goto(f"file://{html_path}")
         await page.wait_for_timeout(18000) # 18 segundos confirmados
