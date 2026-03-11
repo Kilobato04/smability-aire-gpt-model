@@ -89,11 +89,11 @@ def analizar_contingencia_ia(titulo, texto_articulo):
     Lee el TÍTULO y el TEXTO del comunicado oficial y extrae la verdad legal en formato JSON.
     
     REGLAS INFALIBLES PARA EL JSON:
-    1. "razonamiento": Escribe paso a paso tu lógica. ¿El título dice SE SUSPENDE o MANTIENE?
-    2. "estatus": Si el título o el primer párrafo dice "SUSPENDE" o "LEVANTA", pon "SUSPENDE" (ignora la palabra "mantiene" si hablan del clima). Si dice "MANTIENE", pon "MANTIENE".
-    3. "fase": Si el estatus es "SUSPENDE", pon "None". Si es "MANTIENE", pon "Fase I" o "Fase II".
-    4. "resumen_hnc": Si el estatus es "SUSPENDE", pon "Circulación normal". Si es "MANTIENE", resume qué autos no circulan.
-    5. "fecha_hora": Extrae la fecha y hora de emisión (Ej: "17 de febrero, 18:00 horas")."""
+    1. "razonamiento": Escribe paso a paso tu lógica legal.
+    2. "estatus": EVALUACIÓN LITERAL. Si el título dice "ACTIVA" o "DECLARA", pon obligatoriamente "ACTIVA". Si dice "MANTIENE" o "CONTINÚA", pon "MANTIENE". Si dice "SUSPENDE" o "LEVANTA", pon "SUSPENDE". ¡Prohibido inferir!
+    3. "fase": Si el estatus es "SUSPENDE", pon "None". Si es "ACTIVA" o "MANTIENE", pon "Fase I" o "Fase II".
+    4. "resumen_hnc": Si el estatus es "SUSPENDE", pon "Circulación normal". Si es "ACTIVA" o "MANTIENE", resume qué autos no circulan.
+    5. "fecha_hora": Extrae la fecha y hora de emisión (Ej: "10 de marzo, 16:00 horas")."""
     
     try:
         response = client.chat.completions.create(
@@ -111,7 +111,7 @@ def analizar_contingencia_ia(titulo, texto_articulo):
         return {"error": str(e)}
 
 def lambda_handler(event, context):
-    print("🚀 Iniciando CAMe Scraper...")
+    print("🚀 Iniciando CAMe Scraper (Modo Máquina de Estados)...")
     titulo, texto, link_oficial = obtener_contexto_completo()
     
     if not titulo: 
@@ -132,38 +132,32 @@ def lambda_handler(event, context):
     fecha_nueva = resultado_ia.get('fecha_hora', '')
     fecha_vieja = estado_anterior.get('fecha_hora', '')
     
-    # Disparamos si la fecha cambió
+    fase_nueva = resultado_ia.get('fase', 'None')
+    fase_anterior = db_item.get('last_contingency_phase', 'None') # Fase anterior real
+    
+    # Disparamos solo si hay un boletín nuevo
     if fecha_nueva != fecha_vieja and fecha_nueva != "":
-        print(f"🚨 ¡NUEVO BOLETÍN DETECTADO! Actualizando BD... ({fecha_vieja} -> {fecha_nueva})")
         
-        fase_detectada = resultado_ia.get('fase', 'None')
+        # 1. Normalizar la fase según el estatus
         estatus = resultado_ia.get('estatus', 'MANTIENE')
-        
-        # Lógica de Suspensión Segura
-        if estatus in ["SUSPENDE", "SIN_CONTINGENCIA"]:
+        if estatus in ["SUSPENDE", "SIN_CONTINGENCIA", "LEVANTA"]:
+            fase_db = "None"
             fase_broadcast = "SUSPENDIDA"
-            fase_db = "None" 
         else:
-            fase_broadcast = fase_detectada
-            fase_db = fase_detectada
+            fase_db = fase_nueva
+            fase_broadcast = fase_nueva
             
-        # 1. Guardar la verdad oficial en la BD
+        # 2. Guardar SIEMPRE la verdad oficial más reciente en la BD
         table.update_item(
             Key={'user_id': 'SYSTEM_STATE'},
             UpdateExpression="SET came_oficial = :c, last_contingency_phase = :p, updated_at = :t",
             ExpressionAttributeValues={':c': resultado_ia, ':p': fase_db, ':t': datetime.now().isoformat()}
         )
+        
+        # 3. 🔥 MÁQUINA DE ESTADOS: LÓGICA DE TRANSICIÓN ANTI-SPAM
+        if fase_db != fase_anterior:
+            print(f"🚨 ¡CAMBIO DE ESTADO DETECTADO! ({fase_anterior} -> {fase_db}). Disparando Broadcast...")
             
-        # 2. Despertar al Chatbot
-        if fase_broadcast == "SUSPENDIDA":
-            payload = {
-                "action": "BROADCAST_CONTINGENCY",
-                "data": {
-                    "phase": "SUSPENDIDA",
-                    "oficial_link": link_oficial  # <--- Adentro de "data" y con su valor
-                }
-            }
-        else:
             payload = {
                 "action": "BROADCAST_CONTINGENCY",
                 "data": {
@@ -176,9 +170,12 @@ def lambda_handler(event, context):
                     }
                 }
             }
-        
-        lambda_client.invoke(FunctionName=BOT_LAMBDA_NAME, InvocationType='Event', Payload=json.dumps(payload))
-        print("📢 Señal de Broadcast enviada al Chatbot.")
+            lambda_client.invoke(FunctionName=BOT_LAMBDA_NAME, InvocationType='Event', Payload=json.dumps(payload))
+            print("📢 Señal de Broadcast enviada al Chatbot.")
+            
+        else:
+            # El estado es el mismo. Actualizamos la BD silenciosamente pero no enviamos mensaje.
+            print(f"🔄 Boletín de seguimiento: Se mantiene la fase ({fase_db}). Actualización silenciosa, sin Broadcast.")
             
     else:
         print("💤 Sin boletines nuevos. A dormir.")
