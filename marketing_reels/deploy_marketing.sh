@@ -1,12 +1,25 @@
 #!/bin/bash
-# Despliegue ultrarrápido del Manager de Marketing a AWS Lambda
+# Despliegue del Manager de Marketing a AWS Lambda con dependencias
 
 LAMBDA_FUNCTION_NAME="Smability-Marketing-Engine"
 AWS_REGION="us-east-1"
 
-echo "📦 Empaquetando el código Python..."
-# Solo empaquetamos el código y el JSON (sin librerías pesadas)
-zip -r function.zip lambda_function.py master_flows.json
+echo "🧹 Limpiando builds anteriores..."
+rm -rf package
+rm -f function.zip
+
+echo "📦 Instalando dependencias (OpenAI, Requests)..."
+mkdir package
+pip3 install -r requirements.txt -t package/
+
+echo "📁 Copiando código fuente..."
+cp lambda_function.py package/
+cp master_flows.json package/
+
+echo "🗜️ Empaquetando en ZIP..."
+cd package
+zip -r ../function.zip .
+cd ..
 
 echo "☁️ Subiendo a AWS Lambda..."
 aws lambda update-function-code \
@@ -14,7 +27,8 @@ aws lambda update-function-code \
     --zip-file fileb://function.zip \
     --region $AWS_REGION
 
-echo "🧹 Limpiando..."
+echo "🧹 Limpiando archivos temporales..."
+rm -rf package
 rm function.zip
 
 echo "✅ ¡Despliegue del Cerebro completado!"
