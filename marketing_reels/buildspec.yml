@@ -5,15 +5,15 @@ phases:
     runtime-versions:
       python: 3.12
     commands:
-      - echo "📦 Instalando FFmpeg y herramientas de video..."
+      - echo "📦 Instalando dependencias (FFmpeg, Playwright, Requests)..."
       - apt-get update -y
       - apt-get install -y ffmpeg
-      - pip install playwright boto3
+      - pip install playwright boto3 requests
       - playwright install --with-deps chromium
   build:
     commands:
       - if [ -z "$FLOW_ID" ]; then echo "❌ ERROR FATAL - FLOW_ID esta vacio. Abortando fabrica."; exit 1; fi
-      - echo "🎬 Grabando pantalla y uniendo audio..."
+      - echo "🎬 Generando Reel y publicando en Instagram..."
       - cd marketing_reels
       - python render_reel.py
   post_build:
