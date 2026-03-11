@@ -1320,6 +1320,10 @@ def lambda_handler(event, context):
                 transport = user.get('profile_transport', {}) # Tu llave real
                 health = user.get('health_profile', {})        # Tu llave real
 
+                # 🔥 FIX: Leemos el estado del sistema desde DynamoDB
+                sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                current_phase = sys_state.get('last_contingency_phase', 'None')
+
                 # 3. 🚩 INVOCAR LA TARJETA MAESTRA (AQUÍ ESTÁN LOS CANDADOS 🔒)
                 card_resumen = cards.generate_summary_card(
                     user_name=first_name,
@@ -1328,7 +1332,8 @@ def lambda_handler(event, context):
                     locations=locations,
                     plan_status=texto_plan,
                     transport_data=transport,
-                    health_data=health
+                    health_data=health,
+                    global_contingency=current_phase
                 )
                 
                 # 4. Obtener botones (Muestra "Go Premium" si es FREE)
@@ -1634,6 +1639,10 @@ def lambda_handler(event, context):
 
                 texto_plan = f"TRIAL ({days_left} días restantes)" if tier == 'TRIAL' else tier
 
+                # 🔥 FIX: Leemos el estado del sistema desde DynamoDB
+                sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                current_phase = sys_state.get('last_contingency_phase', 'None')
+                
                 # 2. 🚩 LLAMADA ÚNICA AL MOTOR DE TARJETAS (Sin lógica duplicada)
                 card_resumen = cards.generate_summary_card(
                     user_name=first_name,
@@ -1642,7 +1651,8 @@ def lambda_handler(event, context):
                     locations=user.get('locations', {}),
                     plan_status=texto_plan,
                     transport_data=user.get('profile_transport', {}),
-                    health_data=user.get('health_profile', {})
+                    health_data=user.get('health_profile', {}),
+                    global_contingency=current_phase
                 )
                 
                 # 3. Obtener botones dinámicos usando la función de cards.py
