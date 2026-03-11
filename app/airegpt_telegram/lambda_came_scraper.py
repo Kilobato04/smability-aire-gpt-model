@@ -16,6 +16,7 @@ client = OpenAI(api_key=OPENAI_API_KEY, timeout=20.0)
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(DYNAMODB_TABLE)
 lambda_client = boto3.client('lambda')
+codebuild_client = boto3.client('codebuild')
 
 PRENSA_URL = "https://www.gob.mx/comisionambiental/es/archivo/prensa"
 BASE_URL = "https://www.gob.mx"
@@ -172,6 +173,20 @@ def lambda_handler(event, context):
             }
             lambda_client.invoke(FunctionName=BOT_LAMBDA_NAME, InvocationType='Event', Payload=json.dumps(payload))
             print("📢 Señal de Broadcast enviada al Chatbot.")
+
+            # 🎬 --- NUEVO: PING A LA FÁBRICA DE REELS DE EMERGENCIA ---
+            if fase_db != "None":
+                try:
+                    codebuild_client.start_build(
+                        projectName='Smability-Marketing-Renderer',
+                        environmentVariablesOverride=[
+                            {'name': 'ES_CONTINGENCIA', 'value': 'true', 'type': 'PLAINTEXT'}
+                        ]
+                    )
+                    print("🎬 Fábrica de Reels despertada para emergencia.")
+                except Exception as e:
+                    print(f"⚠️ Error al encender fábrica de Reels: {e}")
+            # ----------------------------------------------------------
             
         else:
             # El estado es el mismo. Actualizamos la BD silenciosamente pero no enviamos mensaje.
