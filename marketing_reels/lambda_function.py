@@ -3,14 +3,12 @@ import os
 import random
 import boto3
 import requests
-from openai import OpenAI
 
 # --- 🔑 CONFIGURACIÓN DE APIS ---
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 CODEBUILD_PROJECT = os.environ.get('CODEBUILD_PROJECT', 'Smability-Marketing-Renderer')
 MASTER_API_URL = "https://y4zwdmw7vf.execute-api.us-east-1.amazonaws.com/prod/api/air-quality/current?type=reference"
 
-client = OpenAI(api_key=OPENAI_API_KEY, timeout=15.0)
 codebuild = boto3.client('codebuild')
 
 def verificar_contingencia_oficial():
@@ -47,10 +45,9 @@ def lambda_handler(event, context):
         flujos_contingencia = [f for f in master_data["flows"] if f.get("contingencia_override")]
         flujo_elegido = flujos_contingencia[0] # Tomamos el de emergencia
     else:
-        # Día normal: Elegimos uno al azar o según un contador guardado
+        # Día normal: Elegimos uno al azar
         numero_de_flow_normal = random.randint(1, len(master_data["flows"]) - 1)
         print(f"✅ Día normal. Elegido el flow #{numero_de_flow_normal}")
-        # Filtramos los que NO son de contingencia
         flujos_normales = [f for f in master_data["flows"] if not f.get("contingencia_override")]
         flujo_elegido = flujos_normales[numero_de_flow_normal - 1]
 
@@ -58,7 +55,7 @@ def lambda_handler(event, context):
     tema = flujo_elegido.get("color_theme", "red_alert")
     print(f"🎯 Mandando a fabricar: [{flow_id}] | Tema: {tema}")
 
-    # 3. OPENAI GENERANDO EL COPY JUGOSO
+    # 3. OPENAI GENERANDO EL COPY JUGOSO (MODO LIGERO CON REQUESTS)
     instr = flujo_elegido["llm_instructions"]
     prompt_armado = instr["prompt_template"].format(
         tone=instr["tone"], persona=instr["persona"], avoid=", ".join(instr["avoid"]),
@@ -66,20 +63,29 @@ def lambda_handler(event, context):
     ).replace("[FLOW_MESSAGES]", " | ".join([m["text"] for m in flujo_elegido["messages"]]))
 
     try:
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "system", "content": "Experto en Reels virales."}, {"role": "user", "content": prompt_armado}],
-            temperature=0.7
-        )
-        caption_final = res.choices[0].message.content.strip()
+        print("🤖 Pidiendo copy a ChatGPT...")
+        headers = {
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "gpt-4o-mini",
+            "messages": [
+                {"role": "system", "content": "Experto en Reels virales."}, 
+                {"role": "user", "content": prompt_armado}
+            ],
+            "temperature": 0.7
+        }
+        res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=15)
+        res.raise_for_status() # Lanza error si falla
+        caption_final = res.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
         print(f"Error OpenAI: {e}")
         caption_final = "Descubre cuánto humo respiras al día. 😷 Entra al link en nuestra bio."
 
     print(f"📝 Caption generado:\n{caption_final}")
 
-    # 4. 🔥 ¡AQUÍ ESTÁ LA MAGIA! LE PASAMOS LA ESTAFETA AL OBRERO (CODEBUILD)
-    # Empaquetamos todo lo que CodeBuild necesita saber
+    # 4. 🔥 LE PASAMOS LA ESTAFETA AL OBRERO (CODEBUILD)
     payload_para_codebuild = {
         'FLOW_ID': flow_id,
         'TEMA_COLOR': tema,
@@ -89,7 +95,6 @@ def lambda_handler(event, context):
     }
 
     try:
-        # Disparamos la máquina pesada inyectando nuestras variables
         response = codebuild.start_build(
             projectName=CODEBUILD_PROJECT,
             environmentVariablesOverrides=[
