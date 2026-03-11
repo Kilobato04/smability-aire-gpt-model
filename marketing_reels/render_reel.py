@@ -64,10 +64,10 @@ async def grabar():
         
         # 🔥 FIX: EL TRUCO DEL CLAQUETAZO
         await page.goto(f"file://{html_path}") # 1. Cargamos la página para que pinte el fondo
-        await page.wait_for_timeout(1000)      # 2. Dejamos que el motor de video caliente por 1 segundo
+        await page.wait_for_timeout(2000)      # 2. Dejamos que el motor de video caliente por 1 segundo
         await page.reload()                    # 3. ¡RECARGAMOS! La animación empieza de 0 con la cámara ya rodando 🎬
         
-        await page.wait_for_timeout(18000)     # Grabamos los 18 segundos completos
+        await page.wait_for_timeout(19000)     # Grabamos los 18 segundos completos
         await page.close()
         await context.close()
         await browser.close()
