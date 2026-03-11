@@ -33,9 +33,13 @@ def verificar_contingencia_oficial():
 def lambda_handler(event, context):
     print("🎬 Iniciando Manager de Marketing (El Cerebro)...")
     
-    # 1. ¿Día normal o Contingencia?
-    hay_contingencia, phase = verificar_contingencia_oficial()
-    
+    # 1. ¿Día normal o Contingencia? (¡PRIORIDAD AL SCRAPER!)
+    if event.get("contingencia_override") == True:
+        hay_contingencia = True
+        print("🚨 ORDEN DIRECTA DEL SCRAPER (CAMe). Ignorando API. Forzando Reel Rojo.")
+    else:
+        hay_contingencia, phase = verificar_contingencia_oficial()
+        
     # 2. Leer el Master JSON para saber qué reel toca
     with open("master_flows.json", "r", encoding="utf-8") as f:
         master_data = json.load(f)
