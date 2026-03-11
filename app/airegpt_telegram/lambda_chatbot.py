@@ -1799,8 +1799,10 @@ def lambda_handler(event, context):
                 system_extra = "ESTADO: PENDING_NAME_FOR_LOCATION (Tengo coordenadas en memoria esperando nombre)."
             
             # Solo sugerimos onboarding si no hay draft pendiente
-            elif not has_casa: system_extra = "ONBOARDING 1: Pide CASA"
-            elif not has_trabajo: system_extra = "ONBOARDING 2: Pide TRABAJO"
+            elif not has_casa: 
+                system_extra = "ONBOARDING 1: Pide CASA"
+            elif not has_destino: # <--- FIX APLICADO AQUÍ
+                system_extra = "ONBOARDING 2: Pide un DESTINO (Trabajo, Gym, Escuela)"
 
         # --- FIX: MINI-CALENDARIO ANTI-ALUCINACIONES ---
         now_mx = get_mexico_time()
