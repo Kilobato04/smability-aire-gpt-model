@@ -174,16 +174,15 @@ def lambda_handler(event, context):
             lambda_client.invoke(FunctionName=BOT_LAMBDA_NAME, InvocationType='Event', Payload=json.dumps(payload))
             print("📢 Señal de Broadcast enviada al Chatbot.")
 
-            # 🎬 --- NUEVO: PING A LA FÁBRICA DE REELS DE EMERGENCIA ---
+            # 🎬 --- FIX DEFINITIVO: PING A LA LAMBDA DE MARKETING ---
             if fase_db != "None":
                 try:
-                    codebuild_client.start_build(
-                        projectName='Smability-Marketing-Renderer',
-                        environmentVariablesOverride=[
-                            {'name': 'ES_CONTINGENCIA', 'value': 'true', 'type': 'PLAINTEXT'}
-                        ]
+                    lambda_client.invoke(
+                        FunctionName='Smability-Marketing-Engine',
+                        InvocationType='Event',
+                        Payload=json.dumps({"contingencia_override": True})
                     )
-                    print("🎬 Fábrica de Reels despertada para emergencia.")
+                    print("🎬 Cerebro de Reels despertado para emergencia.")
                 except Exception as e:
                     print(f"⚠️ Error al encender fábrica de Reels: {e}")
             # ----------------------------------------------------------
