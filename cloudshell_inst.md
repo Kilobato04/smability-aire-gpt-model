@@ -30,6 +30,8 @@ cd api_light
 cd app/airegpt_telegram
 ./deploy_training.sh - correr el entrenamiento
 ./deploy_graphics.sh - corre updates de graficos de exposicion y cigarros
+cd marketing_reels
+./deploy_marketing.sh -- corre updates de reel marketing
 ```
 
 ## 3. Borrar todos los zips y scripts viejos
