@@ -45,11 +45,10 @@ def lambda_handler(event, context):
         flujos_contingencia = [f for f in master_data["flows"] if f.get("contingencia_override")]
         flujo_elegido = flujos_contingencia[0] # Tomamos el de emergencia
     else:
-        # Día normal: Elegimos uno al azar
-        numero_de_flow_normal = random.randint(1, len(master_data["flows"]) - 1)
-        print(f"✅ Día normal. Elegido el flow #{numero_de_flow_normal}")
+        # Día normal: Filtramos primero y elegimos uno al azar directamente
         flujos_normales = [f for f in master_data["flows"] if not f.get("contingencia_override")]
-        flujo_elegido = flujos_normales[numero_de_flow_normal - 1]
+        flujo_elegido = random.choice(flujos_normales)
+        print(f"✅ Día normal. Elegido el flow ID: {flujo_elegido.get('flow_id')}")
 
     flow_id = flujo_elegido['flow_id']
     tema = flujo_elegido.get("color_theme", "red_alert")
