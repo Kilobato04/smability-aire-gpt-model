@@ -61,7 +61,7 @@ async def grabar():
         context = await browser.new_context(record_video_dir=video_dir, viewport={"width": 432, "height": 768}, device_scale_factor=2.5)
         page = await context.new_page()
         await page.goto(f"file://{html_path}")
-        await page.wait_for_timeout(18000) # 18 segundos confirmados
+        await page.wait_for_timeout(21000) # 21 segundos confirmados
         await page.close()
         await context.close()
         await browser.close()
