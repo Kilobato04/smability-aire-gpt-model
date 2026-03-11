@@ -469,7 +469,7 @@ def format_days_text(days_list):
 
 
 # --- 2. ACTUALIZAR FUNCIÓN GENERADORA DE RESUMEN ---
-def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, transport_data=None, health_data=None):
+def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, transport_data=None, health_data=None, global_contingency="None"):
     # --- ESCUDO ANTI-ERROR 400 ---
     def clean(text):
         if text is None: return ""
@@ -585,14 +585,19 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         if vehicle and vehicle.get('active'):
             plate = vehicle.get('plate_last_digit')
             holo = vehicle.get('hologram')
-            can_drive, r_short, _ = check_driving_status(plate, holo, "hoy", "None")
+            
+            # 🔥 FIX: Le pasamos la contingencia real del sistema al motor
+            can_drive, r_short, _ = check_driving_status(plate, holo, "hoy", global_contingency)
+            
             status_text = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
-            hnc_str = f"• Hoy: **{status_text}** ({r_short})"
+            # Hacemos notar visualmente si hay Doble HNC
+            alerta_txt = "⚠️ (Doble HNC)" if global_contingency != "None" else ""
+            hnc_str = f"• Hoy: **{status_text}** {alerta_txt} ({r_short})"
         else:
             hnc_str = "• 🔕 Registra tu auto para ver restricciones." 
     else:
         hnc_str = "• 🔒 **Estatus Diario (Premium)**"
-
+        
     return CARD_SUMMARY.format(
         user_name=clean(user_name),
         plan_status=plan_clean.upper(),
