@@ -1,24 +1,20 @@
 #!/bin/bash
-# Despliegue de Marketing Engine a AWS ECR y Lambda
+# Despliegue ultrarrápido del Manager de Marketing a AWS Lambda
 
-AWS_REGION="us-east-1" # Cambia a tu región
-ACCOUNT_ID="123456789012" # Tu cuenta AWS
-ECR_REPO_NAME="airegpt-marketing-engine"
-LAMBDA_FUNCTION_NAME="MarketingReelGenerator"
+LAMBDA_FUNCTION_NAME="Smability-Marketing-Engine"
+AWS_REGION="us-east-1"
 
-echo "🔐 Iniciando sesión en AWS ECR..."
-aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+echo "📦 Empaquetando el código Python..."
+# Solo empaquetamos el código y el JSON (sin librerías pesadas)
+zip -r function.zip lambda_function.py master_flows.json
 
-echo "📦 Construyendo la imagen Docker..."
-docker build -t $ECR_REPO_NAME ./marketing_engine
+echo "☁️ Subiendo a AWS Lambda..."
+aws lambda update-function-code \
+    --function-name $LAMBDA_FUNCTION_NAME \
+    --zip-file fileb://function.zip \
+    --region $AWS_REGION
 
-echo "🏷️ Etiquetando la imagen..."
-docker tag $ECR_REPO_NAME:latest $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:latest
+echo "🧹 Limpiando..."
+rm function.zip
 
-echo "☁️ Subiendo imagen a ECR..."
-docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:latest
-
-echo "🔄 Actualizando AWS Lambda..."
-aws lambda update-function-code --function-name $LAMBDA_FUNCTION_NAME --image-uri $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_NAME:latest
-
-echo "✅ ¡Despliegue de Marketing completado!"
+echo "✅ ¡Despliegue del Cerebro completado!"
