@@ -93,11 +93,12 @@ def lambda_handler(event, context):
         'ES_CONTINGENCIA': str(hay_contingencia).lower()
     }
 
+    #--
     try:
         response = codebuild.start_build(
             projectName=CODEBUILD_PROJECT,
-            environmentVariablesOverrides=[
-                {'name': k, 'value': v, 'type': 'PLAINTEXT'} for k, v in payload_para_codebuild.items()
+            environmentVariablesOverride=[ # <--- CORREGIDO (Sin "s")
+                {'name': k, 'value': str(v), 'type': 'PLAINTEXT'} for k, v in payload_para_codebuild.items()
             ]
         )
         build_id = response['build']['id']
