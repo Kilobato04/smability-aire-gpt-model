@@ -52,30 +52,32 @@ os.system(f"rm -rf {video_dir} && mkdir -p {video_dir}")
 with open(html_path, "w", encoding="utf-8") as f:
     f.write(html_final)
 
-# 4. GRABAMOS LA PANTALLA CON PLAYWRIGHT (15 SEGUNDOS)
+# 4. GRABAMOS LA PANTALLA CON PLAYWRIGHT (15 SEGUNDOS NATIVOS IG)
 async def grabar():
     print("🎥 Grabando navegador fantasma...")
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=["--disable-dev-shm-usage", "--disable-gpu", "--no-sandbox"])
-        context = await browser.new_context(record_video_dir=video_dir, viewport={"width": 432, "height": 768}, device_scale_factor=3)
+        # 🔥 FIX: 540x960 * 2 = 1080x1920 EXACTOS (El tamaño nativo perfecto de Instagram)
+        context = await browser.new_context(record_video_dir=video_dir, viewport={"width": 540, "height": 960}, device_scale_factor=2)
         page = await context.new_page()
         await page.goto(f"file://{html_path}")
-        await page.wait_for_timeout(15000)
+        await page.wait_for_timeout(18000) # 18 segundos confirmados
         await page.close()
         await context.close()
         await browser.close()
 
 asyncio.run(grabar())
 
-# 5. UNIMOS AUDIO Y VIDEO CON FFMPEG
+# 5. UNIMOS AUDIO Y VIDEO CON FFMPEG (CALIDAD PREMIUM)
 video_original = os.path.join(video_dir, os.listdir(video_dir)[0])
 output_mp4 = "/tmp/reel_final.mp4"
 
 print("🎞️ Uniendo pistas de video y audio...")
+# 🔥 FIX: CRF de 18 a 14 (Más pesado/Mayor calidad), preset a 'slow' para mejor renderizado y audio a 320k.
 comando_ffmpeg = f"""
 ffmpeg -y -i {video_original} -stream_loop -1 -i "{audio_local}" \
--c:v libx264 -crf 18 -preset fast -pix_fmt yuv420p \
--c:a aac -b:a 192k -map 0:v:0 -map 1:a:0 -shortest -t 15 \
+-c:v libx264 -crf 14 -preset slow -profile:v high -pix_fmt yuv420p \
+-c:a aac -b:a 320k -map 0:v:0 -map 1:a:0 -shortest -t 15 \
 -af "afade=t=out:st=13:d=2" {output_mp4} -hide_banner -loglevel error
 """
 os.system(comando_ffmpeg)
