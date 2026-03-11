@@ -18,7 +18,7 @@ s3 = boto3.client('s3')
 # Extraemos el número del flujo (ej. circulacion_003 -> 003)
 match = re.search(r'\d+', FLOW_ID)
 num_str = match.group() if match else "001"
-audio_filename = f"reel_{num_str}.mp4"  # <-- ASEGÚRATE DE QUE TUS AUDIOS SE LLAMEN ASÍ (ej. reel_001.mp4)
+audio_filename = f"aire_{num_str}.mp4"  # <-- ASEGÚRATE DE QUE TUS AUDIOS SE LLAMEN ASÍ (ej. reel_001.mp4)
 audio_local = "/tmp/audio.mp4"
 
 try:
