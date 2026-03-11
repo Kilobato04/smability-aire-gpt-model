@@ -1977,28 +1977,34 @@ def lambda_handler(event, context):
                             p_d, h_d = str(veh.get('plate_last_digit')), str(veh.get('hologram'))
                             u_ask = user_content.lower()
                             
+                            # 🔥 FIX 1: LEER EL ESTADO DE CONTINGENCIA AQUÍ TAMBIÉN
+                            sys_state = table.get_item(Key={'user_id': 'SYSTEM_STATE'}).get('Item', {})
+                            current_phase = sys_state.get('last_contingency_phase', 'None')
+                            
                             # A. Calendario Mensual
                             if any(x in u_ask for x in ["mes", "calendario", "fechas", "lista"]) or fn == "obtener_calendario_mensual":
                                 now = get_mexico_time()
                                 meses_es = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
                                 lista_dias = get_monthly_prohibited_dates(p_d, h_d, now.year, now.month)
                                 txt_sem, txt_sab = get_restriction_summary(p_d, h_d)
+                                
+                                # 🔥 FIX 2: Agregamos el tag visual al mes si hay contingencia
+                                aviso_contingencia = f"⚠️ DOBLE HNC ACTIVO ({current_phase})\n\n" if current_phase != "None" else ""
+                                
                                 card_mes = cards.CARD_HNC_DETAILED.format(
-                                    mes_nombre=meses_es[now.month], plate=p_d, color=veh.get('engomado','N/A'),
+                                    mes_nombre=aviso_contingencia + meses_es[now.month], plate=p_d, color=veh.get('engomado','N/A'),
                                     holo=h_d.upper(), verificacion_txt=cards.get_verification_period(p_d, h_d),
                                     dias_semana_txt=txt_sem, sabados_txt=txt_sab,
                                     lista_fechas="\n".join(lista_dias) if lista_dias else "¡Circulas todo el mes! 🎉",
                                     multa_cdmx="$2,171", multa_edomex="$2,171", footer=cards.BOT_FOOTER
                                 )
                                 send_telegram(chat_id, card_mes, markup=cards.get_hnc_buttons())
-                                # 🚩 AGREGADO "visual" para silenciador
                                 r = "Éxito: Calendario mensual visual enviado."
                         
                             # B. Verificación
                             elif "verifi" in u_ask or fn == "consultar_verificacion":
                                 card_v = cards.CARD_VERIFICATION.format(plate_info=p_d, engomado=veh.get('engomado','N/A'), period_txt=cards.get_verification_period(p_d, h_d), deadline=get_verification_deadline(cards.get_verification_period(p_d, h_d)), fine_amount="2,457", footer=cards.BOT_FOOTER)
                                 send_telegram(chat_id, card_v, markup=cards.get_hnc_buttons())
-                                # 🚩 AGREGADO "visual" para silenciador
                                 r = "Éxito: Tarjeta visual de verificación enviada."
                         
                             # C. Veredicto Diario
@@ -2006,10 +2012,15 @@ def lambda_handler(event, context):
                                 offset = 1 if "mañana" in u_ask else 2 if "pasado mañana" in u_ask else 0
                                 label = "Mañana" if offset == 1 else "Pasado Mañana" if offset == 2 else "Hoy"
                                 target_date = (get_mexico_time() + timedelta(days=offset)).strftime("%Y-%m-%d")
-                                can_drive, r_short, _ = cards.check_driving_status(p_d, h_d, target_date)
-                                card_day = cards.CARD_HNC_RESULT.format(fecha_str=target_date, dia_semana=label, plate_info=p_d, hologram=h_d, status_emoji="🟢" if can_drive else "🔴", status_title="SÍ CIRCULA" if can_drive else "NO CIRCULA", status_message="", reason=r_short, footer=cards.BOT_FOOTER)
+                                
+                                # 🔥 FIX 3: PASAMOS current_phase AL MOTOR
+                                can_drive, r_short, _ = cards.check_driving_status(p_d, h_d, target_date, current_phase)
+                                
+                                alerta_txt = " ⚠️ (Doble HNC)" if current_phase != "None" else ""
+                                status_str = ("SÍ CIRCULA" if can_drive else "NO CIRCULA") + alerta_txt
+                                
+                                card_day = cards.CARD_HNC_RESULT.format(fecha_str=target_date, dia_semana=label, plate_info=p_d, hologram=h_d, status_emoji="🟢" if can_drive else "🔴", status_title=status_str, status_message="", reason=r_short, footer=cards.BOT_FOOTER)
                                 send_telegram(chat_id, card_day, markup=cards.get_hnc_buttons())
-                                # 🚩 AGREGADO "visual" para silenciador
                                 r = f"Éxito: Veredicto visual para {label} enviado."
 
                     #-----
