@@ -52,16 +52,22 @@ os.system(f"rm -rf {video_dir} && mkdir -p {video_dir}")
 with open(html_path, "w", encoding="utf-8") as f:
     f.write(html_final)
 
-# 4. GRABAMOS LA PANTALLA CON PLAYWRIGHT (15 SEGUNDOS NATIVOS IG)
+# 4. GRABAMOS LA PANTALLA CON PLAYWRIGHT
 async def grabar():
     print("🎥 Grabando navegador fantasma...")
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=["--disable-dev-shm-usage", "--disable-gpu", "--no-sandbox"])
-        # 🔥 FIX: 540x960 * 2 = 1080x1920 EXACTOS (El tamaño nativo perfecto de Instagram)
+        
+        # Ajustado a tu escala original o la de 2.5 para IG
         context = await browser.new_context(record_video_dir=video_dir, viewport={"width": 432, "height": 768}, device_scale_factor=2.5)
         page = await context.new_page()
-        await page.goto(f"file://{html_path}")
-        await page.wait_for_timeout(25000) # 21 segundos confirmados
+        
+        # 🔥 FIX: EL TRUCO DEL CLAQUETAZO
+        await page.goto(f"file://{html_path}") # 1. Cargamos la página para que pinte el fondo
+        await page.wait_for_timeout(1000)      # 2. Dejamos que el motor de video caliente por 1 segundo
+        await page.reload()                    # 3. ¡RECARGAMOS! La animación empieza de 0 con la cámara ya rodando 🎬
+        
+        await page.wait_for_timeout(18000)     # Grabamos los 18 segundos completos
         await page.close()
         await context.close()
         await browser.close()
