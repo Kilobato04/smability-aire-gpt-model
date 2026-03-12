@@ -751,71 +751,57 @@ def lambda_handler(event, context):
     if event.get('action') == "BROADCAST_CONTINGENCY":
         print("📢 Iniciando Broadcast...")
         
-        # 👇 NOTA: Ya quitamos el 'try:' problemático de aquí.
         data = event.get('data', {})
-        phase = data.get('phase')
+        phase = data.get('phase', 'None')
         now_mx = get_mexico_time().strftime("%H:%M")
-        msg = ""
+        
+        # --- FIX: EXTRAER VARIABLES SEGURAS ---
+        link_came = data.get('oficial_link') # Pasamos nulo si no existe, el helper lo salva
+        
+        val = data.get('value', {}).get('value', '')
+        unit = data.get('value', {}).get('unit', '')
+        tipo = data.get('alert_type', 'Contaminación').capitalize()
+        pollutant_str = f"{tipo} ({val} {unit})" if val else "Contaminación"
+        
+        station_name = data.get('trigger_station_name', 'Red Oficial SIMAT')
+        station_id = data.get('trigger_station_id', '')
+        station_display = f"{station_name} ({station_id})" if station_id else station_name
+        
+        # Extraer Restricciones (Protegido contra nulos)
+        recs = data.get('recommendations', {})
+        categories = recs.get('categories', [])
+        restricciones_list = []
+        for cat in categories:
+            if "VEHICULAR" in cat.get('name', '').upper():
+                restricciones_list = cat.get('items', [])
+                break 
+        
+        res_txt = "\n".join([f"🚫 {item}" for item in restricciones_list]) if restricciones_list else "🚫 Circulación normal."
 
-        # --- FIX: EXTRAER EL LINK OFICIAL DE LA CAME ---
-        link_came = data.get('oficial_link', 'https://www.gob.mx/comisionambiental')
+        # 🚀 ¡AQUÍ ESTÁ EL FIX! Llamada al nuevo Helper Seguro
+        msg = cards.generate_contingency_card(
+            phase=phase,
+            report_time=now_mx,
+            oficial_link=link_came,
+            pollutant_info=pollutant_str,
+            station_info=station_display,
+            restrictions_txt=res_txt
+        )
 
-        if phase == "SUSPENDIDA":
-            msg = cards.CARD_CONTINGENCY_LIFTED.format(
-                report_time=now_mx,
-                oficial_link=link_came, # <--- ENLACE INYECTADO
-                footer=cards.BOT_FOOTER
-            )
-        else:
-            # 1. Datos del Contaminante
-            val = data.get('value', {}).get('value', '')
-            unit = data.get('value', {}).get('unit', '')
-            tipo = data.get('alert_type', 'Contaminación').capitalize()
-            pollutant_str = f"{tipo} ({val} {unit})"
-            
-            # --- NUEVO: Extraer nombre de la estación ---
-            station_name = data.get('trigger_station_name', 'Red Oficial SIMAT')
-            station_id = data.get('trigger_station_id', '')
-            station_display = f"{station_name} ({station_id})" if station_id else station_name
-            
-            # 2. Extraer Restricciones 
-            recs = data.get('recommendations', {})
-            categories = recs.get('categories', [])
-            restricciones_list = []
-            
-            for cat in categories:
-                if "VEHICULAR" in cat.get('name', '').upper():
-                    restricciones_list = cat.get('items', [])
-                    break 
-            
-            res_txt = "\n".join([f"🚫 {item}" for item in restricciones_list]) if restricciones_list else "🚫 Consulta fuentes oficiales."
-
-            # 3. Formatear Tarjeta (Pasando el nuevo parámetro)
-            msg = cards.CARD_CONTINGENCY.format(
-                report_time=now_mx,
-                phase=phase.upper(),
-                pollutant_info=pollutant_str,
-                station_info=station_display,
-                restrictions_txt=res_txt,
-                oficial_link=link_came, # <--- ENLACE INYECTADO
-                footer=cards.BOT_FOOTER
-            )
-            # NUEVO: Teclado Inline combinado (Compartir + Mi Resumen)
-            # Asumiendo que tu archivo cards.py tiene una función get_contingency_buttons
-            # Si no la tienes, inyectamos el JSON directamente aquí:
-            markup_contingencia = {
-                "inline_keyboard": [
-                    [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}],
-                    [{"text": "📲 Compartir Alerta", "switch_inline_query": "contingencia"}] 
-                ]
-            }
+        # Teclado Inline combinado (Compartir + Mi Resumen)
+        markup_contingencia = {
+            "inline_keyboard": [
+                [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}],
+                [{"text": "📲 Compartir Alerta", "switch_inline_query": "contingencia"}] 
+            ]
+        }
 
         # B. Enviar a Usuarios (Scan Eficiente)
         try:
-            # --- FIX BANNERS: Calculamos la foto ANTES del bucle para no gastar CPU ---
+            # --- FIX BANNERS: Calculamos la foto ANTES del bucle ---
             import os
             directorio_actual = os.path.dirname(os.path.abspath(__file__))
-            if phase == "SUSPENDIDA":
+            if phase == "SUSPENDIDA" or phase == "None":
                 ruta_imagen = os.path.join(directorio_actual, "banners", "banner_buena.png")
             else:
                 ruta_imagen = os.path.join(directorio_actual, "banners", "banner_contingencia.png")
@@ -834,7 +820,6 @@ def lambda_handler(event, context):
                 if start_key: scan_kwargs['ExclusiveStartKey'] = start_key
                 response = table.scan(**scan_kwargs)
                 for u in response.get('Items', []):
-                    # --- FIX BANNERS: Usamos la nueva función con foto ---
                     send_telegram_photo_local(u['user_id'], ruta_imagen, msg, markup=markup_contingencia)
                     count += 1
                 start_key = response.get('LastEvaluatedKey')
