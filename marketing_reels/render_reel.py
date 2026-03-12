@@ -114,18 +114,36 @@ try:
         
         if "id" in res_crear:
             creation_id = res_crear["id"]
-            print("📦 Procesando en Meta (30s)...")
-            time.sleep(30)
+            print(f"📦 Contenedor creado (ID: {creation_id}). Meta está procesando...")
             
-            # Fase B: Publicar definitivamente
-            res_pub = requests.post(f"https://graph.facebook.com/v19.0/{IG_USER_ID}/media_publish", data={
-                "creation_id": creation_id, "access_token": IG_TOKEN
-            }).json()
+            # 🔥 NUEVO: BUCLE INTELIGENTE DE ESPERA
+            status_code = "IN_PROGRESS"
+            intentos = 0
             
-            if "id" in res_pub:
-                print(f"🎉 ¡PUBLICADO EXITOSAMENTE! ID: {res_pub['id']}")
+            # Preguntamos a Meta cada 10 segundos (Máximo 2 minutos de espera)
+            while status_code != "FINISHED" and intentos < 12:
+                time.sleep(10) 
+                intentos += 1
+                url_status = f"https://graph.facebook.com/v19.0/{creation_id}?fields=status_code&access_token={IG_TOKEN}"
+                res_status = requests.get(url_status).json()
+                
+                status_code = res_status.get("status_code", "ERROR")
+                print(f"⏳ Meta trabajando (Intento {intentos}/12): {status_code}")
+
+            # Fase B: Solo publicamos si Meta dice que ya está listo
+            if status_code == "FINISHED":
+                print("🚀 ¡Meta terminó de procesar! Disparando publicación...")
+                res_pub = requests.post(f"https://graph.facebook.com/v19.0/{IG_USER_ID}/media_publish", data={
+                    "creation_id": creation_id, "access_token": IG_TOKEN
+                }).json()
+                
+                if "id" in res_pub:
+                    print(f"🎉 ¡PUBLICADO EXITOSAMENTE! ID: {res_pub['id']}")
+                else:
+                    print(f"❌ Fallo al publicar: {json.dumps(res_pub)}")
             else:
-                print(f"❌ Fallo al publicar: {json.dumps(res_pub)}")
+                print(f"❌ Meta tardó demasiado o el video dio error interno. Estado final: {status_code}")
+                
         else:
             print(f"❌ Fallo al crear contenedor: {json.dumps(res_crear)}")
 except Exception as e:
