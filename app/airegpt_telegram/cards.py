@@ -730,6 +730,34 @@ def generate_advanced_settings_card(user_id):
     }
     return text, markup
 
+# --- HELPER SEGURO PARA TARJETAS DE CONTINGENCIA ---
+def generate_contingency_card(phase, report_time, oficial_link=None, pollutant_info="Contaminación", station_info="ZMVM", restrictions_txt="Circulación normal"):
+    """
+    Construye la tarjeta de contingencia roja o verde evitando errores de KeyError 
+    si falta el link oficial o algún otro dato de la API/Scraper.
+    """
+    # Enlace de respaldo por si el Scraper no lo manda en el Payload
+    safe_link = oficial_link if oficial_link else "https://www.gob.mx/comisionambiental"
+    
+    # Si la fase es "None" o el estatus es suspender, mandamos la VERDE
+    if phase == "None" or phase == "":
+        return CARD_CONTINGENCY_LIFTED.format(
+            report_time=report_time,
+            oficial_link=safe_link,
+            footer=BOT_FOOTER
+        )
+    # Si hay fase activa (Fase I, Fase II), mandamos la ROJA
+    else:
+        return CARD_CONTINGENCY.format(
+            report_time=report_time,
+            phase=phase,
+            pollutant_info=pollutant_info,
+            station_info=station_info,
+            restrictions_txt=restrictions_txt,
+            oficial_link=safe_link,
+            footer=BOT_FOOTER
+        )
+
 # =====================================================================
 # 🚗 MOTOR HNC V2, SALUD Y PRONÓSTICO (COMPARTIDO BOT Y SCHEDULER)
 # =====================================================================
