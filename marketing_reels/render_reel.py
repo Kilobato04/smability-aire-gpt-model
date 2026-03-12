@@ -91,7 +91,7 @@ ffmpeg -y -i {video_original} -stream_loop -1 -i "{audio_local}" \
 os.system(comando_ffmpeg)
 print(f"✅ Video optimizado para IG generado en {output_mp4}")
 
-# 6. SUBIDA A S3 Y MODO DEBUG (Instagram Desactivado)
+# 6. SUBIDA A S3 Y PUBLICACIÓN EN INSTAGRAM
 video_s3_key = f"reels_publicados/reel_{FLOW_ID}.mp4"
 try:
     print(f"☁️ Subiendo a S3 forzando etiqueta ContentType: video/mp4...")
@@ -102,11 +102,9 @@ try:
         ExtraArgs={'ContentType': 'video/mp4'} # 🔥 EL TRUCO DE META
     )
     print(f"✅ Video subido exitosamente a S3. Ruta: {video_s3_key}")
-    print("🛑 MODO DEBUG: Publicación en Instagram desactivada por ahora.")
     
-    """ 
     # ========================================================
-    # 🔒 BLOQUE DE INSTAGRAM COMENTADO PARA PRUEBAS VISUALES
+    # 📱 BLOQUE DE INSTAGRAM (ACTIVADO)
     # ========================================================
     video_url = s3.generate_presigned_url('get_object', Params={'Bucket': S3_BUCKET, 'Key': video_s3_key}, ExpiresIn=3600)
     
@@ -150,6 +148,6 @@ try:
         else:
             print(f"❌ Fallo al crear contenedor: {json.dumps(res_crear)}")
     # ========================================================
-    """
+
 except Exception as e:
     print(f"❌ Error en el flujo de salida: {e}")
