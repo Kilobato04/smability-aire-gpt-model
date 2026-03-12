@@ -73,16 +73,23 @@ asyncio.run(grabar())
 
 # 5. ENSAMBLE FINAL CON FFMPEG (Cierre de comillas corregido)
 video_original = os.path.join(video_dir, os.listdir(video_dir)[0])
-print("🎞️ Uniendo pistas con FFmpeg...")
+print("🎞️ Aplicando filtro de nitidez y uniendo pistas con FFmpeg...")
+
+# 🔥 AJUSTES APLICADOS:
+# -crf 10 (casi sin pérdida) | -preset veryslow (mejor compresión)
+# -tune animation (protege bordes duros) | -vf "unsharp=5:5:0.8" (filtro de nitidez)
+# -color_... bt709 (colores estándar para Instagram)
 
 comando_ffmpeg = f"""
 ffmpeg -y -i {video_original} -stream_loop -1 -i "{audio_local}" \
--c:v libx264 -crf 14 -preset slow -profile:v high -pix_fmt yuv420p \
+-c:v libx264 -crf 10 -preset veryslow -tune animation -profile:v high -pix_fmt yuv420p \
+-color_range 1 -colorspace bt709 -color_trc bt709 -color_primaries bt709 \
+-vf "unsharp=5:5:0.8" \
 -c:a aac -b:a 320k -map 0:v:0 -map 1:a:0 -shortest -t 15 \
 -af "afade=t=out:st=13:d=2" {output_mp4} -hide_banner -loglevel error
 """
 
-os.system(comando_ffmpeg) # <--- ¡Aquí se crea el video realmente!
+os.system(comando_ffmpeg) # <--- ¡Aquí se crea el video ultra-nítido!
 print(f"✅ Video final generado en {output_mp4}")
 
 # 6. SUBIDA A S3 Y PUBLICACIÓN EN INSTAGRAM
