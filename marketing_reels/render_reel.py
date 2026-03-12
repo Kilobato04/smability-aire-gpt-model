@@ -3,9 +3,11 @@ import json
 import asyncio
 import re
 import boto3
+import requests
+import time
 from playwright.async_api import async_playwright
 
-# 1. RECIBIMOS LAS VARIABLES QUE MANDÓ LA LAMBDA
+# 1. VARIABLES DE ENTORNO (El "Cerebro" manda esto)
 FLOW_ID = os.environ.get("FLOW_ID", "default_001")
 TEMA = os.environ.get("TEMA_COLOR", "red_alert")
 MESSAGES_JSON = os.environ.get("MESSAGES_JSON", "[]")
@@ -13,22 +15,27 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "smability-marketing-reels")
 
 print(f"🎬 Iniciando motor gráfico para: {FLOW_ID}")
 
-# 2. DESCARGAMOS EL AUDIO DESDE EL BUCKET S3
+# 2. CONFIGURACIÓN DE RUTAS Y S3
 s3 = boto3.client('s3')
-# Extraemos el número del flujo (ej. circulacion_003 -> 003)
 match = re.search(r'\d+', FLOW_ID)
 num_str = match.group() if match else "001"
-audio_filename = f"aire_{num_str}.mp4"  # <-- ASEGÚRATE DE QUE TUS AUDIOS SE LLAMEN ASÍ (ej. reel_001.mp4)
+audio_filename = f"aire_{num_str}.mp4" 
 audio_local = "/tmp/audio.mp4"
+output_mp4 = "/tmp/reel_final.mp4"
+video_dir = "/tmp/videos/"
 
+# Descarga de audio desde la bodega
 try:
     print(f"🎵 Descargando {audio_filename} desde S3...")
     s3.download_file(S3_BUCKET, f"audios/{audio_filename}", audio_local)
 except Exception as e:
-    print(f"⚠️ No se encontró el audio. Fallback a genérico. Error: {e}")
-    os.system(f"touch {audio_local}") # Archivo vacío temporal si falla
+    print(f"⚠️ Audio no encontrado. Generando pista de silencio...")
+    os.system(f"ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo -t 15 {audio_local} -y")
 
-# 3. ARMAMOS EL HTML CON LOS ESTILOS
+# 3. PREPARACIÓN DEL TEMPLATE HTML
+with open("template_base.html", "r", encoding="utf-8") as file:
+    html_template = file.read()
+
 estilos_css = {
     "red_alert": {"bg": "#FF4444 0%,#C0392B 30%,#8B0000 60%,#3a0000 100%", "header": "#FF3B30,#c0392b"},
     "blue_calm": {"bg": "#4facfe 0%,#00f2fe 30%,#01476b 60%,#002033 100%", "header": "#2AABEE,#1a85c2"},
@@ -38,53 +45,81 @@ estilos_css = {
 }
 tema_actual = estilos_css.get(TEMA, estilos_css["red_alert"])
 
-with open("template_base.html", "r", encoding="utf-8") as file:
-    html_template = file.read()
-
-html_final = html_template.replace("__BG_GRADIENT__", tema_actual["bg"])
-html_final = html_final.replace("__HEADER_GRADIENT__", tema_actual["header"])
-html_final = html_final.replace("__JSON_MESSAGES__", MESSAGES_JSON)
+html_final = html_template.replace("__BG_GRADIENT__", tema_actual["bg"]) \
+                           .replace("__HEADER_GRADIENT__", tema_actual["header"]) \
+                           .replace("__JSON_MESSAGES__", MESSAGES_JSON)
 
 html_path = "/tmp/render_temp.html"
-video_dir = "/tmp/videos/"
 os.system(f"rm -rf {video_dir} && mkdir -p {video_dir}")
-
 with open(html_path, "w", encoding="utf-8") as f:
     f.write(html_final)
 
-# 4. GRABAMOS LA PANTALLA CON PLAYWRIGHT
+# 4. GRABACIÓN CON PLAYWRIGHT (Navegador fantasma)
 async def grabar():
-    print("🎥 Grabando navegador fantasma...")
+    print("🎥 Grabando navegador...")
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--disable-dev-shm-usage", "--disable-gpu", "--no-sandbox"])
-        
-        # Ajustado a tu escala original o la de 2.5 para IG
+        browser = await p.chromium.launch(headless=True, args=["--disable-dev-shm-usage", "--no-sandbox"])
         context = await browser.new_context(record_video_dir=video_dir, viewport={"width": 432, "height": 768}, device_scale_factor=2.5)
         page = await context.new_page()
-        
-        # 🔥 FIX: EL TRUCO DEL CLAQUETAZO
-        await page.goto(f"file://{html_path}") # 1. Cargamos la página para que pinte el fondo
-        await page.wait_for_timeout(3000)      # 2. Dejamos que el motor de video caliente por 1 segundo
-        await page.reload()                    # 3. ¡RECARGAMOS! La animación empieza de 0 con la cámara ya rodando 🎬
-        
-        await page.wait_for_timeout(19000)     # Grabamos los 18 segundos completos
+        await page.goto(f"file://{html_path}")
+        await page.wait_for_timeout(3000)
+        await page.reload() # El truco del claquetazo 🎬
+        await page.wait_for_timeout(19000)
         await page.close()
         await context.close()
         await browser.close()
 
 asyncio.run(grabar())
 
-# 5. UNIMOS AUDIO Y VIDEO CON FFMPEG (CALIDAD PREMIUM)
+# 5. ENSAMBLE FINAL CON FFMPEG (Cierre de comillas corregido)
 video_original = os.path.join(video_dir, os.listdir(video_dir)[0])
-output_mp4 = "/tmp/reel_final.mp4"
+print("🎞️ Uniendo pistas con FFmpeg...")
 
-print("🎞️ Uniendo pistas de video y audio...")
-# 🔥 FIX: CRF de 18 a 14 (Más pesado/Mayor calidad), preset a 'slow' para mejor renderizado y audio a 320k.
 comando_ffmpeg = f"""
 ffmpeg -y -i {video_original} -stream_loop -1 -i "{audio_local}" \
 -c:v libx264 -crf 14 -preset slow -profile:v high -pix_fmt yuv420p \
 -c:a aac -b:a 320k -map 0:v:0 -map 1:a:0 -shortest -t 15 \
 -af "afade=t=out:st=13:d=2" {output_mp4} -hide_banner -loglevel error
 """
-os.system(comando_ffmpeg)
-print("✅ Procesamiento FFmpeg finalizado.")
+
+os.system(comando_ffmpeg) # <--- ¡Aquí se crea el video realmente!
+print(f"✅ Video final generado en {output_mp4}")
+
+# 6. SUBIDA A S3 Y PUBLICACIÓN EN INSTAGRAM
+video_s3_key = f"reels_publicados/reel_{FLOW_ID}.mp4"
+try:
+    print(f"☁️ Subiendo a S3 para que Meta lo recoja...")
+    s3.upload_file(output_mp4, S3_BUCKET, video_s3_key)
+    
+    # Generamos link temporal para Instagram
+    video_url = s3.generate_presigned_url('get_object', Params={'Bucket': S3_BUCKET, 'Key': video_s3_key}, ExpiresIn=3600)
+    
+    IG_TOKEN = os.environ.get("IG_ACCESS_TOKEN")
+    IG_USER_ID = os.environ.get("IG_ACCOUNT_ID")
+    CAPTION = os.environ.get("CAPTION_INSTAGRAM", f"Reporte de aire: {FLOW_ID} 😷 #AIreGPT")
+
+    if IG_TOKEN and IG_USER_ID:
+        print("🤖 Publicando en Instagram...")
+        # Fase A: Crear contenedor
+        res_crear = requests.post(f"https://graph.facebook.com/v19.0/{IG_USER_ID}/media", data={
+            "media_type": "REELS", "video_url": video_url, "caption": CAPTION, "share_to_feed": "true", "access_token": IG_TOKEN
+        }).json()
+        
+        if "id" in res_crear:
+            creation_id = res_crear["id"]
+            print("📦 Procesando en Meta (30s)...")
+            time.sleep(30)
+            
+            # Fase B: Publicar definitivamente
+            res_pub = requests.post(f"https://graph.facebook.com/v19.0/{IG_USER_ID}/media_publish", data={
+                "creation_id": creation_id, "access_token": IG_TOKEN
+            }).json()
+            
+            if "id" in res_pub:
+                print(f"🎉 ¡PUBLICADO EXITOSAMENTE! ID: {res_pub['id']}")
+            else:
+                print(f"❌ Fallo al publicar: {json.dumps(res_pub)}")
+        else:
+            print(f"❌ Fallo al crear contenedor: {json.dumps(res_crear)}")
+except Exception as e:
+    print(f"❌ Error en el flujo de salida: {e}")
