@@ -71,34 +71,43 @@ async def grabar():
 
 asyncio.run(grabar())
 
-# 5. UNIMOS AUDIO Y VIDEO CON FFMPEG (Dieta Instagram 🥗)
+# 5. UNIMOS AUDIO Y VIDEO CON FFMPEG (Receta Meta / Frankenstein 🤖)
 video_original = os.path.join(video_dir, os.listdir(video_dir)[0])
 output_mp4 = "/tmp/reel_final.mp4"
 
-print("🎞️ Aplicando compresión optimizada para Meta...")
+print("🎞️ Aplicando compresión ultra-optimizada para Meta...")
 
-# 🔥 AJUSTES APLICADOS:
-# -r 30 (30 cuadros exactos) | -b:v 4M -maxrate 5M (Límite de peso para evitar la trituradora)
-# -profile:v high -level:v 4.2 (El estándar exacto de móviles)
 comando_ffmpeg = f"""
 ffmpeg -y -i {video_original} -stream_loop -1 -i "{audio_local}" \
--c:v libx264 -profile:v high -level:v 4.2 -pix_fmt yuv420p \
--r 30 -b:v 4M -maxrate 5M -bufsize 10M -preset slow -tune animation \
+-c:v libx264 -profile:v high -level:v 4.0 -pix_fmt yuv420p \
+-r 30 -b:v 8M -maxrate 10M -bufsize 16M -preset slow -tune animation \
+-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" \
 -color_range 1 -colorspace bt709 -color_trc bt709 -color_primaries bt709 \
--c:a aac -b:a 256k -map 0:v:0 -map 1:a:0 -shortest -t 15 \
+-movflags +faststart \
+-c:a aac -b:a 192k -ar 44100 -ac 2 -map 0:v:0 -map 1:a:0 -shortest -t 15 \
 -af "afade=t=out:st=13:d=2" {output_mp4} -hide_banner -loglevel error
 """
 
 os.system(comando_ffmpeg)
 print(f"✅ Video optimizado para IG generado en {output_mp4}")
 
-# 6. SUBIDA A S3 Y PUBLICACIÓN EN INSTAGRAM
+# 6. SUBIDA A S3 Y MODO DEBUG (Instagram Desactivado)
 video_s3_key = f"reels_publicados/reel_{FLOW_ID}.mp4"
 try:
-    print(f"☁️ Subiendo a S3 para que Meta lo recoja...")
-    s3.upload_file(output_mp4, S3_BUCKET, video_s3_key)
+    print(f"☁️ Subiendo a S3 forzando etiqueta ContentType: video/mp4...")
+    s3.upload_file(
+        output_mp4, 
+        S3_BUCKET, 
+        video_s3_key,
+        ExtraArgs={'ContentType': 'video/mp4'} # 🔥 EL TRUCO DE META
+    )
+    print(f"✅ Video subido exitosamente a S3. Ruta: {video_s3_key}")
+    print("🛑 MODO DEBUG: Publicación en Instagram desactivada por ahora.")
     
-    # Generamos link temporal para Instagram
+    """ 
+    # ========================================================
+    # 🔒 BLOQUE DE INSTAGRAM COMENTADO PARA PRUEBAS VISUALES
+    # ========================================================
     video_url = s3.generate_presigned_url('get_object', Params={'Bucket': S3_BUCKET, 'Key': video_s3_key}, ExpiresIn=3600)
     
     IG_TOKEN = os.environ.get("IG_ACCESS_TOKEN")
@@ -107,7 +116,6 @@ try:
 
     if IG_TOKEN and IG_USER_ID:
         print("🤖 Publicando en Instagram...")
-        # Fase A: Crear contenedor
         res_crear = requests.post(f"https://graph.facebook.com/v19.0/{IG_USER_ID}/media", data={
             "media_type": "REELS", "video_url": video_url, "caption": CAPTION, "share_to_feed": "true", "access_token": IG_TOKEN
         }).json()
@@ -116,21 +124,17 @@ try:
             creation_id = res_crear["id"]
             print(f"📦 Contenedor creado (ID: {creation_id}). Meta está procesando...")
             
-            # 🔥 NUEVO: BUCLE INTELIGENTE DE ESPERA
             status_code = "IN_PROGRESS"
             intentos = 0
             
-            # Preguntamos a Meta cada 10 segundos (Máximo 2 minutos de espera)
             while status_code != "FINISHED" and intentos < 12:
                 time.sleep(10) 
                 intentos += 1
                 url_status = f"https://graph.facebook.com/v19.0/{creation_id}?fields=status_code&access_token={IG_TOKEN}"
                 res_status = requests.get(url_status).json()
-                
                 status_code = res_status.get("status_code", "ERROR")
                 print(f"⏳ Meta trabajando (Intento {intentos}/12): {status_code}")
 
-            # Fase B: Solo publicamos si Meta dice que ya está listo
             if status_code == "FINISHED":
                 print("🚀 ¡Meta terminó de procesar! Disparando publicación...")
                 res_pub = requests.post(f"https://graph.facebook.com/v19.0/{IG_USER_ID}/media_publish", data={
@@ -142,9 +146,10 @@ try:
                 else:
                     print(f"❌ Fallo al publicar: {json.dumps(res_pub)}")
             else:
-                print(f"❌ Meta tardó demasiado o el video dio error interno. Estado final: {status_code}")
-                
+                print(f"❌ Meta tardó demasiado. Estado final: {status_code}")
         else:
             print(f"❌ Fallo al crear contenedor: {json.dumps(res_crear)}")
+    # ========================================================
+    """
 except Exception as e:
     print(f"❌ Error en el flujo de salida: {e}")
