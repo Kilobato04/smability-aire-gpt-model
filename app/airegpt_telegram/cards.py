@@ -366,10 +366,9 @@ CARD_MY_LOCATIONS = """📍 *MIS UBICACIONES GUARDADAS*
 CARD_EXPOSICION = """{emoji_alerta} *Reporte de Exposición*
 👋 Hola {user_name}!
 
-Ayer *{fecha_ayer}* te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
+😷 Ayer *{fecha_ayer}* te expusiste a una calidad del aire que le pasó factura a tu cuerpo. 👇
 
 {rutina_str}
-😷 *Aire que respiraste:* {calidad_ias} ({promedio_ias} pts IAS). Sin embargo...
 
 {emoji_cigarro} Respiraste el equivalente a *{cigarros} cigarros invisibles* en tu rutina.
 {emoji_edad} Esto sumó *{dias} días extra* de desgaste a tu Edad Urbana.
