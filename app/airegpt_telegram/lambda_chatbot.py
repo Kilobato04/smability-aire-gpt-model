@@ -796,10 +796,11 @@ def lambda_handler(event, context):
             ]
         }
 
-        # B. Enviar a Usuarios (Scan Eficiente)
+        # B. Enviar a Usuarios (Scan Eficiente y con GATEKEEPER)
         try:
             # --- FIX BANNERS: Calculamos la foto ANTES del bucle ---
             import os
+            import stripeairegpt # Importamos tu validador de pagos
             directorio_actual = os.path.dirname(os.path.abspath(__file__))
             if phase == "SUSPENDIDA" or phase == "None":
                 ruta_imagen = os.path.join(directorio_actual, "banners", "banner_buena.png")
@@ -807,10 +808,10 @@ def lambda_handler(event, context):
                 ruta_imagen = os.path.join(directorio_actual, "banners", "banner_contingencia.png")
             # -------------------------------------------------------------------------
 
+            # 🚀 FIX: Quitamos 'ProjectionExpression' para traer el perfil completo
             scan_kwargs = {
                 'FilterExpression': "alerts.contingency = :a",
-                'ExpressionAttributeValues': {":a": True},
-                'ProjectionExpression': "user_id"
+                'ExpressionAttributeValues': {":a": True}
             }
             done = False
             start_key = None
@@ -820,12 +821,18 @@ def lambda_handler(event, context):
                 if start_key: scan_kwargs['ExclusiveStartKey'] = start_key
                 response = table.scan(**scan_kwargs)
                 for u in response.get('Items', []):
-                    send_telegram_photo_local(u['user_id'], ruta_imagen, msg, markup=markup_contingencia)
-                    count += 1
+                    
+                    # 🛡️ EL CADENERO: Evaluamos si el usuario tiene derecho a la alerta
+                    tier, _ = stripeairegpt.evaluate_user_tier(u)
+                    
+                    if tier in ['PREMIUM', 'TRIAL']:
+                        send_telegram_photo_local(u['user_id'], ruta_imagen, msg, markup=markup_contingencia)
+                        count += 1
+                        
                 start_key = response.get('LastEvaluatedKey')
                 if not start_key: done = True
             
-            print(f"✅ Broadcast enviado a {count} usuarios.")
+            print(f"✅ Broadcast enviado a {count} usuarios Premium/Trial.")
             return {'statusCode': 200, 'body': f'Sent to {count}'}
         except Exception as e:
             print(f"❌ Error Broadcast: {e}")
