@@ -6,11 +6,11 @@ import cards # <--- Importamos nuestro UI centralizado
 # ==========================================
 # 1. CONFIGURACIÓN DE STRIPE (SANDBOX)
 # ==========================================
-STRIPE_LINK_MONTHLY = "https://buy.stripe.com/test_3cI3cw8Uj1rM5Ikg5M2Ji00"
-STRIPE_LINK_SEMESTRAL = "https://buy.stripe.com/test_9B6bJ20nNb2meeQg5M2Ji02"
-STRIPE_LINK_ANNUAL = "https://buy.stripe.com/test_fZuaEY3zZ8Uec6IbPw2Ji01"
+STRIPE_LINK_MONTHLY = "https://buy.stripe.com/6oUdRafiH4DY0o03j02Ji06"
+STRIPE_LINK_SEMESTRAL = "https://buy.stripe.com/cNi9AU8Ujdau8Uwf1I2Ji07"
+STRIPE_LINK_ANNUAL = "https://buy.stripe.com/aFa8wQ3zZ4DY8UwbPw2Ji08"
 
-TRIAL_DAYS = 2
+TRIAL_DAYS = 3
 
 def get_mexico_time():
     return datetime.utcnow() - timedelta(hours=6)
