@@ -18,9 +18,6 @@ def get_mexico_time():
 # ==========================================
 # 2. EL GATEKEEPER (Evaluador de Estatus con Trial)
 # ==========================================
-# ==========================================
-# 2. EL GATEKEEPER (Evaluador de Estatus con Trial)
-# ==========================================
 def evaluate_user_tier(user_item):
     """
     Evalúa al usuario y retorna:
@@ -127,4 +124,13 @@ def get_management_portal_link():
     Stripe se encarga de la autenticación vía Email del usuario.
     """
     # Este es tu link oficial de Test Mode
-    return "https://billing.stripe.com/p/login/test_7sI8A319ddOI7S0288"
+    return "# ==========================================
+# 5. GENERADOR DEL PORTAL DE GESTIÓN (RECOMENDADO)
+# ==========================================
+def get_management_portal_link():
+    """
+    Retorna el link directo al portal de Stripe configurado en el Dashboard.
+    Stripe se encarga de la autenticación vía Email del usuario.
+    """
+    # 🚀 FIX: Este es tu link oficial de LIVE Mode (Producción)
+    return "https://billing.stripe.com/p/login/3cI3cw8Uj1rM5Ikg5M2Ji00"
