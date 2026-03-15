@@ -800,7 +800,6 @@ def lambda_handler(event, context):
         try:
             # --- FIX BANNERS: Calculamos la foto ANTES del bucle ---
             import os
-            import stripeairegpt # Importamos tu validador de pagos
             directorio_actual = os.path.dirname(os.path.abspath(__file__))
             if phase == "SUSPENDIDA" or phase == "None":
                 ruta_imagen = os.path.join(directorio_actual, "banners", "banner_buena.png")
