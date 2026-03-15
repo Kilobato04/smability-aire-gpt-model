@@ -123,14 +123,5 @@ def get_management_portal_link():
     Retorna el link directo al portal de Stripe configurado en el Dashboard.
     Stripe se encarga de la autenticación vía Email del usuario.
     """
-    # Este es tu link oficial de Test Mode
-    return "# ==========================================
-# 5. GENERADOR DEL PORTAL DE GESTIÓN (RECOMENDADO)
-# ==========================================
-def get_management_portal_link():
-    """
-    Retorna el link directo al portal de Stripe configurado en el Dashboard.
-    Stripe se encarga de la autenticación vía Email del usuario.
-    """
     # 🚀 FIX: Este es tu link oficial de LIVE Mode (Producción)
     return "https://billing.stripe.com/p/login/3cI3cw8Uj1rM5Ikg5M2Ji00"
