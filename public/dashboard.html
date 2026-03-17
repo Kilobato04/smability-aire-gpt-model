@@ -181,13 +181,20 @@
         // CONFIGURACIÓN
         const API_URL = "https://3s2niqf45lksfqfmrc2cg2ivpi0fealf.lambda-url.us-east-1.on.aws/?action=list_users&key=02Kilobaterias";
 
-        let currentNextKey = null; // Guarda el token de la siguiente página
+        let currentNextKey = null; 
+        let accumulatedAlerts = 0; // NUEVO: Acumulador de alertas
+        let accumulatedPremium = 0; // NUEVO: Acumulador de premium
 
         async function fetchData(loadMore = false) {
             const loader = document.getElementById('loader');
             const container = document.getElementById('users-container');
             
-            if (!loadMore) { container.innerHTML = ''; container.className = 'users-list'; }
+            if (!loadMore) { 
+                container.innerHTML = ''; 
+                container.className = 'users-list'; 
+                accumulatedAlerts = 0; // Reiniciamos si es carga nueva
+                accumulatedPremium = 0; 
+            }
             loader.style.display = 'flex';
 
             let url = API_URL;
@@ -197,12 +204,20 @@
                 const response = await fetch(url);
                 const data = await response.json();
                 
-                currentNextKey = data.next_key || null; // Guardamos el token
+                currentNextKey = data.next_key || null; 
 
-                data.users.forEach(u => container.appendChild(createUserRow(u)));
+                data.users.forEach(u => {
+                    container.appendChild(createUserRow(u));
+                    // NUEVO: Vamos sumando las métricas de los usuarios que van llegando
+                    accumulatedAlerts += (u.quotas?.alerts?.used || 0);
+                    if (u.status === 'PREMIUM') accumulatedPremium++;
+                });
 
-                // Actualizar métricas (Aproximación para la vista actual)
-                document.getElementById('total-users').innerText = document.querySelectorAll('.user-row').length + (currentNextKey ? '+' : '');
+                // Actualizar Sidebar (Agregamos un '+' si hay más páginas ocultas)
+                const isMore = currentNextKey ? '+' : '';
+                document.getElementById('total-users').innerText = document.querySelectorAll('.user-row').length + isMore;
+                document.getElementById('active-alerts').innerText = accumulatedAlerts + isMore;
+                document.getElementById('premium-count').innerText = accumulatedPremium + isMore;
 
                 // Manejar botón de "Cargar Más"
                 let btn = document.getElementById('load-more-btn');
@@ -216,7 +231,7 @@
                         container.parentElement.appendChild(btn);
                     }
                 } else if (btn) {
-                    btn.remove(); // Si ya no hay más, quitamos el botón
+                    btn.remove(); 
                 }
 
             } catch (error) {
