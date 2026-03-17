@@ -82,36 +82,25 @@ def days_between(date_iso):
 def enrich_user_data(item):
     user_id = item.get('user_id', 'unknown')
     try:
-        # 1. Extracción Segura (Usando safe_dict para evitar el error 'str object has no attribute get')
+        # 1. Extracción Segura
         sub_raw = safe_dict(item.get('subscription'))
         profile_raw = safe_dict(item.get('profile'))
         locs_raw = safe_dict(item.get('locations'))
         alerts_raw = safe_dict(item.get('alerts'))
         metrics_raw = safe_dict(item.get('metrics'))
 
-        # 2. Identificar Plan (Con el Cerebro Central)
+        # 2. Identificar Plan (Usando BUSINESS_RULES interno)
         status = sub_raw.get('status', 'FREE')
         tier_key = sub_raw.get('tier', status)
         
-        # Consultamos al módulo centralizado (business_logic)
-        config = business_logic.get_tier_config(item)
-        
-        # Reconstruimos el diccionario pricing para que no se rompa tu frontend
-        plan_name = "Premium Dev (Gratis)" if "MANUAL" in tier_key else ("Premium Anual" if "ANNUAL" in tier_key else ("Premium Mensual" if config["tier_name"] == "PREMIUM" else "Básico"))
-        precio_monto = 0 if config["tier_name"] == "FREE" or "MANUAL" in tier_key else (329.00 if "ANNUAL" in tier_key else 49.00)
-        precio_freq = "Manual" if "MANUAL" in tier_key else ("Anual" if "ANNUAL" in tier_key else ("Mensual" if config["tier_name"] == "PREMIUM" else "N/A"))
-        
-        pricing = {"amount": precio_monto, "freq": precio_freq, "name": plan_name}
+        rules = BUSINESS_RULES.get(tier_key, BUSINESS_RULES.get(status, BUSINESS_RULES.get('FREE')))
+        if not rules: rules = BUSINESS_RULES['FREE']
+        pricing = rules.get('price', {"amount": 0, "freq": "N/A", "name": "Desconocido"})
 
-        # Extraemos los límites de la configuración central
-        limit_locs = config.get("max_locations", 2)
-        limit_alerts = config.get("max_threshold_alerts", 0) + config.get("max_schedule_reports", 0)
-
-        # 3. Calcular Uso (MANTENEMOS TU CÁLCULO INTACTO)
+        # 3. Calcular Uso
         locs_used = len(locs_raw)
         alerts_used = 0
         
-        # Iteración defensiva sobre schedule y threshold
         schedule_alerts = safe_dict(alerts_raw.get('schedule'))
         threshold_alerts = safe_dict(alerts_raw.get('threshold'))
 
@@ -122,11 +111,9 @@ def enrich_user_data(item):
         # 4. Snapshot de Ubicaciones
         locations_snapshot = []
         for place_name, coords in locs_raw.items():
-            coords = safe_dict(coords) # Asegurar que coords sea dict
-            
+            coords = safe_dict(coords) 
             sched_cfg = safe_dict(schedule_alerts.get(place_name))
             thresh_cfg = safe_dict(threshold_alerts.get(place_name))
-            
             thresh_val = thresh_cfg.get('umbral')
             thresh_display = f"> {thresh_val} IMA" if thresh_val else None
 
@@ -154,9 +141,8 @@ def enrich_user_data(item):
         health_stats_raw = safe_dict(item.get('health_stats'))
         transport_raw = safe_dict(item.get('profile_transport'))
 
-        # Calculamos el daño actual de la semana
         current_health = health_stats_raw.get('current_week', [{}])[0] if isinstance(health_stats_raw.get('current_week'), list) and len(health_stats_raw.get('current_week')) > 0 else {}
-        if isinstance(current_health, dict) and 'M' in current_health: current_health = current_health['M'] # Por si viene anidado en formato Dynamo crudo
+        if isinstance(current_health, dict) and 'M' in current_health: current_health = current_health['M'] 
             
         # --- RETURN FINAL ---
         return {
@@ -180,7 +166,7 @@ def enrich_user_data(item):
                 "currency": "MXN",
                 "frequency": pricing['freq'],
                 "stripe_customer_id": sub_raw.get('stripe_customer_id'),
-                "stripe_subscription_id": sub_raw.get('stripe_subscription_id'), # <-- NUEVA LÍNEA
+                "stripe_subscription_id": sub_raw.get('stripe_subscription_id'), 
                 "valid_until": valid_until,
                 "auto_renew": sub_raw.get('auto_renew', False),
                 "next_renewal_human": renewal_text
@@ -188,14 +174,14 @@ def enrich_user_data(item):
             
             "permissions": {
                 "can_chat_bot": True,
-                "can_create_alerts": config.get("can_custom_alerts", False),
-                "can_receive_contingency": config.get("can_contingency", False),
-                "can_add_more_locations": (locs_used < limit_locs)
+                "can_create_alerts": (rules['alert_limit'] > 0),
+                "can_receive_contingency": rules['can_contingency'],
+                "can_add_more_locations": (locs_used < rules['loc_limit'])
             },
             
             "quotas": {
-                "locations": {"used": locs_used, "limit": limit_locs, "remaining": max(0, limit_locs - locs_used)},
-                "alerts": {"used": alerts_used, "limit": limit_alerts, "remaining": max(0, limit_alerts - alerts_used)}
+                "locations": {"used": locs_used, "limit": rules['loc_limit'], "remaining": max(0, rules['loc_limit'] - locs_used)},
+                "alerts": {"used": alerts_used, "limit": rules['alert_limit'], "remaining": max(0, rules['alert_limit'] - alerts_used)}
             },
             
             "profile": {
@@ -207,7 +193,6 @@ def enrich_user_data(item):
             "locations_snapshot": locations_snapshot,
             
             "global_config": {
-                # FIX: Checamos si es booleano o diccionario
                 "contingency_enabled": alerts_raw.get('contingency', {}).get('enabled', False) if isinstance(alerts_raw.get('contingency'), dict) else bool(alerts_raw.get('contingency')),
                 "contingency_last_received": alerts_raw.get('contingency', {}).get('last_received') if isinstance(alerts_raw.get('contingency'), dict) else None
             },
@@ -221,7 +206,7 @@ def enrich_user_data(item):
             "health_and_transport": {
                 "transport_mode": transport_raw.get('medio', 'No definido'),
                 "transport_hours": transport_raw.get('horas', 0),
-                "conditions": list(health_prof_raw.keys()), # Ej: ['asma']
+                "conditions": list(health_prof_raw.keys()), 
                 "weekly_damage": {
                     "cigarros": safe_dict(current_health).get('cigarros', '0'),
                     "dias_edad_perdidos": safe_dict(current_health).get('dias_edad', '0')
@@ -230,8 +215,7 @@ def enrich_user_data(item):
         }
     except Exception as e:
         print(f"🔥 [CRITICAL] Failed to enrich user {user_id}: {str(e)}")
-        traceback.print_exc() # Imprime la línea exacta del error en los logs
-        # Retornamos estructura básica para no romper la lista entera
+        traceback.print_exc() 
         return {"user_id": user_id, "error": "Data corrupta", "raw_error": str(e)}
 
 # --- HANDLER ---
