@@ -2,6 +2,7 @@ import json
 import boto3
 import os
 import traceback
+import base64
 from decimal import Decimal
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -262,7 +263,6 @@ def lambda_handler(event, context):
             
             scan_kwargs = {'Limit': limit}
             if last_key_str:
-                import base64
                 # Decodificamos el token de paginación
                 scan_kwargs['ExclusiveStartKey'] = json.loads(base64.b64decode(last_key_str).decode('utf-8'))
                 
@@ -273,7 +273,6 @@ def lambda_handler(event, context):
             # Codificamos el siguiente token para el frontend
             next_key_str = None
             if next_key_raw:
-                import base64
                 next_key_str = base64.b64encode(json.dumps(next_key_raw).encode('utf-8')).decode('utf-8')
             
             enriched_list = [enrich_user_data(u) for u in items]
