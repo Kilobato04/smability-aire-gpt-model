@@ -92,6 +92,36 @@
             width: 30px; height: 30px; border: 3px solid rgba(56,189,248,0.3); 
             border-top: 3px solid #38bdf8; border-radius: 50%; animation: spin 1s linear infinite;
         }
+        /* ESTILOS DE FILA ACORDEÓN */
+        .users-list { display: flex; flex-direction: column; gap: 10px; }
+        .user-row {
+            background: #1e293b; border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 8px; overflow: hidden; transition: all 0.2s;
+        }
+        .user-row:hover { border-color: rgba(56, 189, 248, 0.4); }
+        .row-header {
+            padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; background: linear-gradient(to right, rgba(56,189,248,0.05), transparent);
+        }
+        .row-basic-info { display: flex; gap: 20px; align-items: center; width: 60%; }
+        .row-name { font-weight: 600; font-size: 15px; width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .row-id { font-family: 'Roboto Mono'; font-size: 11px; color: #64748b; }
+        
+        /* El secreto del Acordeón */
+        .row-details {
+            max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;
+            background: rgba(15, 23, 42, 0.5); border-top: 1px solid transparent;
+        }
+        .user-row.expanded .row-details { max-height: 1000px; border-top-color: rgba(255,255,255,0.05); }
+        .details-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; padding: 20px; }
+        
+        .load-more-btn {
+            width: 100%; padding: 15px; margin-top: 20px; background: rgba(56, 189, 248, 0.1);
+            color: #38bdf8; border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 8px;
+            cursor: pointer; font-weight: 600; transition: all 0.2s;
+        }
+        .load-more-btn:hover { background: rgba(56, 189, 248, 0.2); }
+        
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* SCROLLBAR */
@@ -149,111 +179,96 @@
 
     <script>
         // CONFIGURACIÓN
-        // ⚠️ REEMPLAZA ESTO CON TU URL REAL DE API LIGHT
         const API_URL = "https://3s2niqf45lksfqfmrc2cg2ivpi0fealf.lambda-url.us-east-1.on.aws/?action=list_users&key=02Kilobaterias";
 
-        async function fetchData() {
+        let currentNextKey = null; // Guarda el token de la siguiente página
+
+        async function fetchData(loadMore = false) {
             const loader = document.getElementById('loader');
             const container = document.getElementById('users-container');
             
+            if (!loadMore) { container.innerHTML = ''; container.className = 'users-list'; }
             loader.style.display = 'flex';
-            container.innerHTML = ''; // Limpiar
+
+            let url = API_URL;
+            if (loadMore && currentNextKey) url += `&last_key=${encodeURIComponent(currentNextKey)}`;
 
             try {
-                const response = await fetch(API_URL);
+                const response = await fetch(url);
                 const data = await response.json();
+                
+                currentNextKey = data.next_key || null; // Guardamos el token
 
-                // Validar respuesta
-                if (!data.users) throw new Error("Formato de API inválido");
+                data.users.forEach(u => container.appendChild(createUserRow(u)));
 
-                // Calcular Métricas Globales
-                const users = data.users;
-                const totalUsers = data.count || users.length;
-                let totalAlerts = 0;
-                let premiumUsers = 0;
+                // Actualizar métricas (Aproximación para la vista actual)
+                document.getElementById('total-users').innerText = document.querySelectorAll('.user-row').length + (currentNextKey ? '+' : '');
 
-                users.forEach(u => {
-                    // Renderizar Card de Usuario
-                    const card = createUserCard(u);
-                    container.appendChild(card);
-
-                    // Sumar métricas
-                    totalAlerts += (u.quotas?.alerts?.used || 0);
-                    if (u.status === 'PREMIUM') premiumUsers++;
-                });
-
-                // Actualizar Sidebar
-                document.getElementById('total-users').innerText = totalUsers;
-                document.getElementById('active-alerts').innerText = totalAlerts;
-                document.getElementById('premium-count').innerText = premiumUsers;
+                // Manejar botón de "Cargar Más"
+                let btn = document.getElementById('load-more-btn');
+                if (currentNextKey) {
+                    if (!btn) {
+                        btn = document.createElement('button');
+                        btn.id = 'load-more-btn';
+                        btn.className = 'load-more-btn';
+                        btn.innerText = 'Cargar siguientes 50 usuarios 👇';
+                        btn.onclick = () => fetchData(true);
+                        container.parentElement.appendChild(btn);
+                    }
+                } else if (btn) {
+                    btn.remove(); // Si ya no hay más, quitamos el botón
+                }
 
             } catch (error) {
                 console.error(error);
-                container.innerHTML = `<div style="color: #ef4444; padding: 20px;">❌ Error cargando datos: ${error.message}</div>`;
-            } finally {
-                loader.style.display = 'none';
-            }
+                alert("Error cargando datos");
+            } finally { loader.style.display = 'none'; }
         }
 
-        function createUserCard(u) {
+        function toggleRow(element) {
+            element.parentElement.classList.toggle('expanded');
+        }
+
+        function createUserRow(u) {
             const div = document.createElement('div');
-            div.className = 'user-card';
-
+            div.className = 'user-row';
             const isPremium = u.status === 'PREMIUM';
-            const statusClass = isPremium ? 'premium' : 'free';
-            const statusLabel = isPremium ? 'PREMIUM' : 'FREE';
 
-            // Parsear Ubicaciones para HTML
-            let locsHTML = '';
-            if (u.locations_snapshot && u.locations_snapshot.length > 0) {
-                u.locations_snapshot.forEach(loc => {
-                    let alertInfo = '';
-                    if (loc.config.schedule_report) alertInfo += `⏰ ${loc.config.schedule_report} `;
-                    if (loc.config.threshold_alert) alertInfo += `🚨 ${loc.config.threshold_alert}`;
-                    
-                    if (!alertInfo) alertInfo = 'Sin alertas';
-                    else alertInfo = `<span class="alert-active">${alertInfo}</span>`;
-
-                    locsHTML += `
-                        <div class="loc-tag">
-                            <span class="loc-name">${loc.name}</span>
-                            <span class="loc-detail">${alertInfo}</span>
-                        </div>
-                    `;
-                });
-            } else {
-                locsHTML = '<span style="color:#64748b; font-style:italic;">Sin ubicaciones</span>';
-            }
-
-            // Parsear Fechas (Formato amigable)
-            const lastSeen = u.crm_metrics.last_seen ? u.crm_metrics.last_seen.split(' ')[0] : 'N/A';
-
+            // Armar HTML interno
             div.innerHTML = `
-                <div class="uc-header">
-                    <div>
-                        <span class="uc-name">${u.name}</span>
-                        <span class="uc-id">ID: ${u.user_id}</span>
+                <div class="row-header" onclick="toggleRow(this)">
+                    <div class="row-basic-info">
+                        <span class="badge ${isPremium ? 'premium' : 'free'}">${isPremium ? 'PREMIUM' : 'FREE'}</span>
+                        <span class="row-name">${u.name}</span>
+                        <span class="row-id">ID: ${u.user_id}</span>
                     </div>
-                    <span class="badge ${statusClass}">${statusLabel}</span>
+                    <div style="font-size: 12px; color: #94a3b8;">
+                        Última vez: ${u.crm_metrics.last_seen ? u.crm_metrics.last_seen.split(' ')[0] : 'N/A'} 🔽
+                    </div>
                 </div>
-                <div class="uc-body">
-                    <div class="stat-row">
-                        <span class="stat-key">Última vez:</span>
-                        <span class="stat-val">${lastSeen}</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-key">Alertas Usadas:</span>
-                        <span class="stat-val">${u.quotas.alerts.used} / ${u.quotas.alerts.limit}</span>
-                    </div>
-                    <div class="stat-row">
-                        <span class="stat-key">Contingencia:</span>
-                        <span class="stat-val" style="color:${u.global_config.contingency_enabled ? '#4ade80' : '#ef4444'}">
-                            ${u.global_config.contingency_enabled ? 'ACTIVADA' : 'OFF'}
-                        </span>
-                    </div>
+                
+                <div class="row-details">
+                    <div class="details-grid">
+                        <div>
+                            <div class="section-title">Contingencia & Alertas</div>
+                            <div class="stat-row"><span class="stat-key">Contingencia:</span> <span class="stat-val" style="color:${u.global_config.contingency_enabled ? '#4ade80' : '#ef4444'}">${u.global_config.contingency_enabled ? 'ON' : 'OFF'}</span></div>
+                            <div class="stat-row"><span class="stat-key">Alertas Usadas:</span> <span class="stat-val">${u.quotas.alerts.used} / ${u.quotas.alerts.limit}</span></div>
+                            <div class="stat-row"><span class="stat-key">Holograma:</span> <span class="stat-val">${u.vehicle?.hologram || 'N/A'} (${u.vehicle?.engomado || '-'})</span></div>
+                        </div>
+                        
+                        <div>
+                            <div class="section-title">Perfil de Salud (Semana Actual)</div>
+                            <div class="stat-row"><span class="stat-key">Transporte:</span> <span class="stat-val">${u.health_and_transport?.transport_mode} (${u.health_and_transport?.transport_hours} hrs)</span></div>
+                            <div class="stat-row"><span class="stat-key">Eq. Cigarros:</span> <span class="stat-val" style="color: #f87171;">🚬 ${u.health_and_transport?.weekly_damage?.cigarros}</span></div>
+                            <div class="stat-row"><span class="stat-key">Días Perdidos:</span> <span class="stat-val" style="color: #f87171;">⏳ ${u.health_and_transport?.weekly_damage?.dias_edad_perdidos}</span></div>
+                        </div>
 
-                    <div class="section-title">Ubicaciones & Config</div>
-                    <div>${locsHTML}</div>
+                        <div>
+                            <div class="section-title">Facturación</div>
+                            <div class="stat-row"><span class="stat-key">Plan:</span> <span class="stat-val">${u.subscription.plan_name}</span></div>
+                            <div class="stat-row"><span class="stat-key">Stripe ID:</span> <span class="stat-val">${u.subscription.stripe_customer_id || 'N/A'}</span></div>
+                        </div>
+                    </div>
                 </div>
             `;
             return div;
