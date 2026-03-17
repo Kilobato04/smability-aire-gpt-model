@@ -89,15 +89,25 @@ def enrich_user_data(item):
         alerts_raw = safe_dict(item.get('alerts'))
         metrics_raw = safe_dict(item.get('metrics'))
 
-        # 2. Identificar Plan
+        # 2. Identificar Plan (Con el Cerebro Central)
         status = sub_raw.get('status', 'FREE')
         tier_key = sub_raw.get('tier', status)
         
-        rules = BUSINESS_RULES.get(tier_key, BUSINESS_RULES.get(status, BUSINESS_RULES.get('FREE')))
-        if not rules: rules = BUSINESS_RULES['FREE']
-        pricing = rules.get('price', {"amount": 0, "freq": "N/A", "name": "Desconocido"})
+        # Consultamos al módulo centralizado (business_logic)
+        config = business_logic.get_tier_config(item)
+        
+        # Reconstruimos el diccionario pricing para que no se rompa tu frontend
+        plan_name = "Premium Dev (Gratis)" if "MANUAL" in tier_key else ("Premium Anual" if "ANNUAL" in tier_key else ("Premium Mensual" if config["tier_name"] == "PREMIUM" else "Básico"))
+        precio_monto = 0 if config["tier_name"] == "FREE" or "MANUAL" in tier_key else (329.00 if "ANNUAL" in tier_key else 49.00)
+        precio_freq = "Manual" if "MANUAL" in tier_key else ("Anual" if "ANNUAL" in tier_key else ("Mensual" if config["tier_name"] == "PREMIUM" else "N/A"))
+        
+        pricing = {"amount": precio_monto, "freq": precio_freq, "name": plan_name}
 
-        # 3. Calcular Uso
+        # Extraemos los límites de la configuración central
+        limit_locs = config.get("max_locations", 2)
+        limit_alerts = config.get("max_threshold_alerts", 0) + config.get("max_schedule_reports", 0)
+
+        # 3. Calcular Uso (MANTENEMOS TU CÁLCULO INTACTO)
         locs_used = len(locs_raw)
         alerts_used = 0
         
@@ -178,14 +188,14 @@ def enrich_user_data(item):
             
             "permissions": {
                 "can_chat_bot": True,
-                "can_create_alerts": (rules['alert_limit'] > 0),
-                "can_receive_contingency": rules['can_contingency'],
-                "can_add_more_locations": (locs_used < rules['loc_limit'])
+                "can_create_alerts": config.get("can_custom_alerts", False),
+                "can_receive_contingency": config.get("can_contingency", False),
+                "can_add_more_locations": (locs_used < limit_locs)
             },
             
             "quotas": {
-                "locations": {"used": locs_used, "limit": rules['loc_limit'], "remaining": max(0, rules['loc_limit'] - locs_used)},
-                "alerts": {"used": alerts_used, "limit": rules['alert_limit'], "remaining": max(0, rules['alert_limit'] - alerts_used)}
+                "locations": {"used": locs_used, "limit": limit_locs, "remaining": max(0, limit_locs - locs_used)},
+                "alerts": {"used": alerts_used, "limit": limit_alerts, "remaining": max(0, limit_alerts - alerts_used)}
             },
             
             "profile": {
