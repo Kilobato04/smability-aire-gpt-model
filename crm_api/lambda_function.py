@@ -14,7 +14,6 @@ ADMIN_API_KEY = os.environ.get('CRM_API_KEY', 'smability-secret-admin')
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
 
-# --- 🧠 REGLAS DE NEGOCIO ---
 # --- 🧠 REGLAS DE NEGOCIO (QUOTAS) ---
 BUSINESS_RULES = {
     "FREE": {
@@ -171,6 +170,7 @@ def enrich_user_data(item):
                 "currency": "MXN",
                 "frequency": pricing['freq'],
                 "stripe_customer_id": sub_raw.get('stripe_customer_id'),
+                "stripe_subscription_id": sub_raw.get('stripe_subscription_id'), # <-- NUEVA LÍNEA
                 "valid_until": valid_until,
                 "auto_renew": sub_raw.get('auto_renew', False),
                 "next_renewal_human": renewal_text
@@ -197,8 +197,9 @@ def enrich_user_data(item):
             "locations_snapshot": locations_snapshot,
             
             "global_config": {
-                "contingency_enabled": safe_dict(alerts_raw.get('contingency')).get('enabled', False),
-                "contingency_last_received": safe_dict(alerts_raw.get('contingency')).get('last_received')
+                # FIX: Checamos si es booleano o diccionario
+                "contingency_enabled": alerts_raw.get('contingency', {}).get('enabled', False) if isinstance(alerts_raw.get('contingency'), dict) else bool(alerts_raw.get('contingency')),
+                "contingency_last_received": alerts_raw.get('contingency', {}).get('last_received') if isinstance(alerts_raw.get('contingency'), dict) else None
             },
 
             "vehicle": {
