@@ -267,12 +267,41 @@
                 conditionsHtml = `<span style="color:#f59e0b; font-weight:600;">⚠️ ${u.health_and_transport.conditions.join(', ')}</span>`;
             }
 
-            // --- 📍 PARSER DE UBICACIONES Y ALERTAS ---
+            // --- 📊 PARSER DE HISTORIAL DE SALUD (NUEVO CUADRANTE 5) ---
+            let historyHtml = '';
+            if (u.health_and_transport?.historical && u.health_and_transport.historical.length > 0) {
+                // Tomamos solo las últimas 3 semanas para no hacer la tarjeta gigante
+                let recentHistory = u.health_and_transport.historical.slice(-3).reverse();
+                recentHistory.forEach(h => {
+                    historyHtml += `
+                    <div style="border-bottom: 1px dashed rgba(255,255,255,0.05); padding-bottom: 4px; margin-bottom: 4px;">
+                        <div style="display:flex; justify-content:space-between; font-size:10px;">
+                            <span style="color:#94a3b8">${h.fecha}</span>
+                            <span style="color:#f87171">🚬 ${h.cigarros} | ⏳ ${h.dias_edad}</span>
+                        </div>
+                    </div>`;
+                });
+            } else {
+                historyHtml = '<div style="color:#64748b; font-style:italic; font-size:11px;">Sin historial previo</div>';
+            }
+
+            // --- 📍 PARSER DE UBICACIONES Y ALERTAS (CON DÍAS) ---
             let locsHTML = '';
             if (u.locations_snapshot && u.locations_snapshot.length > 0) {
                 u.locations_snapshot.forEach(loc => {
                     let alertInfo = [];
-                    if (loc.config.schedule_report) alertInfo.push(`⏰ ${loc.config.schedule_report}`);
+                    
+                    if (loc.config.schedule_report) {
+                        // 🌟 MAGIA: Convertir array de días en texto legible
+                        let daysRaw = loc.config.schedule_days || [];
+                        let daysStr = '';
+                        if (daysRaw.length === 7) daysStr = ' (L-D)';
+                        else if (daysRaw.length === 5) daysStr = ' (L-V)';
+                        else if (daysRaw.length === 2) daysStr = ' (Fin de Sem)';
+                        else if (daysRaw.length > 0) daysStr = ` (${daysRaw.length}d)`;
+
+                        alertInfo.push(`⏰ ${loc.config.schedule_report} <span style="color:#38bdf8">${daysStr}</span>`);
+                    }
                     if (loc.config.threshold_alert) alertInfo.push(`🚨 ${loc.config.threshold_alert}`);
                     
                     let alertStr = alertInfo.length > 0 ? alertInfo.join(' | ') : '<span style="color:#64748b">Sin alertas</span>';
@@ -299,7 +328,6 @@
             const lastSeen = u.crm_metrics.last_seen ? u.crm_metrics.last_seen.split(' ')[0] : 'N/A';
             const firstSeen = u.crm_metrics.first_seen ? u.crm_metrics.first_seen.split(' ')[0] : 'N/A';
             const daysInactive = u.crm_metrics.days_inactive;
-            // Si lleva más de 7 días sin usar el bot, lo pintamos de rojo como advertencia
             const inactiveColor = daysInactive > 7 ? '#ef4444' : '#94a3b8';
 
             div.innerHTML = `
@@ -316,22 +344,21 @@
                 </div>
                 
                 <div class="row-details">
-                    <div class="details-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+                    <div class="details-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
                         
                         <div>
                             <div class="section-title">🛡️ Suscripción & CRM</div>
                             <div class="stat-row"><span class="stat-key">Plan:</span> <span class="stat-val">${u.subscription.plan_name}</span></div>
                             <div class="stat-row"><span class="stat-key">Stripe:</span> <span class="stat-val" style="text-align:right;">${stripeCus}${stripeSub}</span></div>
                             <div class="stat-row"><span class="stat-key">Registro:</span> <span class="stat-val">${firstSeen}</span></div>
-                            <div class="stat-row"><span class="stat-key">Renovación:</span> <span class="stat-val">${u.subscription.next_renewal_human}</span></div>
                         </div>
                         
                         <div>
-                            <div class="section-title">🫁 Salud & Transporte</div>
+                            <div class="section-title">🫁 Salud (Actual: ${u.health_and_transport?.weekly_damage?.fecha || 'N/A'})</div>
                             <div class="stat-row"><span class="stat-key">Transporte:</span> <span class="stat-val" style="text-transform:capitalize;">${u.health_and_transport?.transport_mode} (${u.health_and_transport?.transport_hours}h)</span></div>
                             <div class="stat-row"><span class="stat-key">Patologías:</span> <span class="stat-val" style="text-transform:capitalize;">${conditionsHtml}</span></div>
-                            <div class="stat-row"><span class="stat-key">Eq. Cigarros:</span> <span class="stat-val" style="color: #f87171;">🚬 ${u.health_and_transport?.weekly_damage?.cigarros}</span></div>
-                            <div class="stat-row"><span class="stat-key">Días Perdidos:</span> <span class="stat-val" style="color: #f87171;">⏳ ${u.health_and_transport?.weekly_damage?.dias_edad_perdidos}</span></div>
+                            <div class="stat-row"><span class="stat-key">PM2.5 Exp:</span> <span class="stat-val">${u.health_and_transport?.weekly_damage?.promedio_pm25 || '0'} µg</span></div>
+                            <div class="stat-row"><span class="stat-key">Cigarros/Días:</span> <span class="stat-val" style="color: #f87171;">🚬 ${u.health_and_transport?.weekly_damage?.cigarros} | ⏳ ${u.health_and_transport?.weekly_damage?.dias_edad_perdidos}</span></div>
                         </div>
 
                         <div>
@@ -339,12 +366,18 @@
                             <div class="stat-row"><span class="stat-key">Holograma:</span> <span class="stat-val">${u.vehicle?.hologram || 'N/A'} (${u.vehicle?.engomado || '-'})</span></div>
                             <div class="stat-row"><span class="stat-key">Terminación:</span> <span class="stat-val">${u.vehicle?.plate_last_digit !== null ? u.vehicle.plate_last_digit : 'N/A'}</span></div>
                             <div class="stat-row"><span class="stat-key">Contingencia:</span> <span class="stat-val" style="color:${u.global_config.contingency_enabled ? '#4ade80' : '#ef4444'}">${u.global_config.contingency_enabled ? 'ON' : 'OFF'}</span></div>
-                            <div class="stat-row"><span class="stat-key">Alertas Usadas:</span> <span class="stat-val">${u.quotas.alerts.used} / ${u.quotas.alerts.limit}</span></div>
                         </div>
 
                         <div>
                             <div class="section-title">📍 Ubicaciones (${u.quotas.locations.used}/${u.quotas.locations.limit})</div>
                             <div style="margin-top: 8px;">${locsHTML}</div>
+                        </div>
+                        
+                        <div>
+                            <div class="section-title">📊 Historial de Daño</div>
+                            <div style="margin-top: 8px; background: rgba(0,0,0,0.1); padding: 8px; border-radius: 6px;">
+                                ${historyHtml}
+                            </div>
                         </div>
 
                     </div>
