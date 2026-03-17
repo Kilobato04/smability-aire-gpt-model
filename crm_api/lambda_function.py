@@ -108,7 +108,7 @@ def enrich_user_data(item):
             if safe_dict(schedule_alerts.get(place)).get('active'): alerts_used += 1
             if safe_dict(threshold_alerts.get(place)).get('active'): alerts_used += 1
 
-        # 4. Snapshot de Ubicaciones
+        # 4. Snapshot de Ubicaciones (NUEVO: EXTRAE DÍAS)
         locations_snapshot = []
         for place_name, coords in locs_raw.items():
             coords = safe_dict(coords) 
@@ -123,6 +123,7 @@ def enrich_user_data(item):
                 "is_active": coords.get('active', True),
                 "config": {
                     "schedule_report": sched_cfg.get('time'),
+                    "schedule_days": sched_cfg.get('days', []), # <-- EXTRAÍDO
                     "threshold_alert": thresh_display,
                     "consecutive_sent": thresh_cfg.get('consecutive_sent', 0)
                 }
@@ -141,9 +142,22 @@ def enrich_user_data(item):
         health_stats_raw = safe_dict(item.get('health_stats'))
         transport_raw = safe_dict(item.get('profile_transport'))
 
+        # Procesar semana actual
         current_health = health_stats_raw.get('current_week', [{}])[0] if isinstance(health_stats_raw.get('current_week'), list) and len(health_stats_raw.get('current_week')) > 0 else {}
         if isinstance(current_health, dict) and 'M' in current_health: current_health = current_health['M'] 
-            
+        
+        # Procesar semanas históricas
+        hist_weeks_raw = health_stats_raw.get('historical_weeks', [])
+        clean_history = []
+        for hw in hist_weeks_raw:
+            hw_dict = safe_dict(hw)
+            clean_history.append({
+                "cigarros": hw_dict.get('cigarros_totales', '0'),
+                "dias_edad": hw_dict.get('dias_edad_totales', '0'),
+                "fecha": hw_dict.get('fecha_cierre', 'N/A'),
+                "pm25": hw_dict.get('ias_promedio_semana', 'N/A')
+            })
+
         # --- RETURN FINAL ---
         return {
             "user_id": user_id,
@@ -209,8 +223,11 @@ def enrich_user_data(item):
                 "conditions": list(health_prof_raw.keys()), 
                 "weekly_damage": {
                     "cigarros": safe_dict(current_health).get('cigarros', '0'),
-                    "dias_edad_perdidos": safe_dict(current_health).get('dias_edad', '0')
-                }
+                    "dias_edad_perdidos": safe_dict(current_health).get('dias_edad', '0'),
+                    "promedio_pm25": safe_dict(current_health).get('promedio_pm25', 'N/A'),
+                    "fecha": safe_dict(current_health).get('fecha', 'N/A')
+                },
+                "historical": clean_history # <-- EXTRAÍDO
             }
         }
     except Exception as e:
