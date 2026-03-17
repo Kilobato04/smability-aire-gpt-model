@@ -138,6 +138,16 @@ def enrich_user_data(item):
             days_left = -1 * days_between(valid_until)
             renewal_text = f"Vence: {valid_until}"
 
+        # --- NUEVA EXTRACCIÓN: SALUD, AUTO Y TRANSPORTE ---
+        veh_raw = safe_dict(item.get('vehicle'))
+        health_prof_raw = safe_dict(item.get('health_profile'))
+        health_stats_raw = safe_dict(item.get('health_stats'))
+        transport_raw = safe_dict(item.get('profile_transport'))
+
+        # Calculamos el daño actual de la semana
+        current_health = health_stats_raw.get('current_week', [{}])[0] if isinstance(health_stats_raw.get('current_week'), list) and len(health_stats_raw.get('current_week')) > 0 else {}
+        if isinstance(current_health, dict) and 'M' in current_health: current_health = current_health['M'] # Por si viene anidado en formato Dynamo crudo
+            
         # --- RETURN FINAL ---
         return {
             "user_id": user_id,
@@ -188,6 +198,22 @@ def enrich_user_data(item):
             "global_config": {
                 "contingency_enabled": safe_dict(alerts_raw.get('contingency')).get('enabled', False),
                 "contingency_last_received": safe_dict(alerts_raw.get('contingency')).get('last_received')
+            },
+
+            "vehicle": {
+                "active": veh_raw.get('active', False),
+                "plate_last_digit": veh_raw.get('plate_last_digit'),
+                "hologram": veh_raw.get('hologram'),
+                "engomado": veh_raw.get('engomado')
+            },
+            "health_and_transport": {
+                "transport_mode": transport_raw.get('medio', 'No definido'),
+                "transport_hours": transport_raw.get('horas', 0),
+                "conditions": list(health_prof_raw.keys()), # Ej: ['asma']
+                "weekly_damage": {
+                    "cigarros": safe_dict(current_health).get('cigarros', '0'),
+                    "dias_edad_perdidos": safe_dict(current_health).get('dias_edad', '0')
+                }
             }
         }
     except Exception as e:
@@ -231,20 +257,36 @@ def lambda_handler(event, context):
         print(f"🚀 [ACTION] Executing: {action}")
 
         if action == 'list_users':
-            res = table.scan()
+            limit = int(qs.get('limit', 50)) # Paquetes de 50
+            last_key_str = qs.get('last_key')
+            
+            scan_kwargs = {'Limit': limit}
+            if last_key_str:
+                import base64
+                # Decodificamos el token de paginación
+                scan_kwargs['ExclusiveStartKey'] = json.loads(base64.b64decode(last_key_str).decode('utf-8'))
+                
+            res = table.scan(**scan_kwargs)
             items = res.get('Items', [])
-            print(f"📊 [DB SCAN] Found {len(items)} raw items")
+            next_key_raw = res.get('LastEvaluatedKey')
             
-            enriched_list = []
-            for u in items:
-                processed = enrich_user_data(u)
-                enriched_list.append(processed)
+            # Codificamos el siguiente token para el frontend
+            next_key_str = None
+            if next_key_raw:
+                import base64
+                next_key_str = base64.b64encode(json.dumps(next_key_raw).encode('utf-8')).decode('utf-8')
             
-            # Ordenar seguro (evitando error si last_seen no existe)
+            enriched_list = [enrich_user_data(u) for u in items]
+            
+            # Ordenar seguro la página actual (evitando error si last_seen no existe)
             enriched_list.sort(key=lambda x: str(x.get('crm_metrics', {}).get('last_seen', '')), reverse=True)
             
-            print(f"✅ [SUCCESS] Returning {len(enriched_list)} enriched users")
-            return response(200, {'count': len(enriched_list), 'users': enriched_list})
+            print(f"✅ [SUCCESS] Returning {len(enriched_list)} enriched users (Paginated)")
+            return response(200, {
+                'count': len(enriched_list), 
+                'users': enriched_list,
+                'next_key': next_key_str # El frontend usará esto para pedir la pág 2
+            })
 
         elif action == 'get_user':
             uid = qs.get('user_id')
