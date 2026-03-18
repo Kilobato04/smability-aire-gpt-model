@@ -166,6 +166,20 @@ def enrich_user_data(item):
                 "pm25": hw_dict.get('ias_promedio_semana', 'N/A')
             })
 
+        # --- 🛡️ RESCATE DE DATOS (ANTI-FUGAS) ---
+        # 1. Rescate de Fecha: Si es un usuario viejo sin created_at, usamos su última interacción
+        fecha_registro = item.get('created_at')
+        if not fecha_registro:
+            fecha_registro = item.get('last_interaction', '2026-03-01T00:00:00')
+
+        # 2. Rescate de Precio: Priorizamos el precio exacto de DynamoDB sobre el genérico
+        precio_final = pricing['amount']
+        if sub_raw.get('amount') is not None:
+            try: 
+                precio_final = float(sub_raw.get('amount'))
+            except: 
+                pass
+
         # --- RETURN FINAL ---
         return {
             "user_id": user_id,
@@ -174,7 +188,7 @@ def enrich_user_data(item):
             "status": status,
             
             "crm_metrics": {
-                "first_seen": to_mexico_time(item.get('created_at')),
+                "first_seen": to_mexico_time(fecha_registro), # 👈 Usamos la fecha rescatada
                 "last_seen": to_mexico_time(item.get('last_interaction')),
                 "days_inactive": days_between(item.get('last_interaction')),
                 "total_requests": metrics_raw.get('total_requests', 0),
@@ -184,7 +198,7 @@ def enrich_user_data(item):
             "subscription": {
                 "plan_name": pricing['name'],
                 "tier_id": tier_key,
-                "amount": pricing['amount'],
+                "amount": precio_final, # 👈 Usamos el precio rescatado
                 "currency": "MXN",
                 "frequency": pricing['freq'],
                 "stripe_customer_id": sub_raw.get('stripe_customer_id'),
