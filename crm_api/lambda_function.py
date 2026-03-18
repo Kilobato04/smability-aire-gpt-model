@@ -14,38 +14,46 @@ ADMIN_API_KEY = os.environ.get('CRM_API_KEY', 'smability-secret-admin')
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(TABLE_NAME)
 
-# --- 🧠 REGLAS DE NEGOCIO (QUOTAS) ---
+# --- 🧠 REGLAS DE NEGOCIO (QUOTAS Y PRECIOS) ---
 BUSINESS_RULES = {
     "FREE": {
-        "loc_limit": 2, 
-        "alert_limit": 0, 
-        "can_contingency": False,
+        "loc_limit": 2, "alert_limit": 0, "can_contingency": False,
         "price": {"amount": 0, "freq": "N/A", "name": "Básico"}
     },
+    
+    # 💵 BLOQUE MENSUAL ($49)
     "PREMIUM_MONTHLY": {
-        "loc_limit": 3, 
-        "alert_limit": 10, 
-        "can_contingency": True,
+        "loc_limit": 3, "alert_limit": 10, "can_contingency": True,
         "price": {"amount": 49.00, "freq": "Mensual", "name": "Premium Mensual"}
     },
-    "PREMIUM_ANNUAL": {
-        "loc_limit": 3, 
-        "alert_limit": 10, 
-        "can_contingency": True,
-        "price": {"amount": 329.00, "freq": "Anual", "name": "Premium Anual"}
+    # (Mantenemos este por si quedaron usuarios "viejos" de antes del fix del webhook)
+    "PREMIUM_STRIPE": { 
+        "loc_limit": 3, "alert_limit": 10, "can_contingency": True,
+        "price": {"amount": 49.00, "freq": "Mensual", "name": "Premium (Stripe Viejo)"}
     },
-    # 👇 AGREGAMOS ESTOS DOS PARA SOPORTAR EL COMANDO /PROMO 👇
+
+    # 💵 BLOQUE SEMESTRAL ($229)
+    "PREMIUM_SEMESTRAL": {
+        "loc_limit": 3, "alert_limit": 10, "can_contingency": True,
+        "price": {"amount": 229.00, "freq": "Semestral", "name": "Premium Semestral"}
+    },
+
+    # 💵 BLOQUE ANUAL ($399)
+    "PREMIUM_ANNUAL": {
+        "loc_limit": 3, "alert_limit": 10, "can_contingency": True,
+        "price": {"amount": 399.00, "freq": "Anual", "name": "Premium Anual"}
+    },
+
+    # 🛠️ BLOQUE DE DESARROLLADORES (Bypass)
     "PREMIUM_MANUAL": {
-        "loc_limit": 3, 
-        "alert_limit": 10, 
-        "can_contingency": True,
+        "loc_limit": 3, "alert_limit": 10, "can_contingency": True,
         "price": {"amount": 0, "freq": "Manual", "name": "Premium Dev (Gratis)"}
     },
-    "PREMIUM": { # Fallback genérico
-        "loc_limit": 3, 
-        "alert_limit": 10, 
-        "can_contingency": True,
-        "price": {"amount": 0, "freq": "Genérico", "name": "Premium"}
+    
+    # ⚠️ FALLBACK GENÉRICO
+    "PREMIUM": { 
+        "loc_limit": 3, "alert_limit": 10, "can_contingency": True,
+        "price": {"amount": 0, "freq": "Genérico", "name": "Premium (Sin Mapeo)"}
     }
 }
 
