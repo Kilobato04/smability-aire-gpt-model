@@ -414,7 +414,7 @@
                             <div class="section-title">🚗 Vehículo & Contingencia</div>
                             <div class="stat-row"><span class="stat-key">Holograma:</span> <span class="stat-val">${u.vehicle?.hologram || 'N/A'} (${u.vehicle?.engomado || '-'})</span></div>
                             <div class="stat-row"><span class="stat-key">Placa (Fin):</span> <span class="stat-val">${u.vehicle?.plate_last_digit !== null ? u.vehicle.plate_last_digit : 'N/A'}</span></div>
-                            <div class="stat-row"><span class="stat-key">Avisos SMS:</span> <span class="stat-val" style="color:${u.global_config.contingency_enabled ? '#4ade80' : '#ef4444'}">${u.global_config.contingency_enabled ? 'ON' : 'OFF'}</span></div>
+                            <div class="stat-row"><span class="stat-key">Contingencia:</span> <span class="stat-val" style="color:${u.global_config.contingency_enabled ? '#4ade80' : '#ef4444'}">${u.global_config.contingency_enabled ? 'ON' : 'OFF'}</span></div>
                         </div>
 
                         <div>
