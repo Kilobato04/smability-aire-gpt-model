@@ -44,7 +44,8 @@ def lambda_handler(event, context):
                     ExpressionAttributeValues={
                         ':sub': {
                             'status': 'PREMIUM',
-                            'tier': tier_calculado, # <-- AQUÍ USAMOS LA VARIABLE DINÁMICA
+                            'tier': tier_calculado,
+                            'amount': str(amount_total), # 💰 NUEVO: Guardamos el precio exacto pagado
                             'stripe_customer_id': customer_id,
                             'stripe_subscription_id': sub_id,
                             'updated_at': datetime.utcnow().isoformat()
