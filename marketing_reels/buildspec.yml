@@ -18,6 +18,5 @@ phases:
       - python render_reel.py
   post_build:
     commands:
-      - echo "☁️ Subiendo video maestro a S3..."
-      - aws s3 cp /tmp/reel_final.mp4 s3://$S3_BUCKET/outputs/reel_${FLOW_ID}.mp4
-      - echo "✅ ¡El Reel está listo en la bodega!"
+      - echo "✅ Misión cumplida. El script de Python ya subió el video a S3 y a Meta."
+      - echo "🧹 Limpieza automática completada. Cero archivos duplicados."
