@@ -24,7 +24,18 @@ def lambda_handler(event, context):
             customer_id = session.get('customer')
             sub_id = session.get('subscription', 'pago_unico') 
             
-            print(f"💰 Pago exitoso detectado. Telegram ID: {user_id}")
+            # 🌟 NUEVO: DETECCIÓN EXACTA DEL PLAN COMPRADO
+            amount_total = session.get('amount_total', 0) / 100 # Stripe lo manda en centavos (ej. 4900 -> 49.00)
+            
+            tier_calculado = 'PREMIUM_STRIPE' # Fallback
+            if amount_total == 49.00:
+                tier_calculado = 'PREMIUM_MONTHLY'
+            elif amount_total == 229.00:
+                tier_calculado = 'PREMIUM_SEMESTRAL'
+            elif amount_total == 399.00:
+                tier_calculado = 'PREMIUM_ANNUAL'
+            
+            print(f"💰 Pago exitoso detectado. Monto: ${amount_total}. Telegram ID: {user_id}")
             
             if user_id:
                 response = table.update_item(
@@ -33,7 +44,7 @@ def lambda_handler(event, context):
                     ExpressionAttributeValues={
                         ':sub': {
                             'status': 'PREMIUM',
-                            'tier': 'PREMIUM_STRIPE',
+                            'tier': tier_calculado, # <-- AQUÍ USAMOS LA VARIABLE DINÁMICA
                             'stripe_customer_id': customer_id,
                             'stripe_subscription_id': sub_id,
                             'updated_at': datetime.utcnow().isoformat()
