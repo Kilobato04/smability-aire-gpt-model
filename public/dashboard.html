@@ -212,18 +212,25 @@
 
                     accumulatedAlerts += (u.quotas?.alerts?.used || 0);
                     if (u.status === 'PREMIUM') accumulatedPremium++;
-
+                    
                     // LÓGICA DE INGRESOS (MRR)
                     let amount = parseFloat(u.subscription?.amount) || 0;
                     if (u.subscription?.frequency === 'Anual') {
-                        amount = amount / 12; // Pro-rateamos el anual para el MRR mensual
+                        amount = amount / 12; // Pro-rateamos el anual
                     }
                     currentMRR += amount;
 
-                    // Agrupar por mes para la gráfica
-                    let firstSeen = u.crm_metrics?.first_seen; // "2026-01-28 06:05 PM"
+                    // Agrupar por mes para la gráfica (AJUSTE STARTUP)
+                    let firstSeen = u.crm_metrics?.first_seen; 
                     if (firstSeen && firstSeen !== 'N/A') {
                         let monthKey = firstSeen.substring(0, 7); // Extrae "YYYY-MM"
+                        
+                        // 🚀 FIX: La monetización empezó en Marzo 2026. 
+                        // Todo usuario viejo que pague, su MRR cuenta a partir de Marzo.
+                        if (monthKey < "2026-03") {
+                            monthKey = "2026-03"; 
+                        }
+
                         if (!mrrHistory[monthKey]) mrrHistory[monthKey] = 0;
                         mrrHistory[monthKey] += amount;
                     }
@@ -259,11 +266,14 @@
         }
 
         function renderChart() {
+            // 🚀 FIX: Inyectamos Febrero en $0 para forzar el inicio visual de la rampa
+            if (!mrrHistory["2026-02"]) mrrHistory["2026-02"] = 0;
+
             // Convertimos el diccionario a Arrays ordenados cronológicamente
             let months = Object.keys(mrrHistory).sort();
             let amounts = months.map(m => mrrHistory[m]);
 
-            // Hacemos el MRR acumulativo (Las suscripciones se suman mes a mes)
+            // Hacemos el MRR acumulativo
             let cumulativeAmounts = [];
             let acc = 0;
             for(let val of amounts) { acc += val; cumulativeAmounts.push(acc); }
