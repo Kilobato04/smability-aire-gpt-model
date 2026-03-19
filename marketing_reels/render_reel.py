@@ -91,7 +91,7 @@ ffmpeg -y -i {video_original} -stream_loop -1 -i "{audio_local}" \
 os.system(comando_ffmpeg)
 print(f"✅ Video optimizado para IG generado en {output_mp4}")
 
-# 6. SUBIDA A S3 Y PUBLICACIÓN EN INSTAGRAM
+# 6. SUBIDA A S3 Y PUBLICACIÓN EN INSTAGRAM (MODO TEST)
 video_s3_key = f"reels_publicados/reel_{FLOW_ID}.mp4"
 try:
     print(f"☁️ Subiendo a S3 forzando etiqueta ContentType: video/mp4...")
@@ -101,10 +101,11 @@ try:
         video_s3_key,
         ExtraArgs={'ContentType': 'video/mp4'} # 🔥 EL TRUCO DE META
     )
-    print(f"✅ Video subido exitosamente a S3. Ruta: {video_s3_key}")
+    print(f"✅ [MODO TEST] Video subido exitosamente a S3. Ruta: {video_s3_key}")
+    print("🛑 [MODO TEST] El código de Instagram está desactivado temporalmente para revisión.")
     
     # ========================================================
-    # 📱 BLOQUE DE INSTAGRAM (ACTIVADO)
+    # 📱 BLOQUE DE INSTAGRAM (DESACTIVADO PARA PRUEBAS)
     # ========================================================
     video_url = s3.generate_presigned_url('get_object', Params={'Bucket': S3_BUCKET, 'Key': video_s3_key}, ExpiresIn=3600)
     
@@ -112,6 +113,8 @@ try:
     IG_USER_ID = os.environ.get("IG_ACCOUNT_ID")
     CAPTION = os.environ.get("CAPTION_INSTAGRAM", f"Reporte de aire: {FLOW_ID} 😷 #AIreGPT")
 
+    # --- INICIO BLOQUE COMENTADO (Descomentar para producción) ---
+    """
     if IG_TOKEN and IG_USER_ID:
         print("🤖 Publicando en Instagram...")
         res_crear = requests.post(f"https://graph.facebook.com/v19.0/{IG_USER_ID}/media", data={
@@ -147,6 +150,8 @@ try:
                 print(f"❌ Meta tardó demasiado. Estado final: {status_code}")
         else:
             print(f"❌ Fallo al crear contenedor: {json.dumps(res_crear)}")
+    """
+    # --- FIN BLOQUE COMENTADO ---
     # ========================================================
 
 except Exception as e:
