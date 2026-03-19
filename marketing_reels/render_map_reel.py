@@ -334,7 +334,7 @@ print(f"✅ [MODO TEST] Video subido a S3 exitosamente en la carpeta: {video_s3_
 print("🛑 [MODO TEST] El código de Instagram está desactivado temporalmente para revisión.")
 
 # --- INICIO BLOQUE COMENTADO (Descomentar para producción) ---
-"""
+
 if IG_TOKEN and IG_USER_ID:
     print("🤖 Creando contenedor en Meta...")
     res_crear = requests.post(f"https://graph.facebook.com/v19.0/{IG_USER_ID}/media", data={
@@ -361,5 +361,5 @@ if IG_TOKEN and IG_USER_ID:
             print(f"❌ Meta tardó demasiado. Estado: {status_code}")
 else:
     print("⚠️ Faltan tokens de Instagram. El video está en S3, pero no se publicó.")
-"""
+
 # --- FIN BLOQUE COMENTADO ---
