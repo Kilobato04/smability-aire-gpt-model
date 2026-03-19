@@ -33,6 +33,30 @@ def verificar_contingencia_oficial():
 def lambda_handler(event, context):
     print("🎬 Iniciando Manager de Marketing (El Cerebro)...")
     
+    # ========================================================
+    # 🚀 INTERCEPTOR: ¿ES LA HORA DEL MAPA DIARIO (12:20 PM)?
+    # ========================================================
+    if event.get("job_type") == "daily_map":
+        print("🗺️ RUTEO: Iniciando producción del Reel de Mapa Dinámico.")
+        try:
+            # Le decimos a CodeBuild que ejecute exclusivamente el motor del mapa
+            response = codebuild.start_build(
+                projectName=CODEBUILD_PROJECT,
+                environmentVariablesOverride=[
+                    {'name': 'MODE', 'value': 'map', 'type': 'PLAINTEXT'}
+                ]
+            )
+            build_id = response['build']['id']
+            print(f"🚀 ¡CodeBuild (MODO MAPA) disparado! ID: {build_id}")
+            return {'statusCode': 200, 'body': f'Mapa en proceso. Trabajo {build_id}'}
+        except Exception as e:
+            print(f"❌ Error disparando CodeBuild para Mapa: {e}")
+            return {'statusCode': 500, 'body': str(e)}
+
+    # ========================================================
+    # 🔴 FLUJO ORIGINAL: REELS DE MARKETING / CONTINGENCIA
+    # ========================================================
+    
     # 1. ¿Día normal o Contingencia? (¡PRIORIDAD AL SCRAPER!)
     if event.get("contingencia_override") == True:
         hay_contingencia = True
