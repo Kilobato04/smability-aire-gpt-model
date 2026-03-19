@@ -33,4 +33,8 @@ out_f.json
 # --- AWS/CloudShell ---
 .aws/
 heavy_source.zip
+
+# --- Artefactos de Despliegue (Lambda) ---
+package/
+function.zip
 EOF
