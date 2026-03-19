@@ -8,7 +8,6 @@
 *{margin:0;padding:0;box-sizing:border-box}
 
 body{
-/* AQUÍ PYTHON INYECTA EL COLOR DE FONDO */
 background:radial-gradient(circle at 30% 20%,__BG_GRADIENT__);
 background-size:400% 400%;
 animation:gradientShift 8s ease infinite;
@@ -47,8 +46,64 @@ padding:90px 0 20px;
 .emoji1{top:12%;left:12%;animation-delay:0s}.emoji2{top:18%;right:8%;animation-delay:2s}.emoji3{bottom:28%;left:8%;animation-delay:4s}.emoji4{bottom:18%;right:18%;animation-delay:1s}.emoji5{top:55%;left:4%;animation-delay:3s}
 @keyframes floatEmoji{0%,100%{transform:translateY(0) rotate(0deg) scale(1);opacity:.8}50%{transform:translateY(-28px) rotate(8deg) scale(1.1);opacity:1}}
 
-.smartphone{width:360px;height:620px;background:linear-gradient(160deg,#1c1c1e,#2c2c2e);border:6px solid #fff;border-radius:35px;position:relative;z-index:10;box-shadow:0 0 0 1px #3a3a3c,0 30px 80px rgba(0,0,0,.7),0 0 80px rgba(0,0,0,.5);animation:phoneGlow 2s ease-in-out infinite,phoneSwing 5s ease-in-out infinite}
-@keyframes phoneGlow{0%,100%{box-shadow:0 0 0 1px #3a3a3c,0 30px 80px rgba(0,0,0,.7),0 0 60px rgba(0,0,0,.4)}50%{box-shadow:0 0 0 1px #3a3a3c,0 30px 80px rgba(0,0,0,.7),0 0 100px rgba(255,255,255,.2)}}
+/* ─── NEON FLICKER SINCRONIZADO ─────────────────────────────── */
+@keyframes neonFlicker{
+  0%   {opacity:1;   filter:brightness(1)}
+  2%   {opacity:0.7; filter:brightness(0.6)}
+  4%   {opacity:1;   filter:brightness(1.1)}
+  15%  {opacity:.85; filter:brightness(.8)}
+  16%  {opacity:1;   filter:brightness(1.2)}
+  45%  {opacity:1;   filter:brightness(1)}
+  50%  {opacity:.4;  filter:brightness(.3)}
+  51%  {opacity:1;   filter:brightness(1.3)}
+  52%  {opacity:.5;  filter:brightness(.4)}
+  53%  {opacity:1;   filter:brightness(1.2)}
+  80%  {opacity:.9;  filter:brightness(.9)}
+  85%  {opacity:1;   filter:brightness(1.4)}
+  95%  {opacity:.8;  filter:brightness(.7)}
+  96%  {opacity:1;   filter:brightness(1.1)}
+  100% {opacity:1;   filter:brightness(1)}
+}
+
+/* ─── iPHONE MÁS GRANDE Y SINCRONIZADO ──────────────────────── */
+.smartphone{
+  /* 🚀 FIX: Aumento de tamaño para mayor presencia */
+  width:380px;height:650px;
+  background:linear-gradient(160deg,#1c1c1e,#2c2c2e);
+  border:3px solid #FFE600;
+  border-radius:35px;
+  position:relative;z-index:10;
+  box-shadow:
+    0 0 0 1px #3a3a3c,
+    0 30px 80px rgba(0,0,0,.7),
+    0 0  6px  2px  #FFE600,
+    0 0  18px 5px  #FFD700,
+    0 0  45px 10px rgba(255,214,0,.55),
+    0 0  90px 20px rgba(255,200,0,.28),
+    0 0  80px      rgba(0,0,0,.4);
+  /* 🚀 FIX: Tiempos matemáticamente perfectos (5s total, 2.5s medio) */
+  animation:phoneGlow 2.5s ease-in-out infinite,
+            phoneSwing 5s ease-in-out infinite,
+            neonFlicker 5s ease-in-out infinite;
+}
+@keyframes phoneGlow{
+  0%,100%{box-shadow:
+    0 0 0 1px #3a3a3c,
+    0 30px 80px rgba(0,0,0,.7),
+    0 0  6px  2px  #FFE600,
+    0 0  18px 5px  #FFD700,
+    0 0  45px 10px rgba(255,214,0,.5),
+    0 0  90px 20px rgba(255,200,0,.22),
+    0 0  80px       rgba(0,0,0,.4)}
+  50%{box-shadow:
+    0 0 0 1px #3a3a3c,
+    0 30px 80px rgba(0,0,0,.7),
+    0 0  8px  3px  #FFE600,
+    0 0  24px 7px  #FFD700,
+    0 0  60px 14px rgba(255,214,0,.7),
+    0 0 110px 28px rgba(255,200,0,.38),
+    0 0 100px       rgba(0,0,0,.6)}
+}
 @keyframes phoneSwing{0%,100%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateY(0) rotateZ(0)}25%{transform:perspective(1000px) rotateY(-8deg) rotateX(2deg) translateY(-12px) rotateZ(-2deg)}50%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateY(0) rotateZ(0)}75%{transform:perspective(1000px) rotateY(-2deg) rotateX(2deg) translateY(12px) rotateZ(2deg)}}
 @keyframes alertShake{0%,100%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(0)}15%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(-6px)}30%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(6px)}45%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(-5px)}60%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(5px)}75%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(-3px)}90%{transform:perspective(1000px) rotateY(-5deg) rotateX(2deg) translateX(3px)}}
 .phone-shake{animation:alertShake .55s ease !important}
@@ -58,7 +113,6 @@ padding:90px 0 20px;
 .notch-cam{width:10px;height:10px;background:#111;border-radius:50%;border:1.5px solid #333}
 
 .screen{width:100%;height:100%;border-radius:30px;overflow:hidden;display:flex;flex-direction:column;background:#17212b}
-/* AQUÍ PYTHON INYECTA EL COLOR DEL HEADER */
 .chat-header{background:linear-gradient(135deg,__HEADER_GRADIENT__);height:80px;display:flex;align-items:center;padding:0 14px;gap:10px;position:relative;overflow:hidden;flex-shrink:0;padding-top:36px}
 .chat-header::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:linear-gradient(45deg,transparent,rgba(255,255,255,.2),transparent);animation:headerShine 2.5s ease-in-out infinite}
 @keyframes headerShine{0%{transform:translateX(-100%) translateY(-100%) rotate(45deg)}50%{transform:translateX(100%) translateY(100%) rotate(45deg)}100%{transform:translateX(200%) translateY(200%) rotate(45deg)}}
@@ -102,7 +156,6 @@ padding:90px 0 20px;
 .push-notif{position:absolute;top:36px;left:8px;right:8px;background:rgba(20,20,22,0.97);border-radius:14px;padding:10px 12px;z-index:50;display:flex;align-items:flex-start;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.1);backdrop-filter:blur(12px);transform:translateY(-90px);opacity:0;transition:transform .45s cubic-bezier(.34,1.56,.64,1),opacity .35s ease}
 .push-notif.show{transform:translateY(0);opacity:1}
 .push-notif.hide{transform:translateY(-90px);opacity:0;transition:transform .35s ease,opacity .25s ease}
-/* AQUÍ PYTHON INYECTA EL COLOR DEL ICONO PUSH */
 .push-icon{width:32px;height:32px;background:linear-gradient(135deg,__HEADER_GRADIENT__);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:iconPulse 1s ease-in-out infinite}
 @keyframes iconPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.5)}50%{box-shadow:0 0 0 6px rgba(255,255,255,0)}}
 .push-icon svg{width:18px;height:18px;fill:#fff}
@@ -126,14 +179,7 @@ padding:90px 0 20px;
 
 <div class="banner-led">
   <div class="banner-content">
-    <span class="banner-text hl">AIREGPT · INFO VITAL</span><span class="banner-dots">●●●</span>
-    <span class="banner-text">MÁS RÁPIDO QUE LAS NOTICIAS</span><span class="banner-dots">●●●</span>
-    <span class="banner-text hl">5 DÍAS GRATIS</span><span class="banner-dots">●●●</span>
-    <span class="banner-text">@airegptcdmx_bot</span><span class="banner-dots">●●●</span>
-    <span class="banner-text hl">AIREGPT · INFO VITAL</span><span class="banner-dots">●●●</span>
-    <span class="banner-text">MÁS RÁPIDO QUE LAS NOTICIAS</span><span class="banner-dots">●●●</span>
-    <span class="banner-text hl">5 DÍAS GRATIS</span><span class="banner-dots">●●●</span>
-    <span class="banner-text">@airegptcdmx_bot</span><span class="banner-dots">●●●</span>
+    <span class="banner-text hl">AIREGPT CONECTANDO AL GEMELO DIGITAL</span><span class="banner-dots">●●●</span><span class="banner-text">MÁS RÁPIDO QUE LAS NOTICIAS OFICIALES ●●● MANTENTE INFORMADO CON @AIREGPTCDMX_BOT ●●●</span>
   </div>
 </div>
 
