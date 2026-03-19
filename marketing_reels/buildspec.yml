@@ -5,18 +5,18 @@ phases:
     runtime-versions:
       python: 3.12
     commands:
-      - echo "📦 Instalando dependencias (FFmpeg, Playwright, Requests)..."
+      - echo "📦 Instalando dependencias del sistema operativo..."
       - apt-get update -y
       - apt-get install -y ffmpeg
-      - pip install playwright boto3 requests
+      - pip install -r marketing_reels/requirements.txt
       - playwright install --with-deps chromium
   build:
     commands:
-      - if [ -z "$FLOW_ID" ]; then echo "❌ ERROR FATAL - FLOW_ID esta vacio. Abortando fabrica."; exit 1; fi
-      - echo "🎬 Generando Reel y publicando en Instagram..."
+      - echo "🎬 Arrancando motor de Marketing..."
       - cd marketing_reels
-      - python render_reel.py
+      # Si la variable MODE es "mapa", corre el script nuevo. Si no, corre el normal.
+      - if [ "$MODE" = "map" ]; then python render_map_reel.py; else python render_reel.py; fi
   post_build:
     commands:
-      - echo "✅ Misión cumplida. El script de Python ya subió el video a S3 y a Meta."
-      - echo "🧹 Limpieza automática completada. Cero archivos duplicados."
+      - echo "✅ Misión cumplida. Archivos subidos a S3 y publicados en Meta."
+      - echo "🧹 Limpieza automática completada."
