@@ -16,7 +16,7 @@ echo -e "${GREEN}🚀 INICIANDO DESPLIEGUE - MARKETING ENGINE${NC}"
 
 echo -e "📦 ${YELLOW}Sincronizando cambios con GitHub (La fuente de la verdad)...${NC}"
 git add .
-git commit -m "Deploy automático: Fix del Cerebro y Mapa" > /dev/null 2>&1 || echo "   (Sin cambios pendientes...)"
+git commit -m "Deploy automático: Fix de Peso del ZIP" > /dev/null 2>&1 || echo "   (Sin cambios pendientes...)"
 git push origin $REPO_BRANCH
 
 if [ $? -ne 0 ]; then
@@ -25,10 +25,13 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}✅ GitHub actualizado correctamente.${NC}"
 
-echo -e "📦 ${YELLOW}Empaquetando dependencias y código...${NC}"
+echo -e "📦 ${YELLOW}Empaquetando dependencias ligeras (Cerebro)...${NC}"
 rm -rf package function.zip
 mkdir package
-pip3 install -r requirements.txt -t package/ > /dev/null 2>&1
+
+# 🚀 FIX: Solo instalamos 'requests'. AWS Lambda ya tiene 'boto3' por defecto. 
+# Esto bajará el peso del ZIP de 100MB a menos de 5MB.
+pip3 install requests -t package/ > /dev/null 2>&1
 
 cp lambda_function.py package/
 cp master_flows.json package/
@@ -42,14 +45,13 @@ zip -rq ../function.zip .
 cd ..
 
 echo -e "☁️ ${YELLOW}Enviando paquete a AWS Lambda ($LAMBDA_FUNCTION_NAME)...${NC}"
-# 🚀 FIX: Quitamos el silenciador para ver por qué AWS rechaza la actualización
 aws lambda update-function-code \
     --function-name $LAMBDA_FUNCTION_NAME \
     --zip-file fileb://function.zip \
     --region $AWS_REGION
 
 if [ $? -ne 0 ]; then
-    echo -e "${RED}❌ ERROR DE AWS DETECTADO: Lee el mensaje de arriba. AWS rechazó el ZIP.${NC}"
+    echo -e "${RED}❌ ERROR DE AWS DETECTADO.${NC}"
     exit 1
 fi
 
