@@ -7,19 +7,16 @@ LAMBDA_FUNCTION_NAME="Smability-Marketing-Engine"
 AWS_REGION="us-east-1"
 REPO_BRANCH="main"
 
-# COLORES
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 echo -e "${GREEN}🚀 INICIANDO DESPLIEGUE - MARKETING ENGINE${NC}"
 
-# 1. SINCRONIZACIÓN AUTOMÁTICA (GIT)
-echo -e "📦 ${YELLOW}Sincronizando cambios con GitHub...${NC}"
+echo -e "📦 ${YELLOW}Sincronizando cambios con GitHub (La fuente de la verdad)...${NC}"
 git add .
-git commit -m "Deploy automático: Update Marketing Engine + Mapa Dinámico" > /dev/null 2>&1 || echo "   (Sin cambios pendientes de commit...)"
-echo -e "⬆️  Subiendo cambios a rama ${REPO_BRANCH}..."
+git commit -m "Deploy automático: Fix del Cerebro y Mapa" > /dev/null 2>&1 || echo "   (Sin cambios pendientes...)"
 git push origin $REPO_BRANCH
 
 if [ $? -ne 0 ]; then
@@ -28,13 +25,11 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}✅ GitHub actualizado correctamente.${NC}"
 
-# 2. EMPAQUETADO Y DESPLIEGUE DIRECTO A LAMBDA
 echo -e "📦 ${YELLOW}Empaquetando dependencias y código...${NC}"
 rm -rf package function.zip
 mkdir package
 pip3 install -r requirements.txt -t package/ > /dev/null 2>&1
 
-# 🚀 FIX: Copiamos la flota completa de archivos al ZIP de la Lambda por seguridad
 cp lambda_function.py package/
 cp master_flows.json package/
 cp render_reel.py package/ 2>/dev/null || :
@@ -46,21 +41,20 @@ cd package
 zip -rq ../function.zip .
 cd ..
 
-echo -e "☁️ ${YELLOW}Actualizando AWS Lambda ($LAMBDA_FUNCTION_NAME)...${NC}"
+echo -e "☁️ ${YELLOW}Enviando paquete a AWS Lambda ($LAMBDA_FUNCTION_NAME)...${NC}"
+# 🚀 FIX: Quitamos el silenciador para ver por qué AWS rechaza la actualización
 aws lambda update-function-code \
     --function-name $LAMBDA_FUNCTION_NAME \
     --zip-file fileb://function.zip \
-    --region $AWS_REGION > /dev/null 2>&1
+    --region $AWS_REGION
 
-# Limpieza
+if [ $? -ne 0 ]; then
+    echo -e "${RED}❌ ERROR DE AWS DETECTADO: Lee el mensaje de arriba. AWS rechazó el ZIP.${NC}"
+    exit 1
+fi
+
 rm -rf package function.zip
-
-# 3. GENERAR LINK DE TRANSPARENCIA
-LINK="https://$AWS_REGION.console.aws.amazon.com/lambda/home?region=$AWS_REGION#/functions/$LAMBDA_FUNCTION_NAME?tab=code"
 
 echo "------------------------------------------------------------"
 echo -e "${GREEN}✅ CEREBRO DE MARKETING ACTUALIZADO EXITOSAMENTE${NC}"
-echo "------------------------------------------------------------"
-echo "👇 HAZ CLIC AQUÍ PARA IR A LA LAMBDA Y HACER EL TEST:"
-echo -e "${YELLOW}$LINK${NC}"
 echo "------------------------------------------------------------"
