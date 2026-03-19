@@ -1,0 +1,1193 @@
+{
+  "flows": [
+    {
+      "flow_id": "aire_001",
+      "publish_date": "2026-03-04",
+      "theme": "aire_malo",
+      "theme_label": "Aire extremadamente malo · ruta Santa Fe",
+      "color_theme": "red_alert",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "alarma_luego_alivio",
+      "recycle_after_days": 21,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_urgente" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "🌫️ AIREGPT · SMABILITY.IO", "text": "¡Hola! 🌫️ Detecté aire Extremadamente Malo en tu ruta hacia Santa Fe. IAS: 142.", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "⚠️ REPORTE DE EXPOSICIÓN", "text": "Tu trayecto de 1.5 hrs = 4.2 cigarros invisibles 🚬 Desgaste celular: +3 días de Edad Urbana.", "delay_ms": 2400, "shake": true, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "¡No puede ser! 😱 ¿Qué hago?", "delay_ms": 4800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "🛡️ ACCIÓN RECOMENDADA", "text": "Pico de ozono a las 6 PM según Red Smability. 💡 Ventanillas cerradas, aire recirculado.", "delay_ms": 6000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 ACTIVA HOY", "text": "Desde $49 MXN/mes ☕ · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 8400, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "urgente pero empático · amigo que te avisa a tiempo",
+        "persona": "habitante CDMX, 28-40 años, auto propio o Uber, le importa su salud",
+        "avoid": ["lenguaje técnico excesivo", "catastrofismo sin solución"],
+        "must_include": ["IAS 142", "@airegptcdmx_bot", "máx 3 hashtags"],
+        "hook_style": "dato impactante en primera línea",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe un caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags del tema. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "aire_002",
+      "publish_date": "2026-03-22",
+      "theme": "aire_malo",
+      "theme_label": "Ozono elevado · mañana peligrosa para correr",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "sorpresa_luego_cuidado",
+      "recycle_after_days": 21,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Buenos días 🏃 voy a salir a correr al parque, ¿cómo está el aire?", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "⚠️ AIREGPT · ALERTA MATUTINA", "text": "Espera. 🚫 Ozono en 148 ppb — nivel Muy Malo. Correr hoy = inflamar tus vías respiratorias durante 48 hrs.", "delay_ms": 1200, "shake": true, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "😨 ¿Y si salgo nada más 20 min?", "delay_ms": 3600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "🫁 DATO CLAVE", "text": "Con ozono alto, 20 min de ejercicio intenso equivalen a 2 cigarros. Tu cuerpo tarda 3 días en recuperarse. 🔬", "delay_ms": 5000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 PROTÉGETE DESDE HOY", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Yo te aviso cuándo sí es seguro salir.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 7200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "protector · científico accesible · sin drama exagerado",
+        "persona": "runner urbano CDMX, 25-38 años, sale a correr mañanas, Chapultepec o parques de colonia",
+        "avoid": ["términos médicos complejos", "prohibir sin alternativa"],
+        "must_include": ["ozono 148 ppb", "equivalencia cigarros", "@airegptcdmx_bot"],
+        "hook_style": "pregunta cotidiana que el runner se hace cada mañana",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe un caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "aire_003",
+      "publish_date": "2026-04-09",
+      "theme": "aire_malo",
+      "theme_label": "Partículas PM2.5 · zona Iztapalapa",
+      "color_theme": "red_alert",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "indignacion_luego_empoderamiento",
+      "recycle_after_days": 21,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_urgente" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "🌫️ AIREGPT · SMABILITY.IO", "text": "Alerta en Iztapalapa 🔴 PM2.5 en 68 µg/m³ — el doble del límite saludable. Invisible pero presente.", "delay_ms": 0, "shake": false, "push_notification": { "active": true, "title": "🔴 PM2.5 ELEVADO · Iztapalapa", "body": "68 µg/m³ · Doble del límite saludable" }, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¿Eso qué significa para mí exactamente? 🤔", "delay_ms": 2800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "alert_red", "label": "🔬 IMPACTO REAL", "text": "PM2.5 entra directo al torrente sanguíneo. 8 hrs de exposición hoy = riesgo cardiovascular equivalente a fumar 6 cigarros. 🚬", "delay_ms": 4400, "shake": true, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "cta", "label": "🚀 ACTIVA TU ESCUDO", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 7000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "revelador · directo · dato que no puedes ignorar",
+        "persona": "residente Iztapalapa o Oriente CDMX, 25-45 años, cualquier nivel socioeconómico",
+        "avoid": ["condescendencia", "tecnicismos sin traducción", "culpar al usuario"],
+        "must_include": ["PM2.5 68 µg/m³", "impacto cardiovascular", "@airegptcdmx_bot"],
+        "hook_style": "dato invisible que se vuelve visible con una cifra concreta",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe un caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "exposicion_001",
+      "publish_date": "2026-04-27",
+      "theme": "exposicion_ruta",
+      "theme_label": "Edad urbana · acumulación de daño en trayecto diario",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "reflexion_luego_accion",
+      "recycle_after_days": 25,
+      "cta_price": "semestral",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "📊 AIREGPT · TU RESUMEN SEMANAL", "text": "Esta semana tu exposición acumulada al aire contaminado equivale a 🚬 21 cigarros invisibles.", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¿21?! 😳 ¿Y yo sin saber nada?", "delay_ms": 2400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "alert_red", "label": "⏳ EDAD URBANA", "text": "A este ritmo, tu Edad Urbana acumula +14 días de envejecimiento celular por mes. La mayoría de chilangos lo vive sin saberlo. 🧬", "delay_ms": 4000, "shake": true, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¿Se puede hacer algo o ya es tarde? 😔", "delay_ms": 6400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "💡 SÍ SE PUEDE", "text": "Conocer el aire antes de salir reduce tu exposición hasta un 40%. Ruta alterna + ventanillas cerradas = diferencia real. ✅", "delay_ms": 8000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 6 MESES DE PROTECCIÓN", "text": "$229 MXN por 6 meses · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 10000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "reflexivo · revelador · esperanzador al final",
+        "persona": "chilango/a, 28-45 años, trayecto diario largo, aún no conecta contaminación con su salud",
+        "avoid": ["fatalismo", "culpa", "tecnicismos"],
+        "must_include": ["21 cigarros semana", "Edad Urbana", "@airegptcdmx_bot", "precio semestral $229"],
+        "hook_style": "número acumulado que nadie esperaba",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe un caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "exposicion_002",
+      "publish_date": "2026-05-21",
+      "theme": "exposicion_ruta",
+      "theme_label": "Comparativa: ruta mala vs ruta alterna · ahorro de exposición",
+      "color_theme": "blue_calm",
+      "priority": "medium",
+      "contingencia_override": false,
+      "target_emotion": "curiosidad_luego_alivio",
+      "recycle_after_days": 20,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Siempre voy por Insurgentes al trabajo. ¿Está bien el aire hoy? 🚗", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "🌫️ COMPARATIVA DE RUTA", "text": "Insurgentes Norte hoy: IAS 118 — Muy Malo 🔴\nRuta alterna por Eje 1 Pte: IAS 62 — Regular 🟡\nDiferencia: -3.1 cigarros invisibles en tu trayecto.", "delay_ms": 1400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "No sabía que la ruta importaba tanto 😮", "delay_ms": 4000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "📡 ASÍ FUNCIONA", "text": "Cruzo sensores Smability en tiempo real con tu ruta habitual y te sugiero la de menor exposición cada mañana. 🗺️", "delay_ms": 5800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 ACTIVA TU RUTA INTELIGENTE", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 7800, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "práctico · útil · revelación inmediata",
+        "persona": "automovilista CDMX, 28-42 años, ruta fija diaria, no ha pensado en el aire de su camino",
+        "avoid": ["abrumar con números", "lenguaje científico"],
+        "must_include": ["comparativa IAS rutas", "cigarros ahorrados", "@airegptcdmx_bot"],
+        "hook_style": "pregunta que el usuario ya se hizo alguna vez sin respuesta",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe un caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "salud_001",
+      "publish_date": "2026-06-08",
+      "theme": "salud_impacto",
+      "theme_label": "Impacto en niños · escuela y exposición matutina",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "preocupacion_parental_luego_control",
+      "recycle_after_days": 28,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_suave_emotiva" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Llevo a mis hijos a la escuela en Azcapotzalco cada mañana. ¿Debo preocuparme? 👨‍👧‍👦", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "🚨 AIREGPT · ALERTA INFANTIL", "text": "Azcapotzalco hoy: IAS 135 — Muy Malo. Los pulmones de niños absorben un 50% más de contaminantes que los adultos. 🫁", "delay_ms": 1600, "shake": true, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "😰 ¿Qué puedo hacer si tengo que llevarlos?", "delay_ms": 4000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "🛡️ PROTOCOLO FAMILIAR", "text": "✅ Recorrido más corto al aire libre\n✅ Salida 7 AM — antes del pico de tráfico\n✅ Evita que jueguen en recreo si IAS > 100\nYo te aviso cada mañana antes de salir. 📱", "delay_ms": 5800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 PROTEGE A TU FAMILIA", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 8200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "empático · protector · padre/madre que cuida con información",
+        "persona": "padre o madre CDMX, 28-42 años, lleva hijos a escuela pública o privada, norte o poniente CDMX",
+        "avoid": ["alarmar sin solución", "culpar al padre/madre", "datos abrumadores"],
+        "must_include": ["IAS 135 Azcapotzalco", "niños absorben 50% más", "@airegptcdmx_bot"],
+        "hook_style": "pregunta que cualquier papá o mamá chilango se hace sin respuesta",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe un caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "salud_002",
+      "publish_date": "2026-06-26",
+      "theme": "salud_impacto",
+      "theme_label": "Embarazadas · riesgo específico en contaminación alta",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "vulnerabilidad_luego_proteccion",
+      "recycle_after_days": 30,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_suave_emotiva" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Estoy embarazada y vivo en Gustavo A. Madero. ¿El aire me afecta más? 🤰", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "⚠️ AIREGPT · ALERTA ESPECIAL", "text": "Sí. PM2.5 elevado en tu zona aumenta riesgo de parto prematuro y bajo peso al nacer según estudios UNAM. Hoy IAS: 122 🔴", "delay_ms": 1800, "shake": true, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "Nadie me había dicho eso 😢 ¿qué hago?", "delay_ms": 4200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "🛡️ CUIDADO INTELIGENTE", "text": "Te aviso diario los picos de contaminación para que planees tus salidas. En días IAS > 100 te sugiero horarios de menor riesgo. 📅", "delay_ms": 6000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 PROTÉGETE Y PROTÉGELO", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 8000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "empático · informado · sin alarmismo innecesario",
+        "persona": "mujer embarazada CDMX, 24-36 años, consciente de su salud, busca información confiable",
+        "avoid": ["alarmar en exceso", "lenguaje médico intimidante", "generalizar riesgos"],
+        "must_include": ["PM2.5", "riesgo embarazo", "IAS 122", "@airegptcdmx_bot"],
+        "hook_style": "dato que la mayoría ignora y que cambia comportamiento",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe un caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "salud_003",
+      "publish_date": "2026-07-14",
+      "theme": "salud_impacto",
+      "theme_label": "Adultos mayores · exposición prolongada y riesgo cardiovascular",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "preocupacion_familiar_luego_accion",
+      "recycle_after_days": 28,
+      "cta_price": "mensual",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Mi mamá tiene 68 años y sale a caminar cada mañana en Tlalpan. ¿Está bien? 👵", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "⚠️ RIESGO CARDIOVASCULAR", "text": "Tlalpan hoy IAS 109 — Malo. Para adultos mayores este nivel puede desencadenar episodios cardíacos con 30 min de caminata. 💔", "delay_ms": 1800, "shake": true, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "No lo sabía... ¿cuándo sí puede salir? 😟", "delay_ms": 4200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "📅 VENTANA SEGURA", "text": "Antes de las 7 AM el IAS en Tlalpan baja a 71 — Regular. Es el mejor momento para su caminata hoy. ✅", "delay_ms": 6000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 CUÍDALOS CON DATOS", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 8000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "familiar · cálido · información que protege a quien más quieres",
+        "persona": "hijo/a adulto, 30-50 años, cuida a padre o madre mayor en CDMX",
+        "avoid": ["tecnicismos médicos", "catastrofismo", "alarmar sin solución"],
+        "must_include": ["IAS 109 Tlalpan", "riesgo cardiovascular mayores", "ventana segura 7 AM", "@airegptcdmx_bot"],
+        "hook_style": "situación familiar cotidiana que cualquiera reconoce",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe un caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "salud_004",
+      "publish_date": "2026-08-01",
+      "theme": "salud_impacto",
+      "theme_label": "Asmáticos · día de alto riesgo sin saberlo",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "urgencia_personal_luego_control",
+      "recycle_after_days": 25,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_urgente" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Soy asmático y hoy me desperté con el pecho apretado. ¿Será el aire? 😮‍💨", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "🚨 AIREGPT · ALERTA ASMA", "text": "Sí. Ozono 162 ppb en tu zona — nivel Extremadamente Malo para vías respiratorias. Tu cuerpo lo estaba detectando antes que tú. 🫁", "delay_ms": 1600, "shake": true, "push_notification": { "active": true, "title": "🚨 ALERTA ASMA · Ozono 162 ppb", "body": "Alto riesgo respiratorio hoy en tu zona" }, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "¿Debo quedarme en casa? Tengo trabajo 😔", "delay_ms": 4000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "💊 PROTOCOLO ASMA HOY", "text": "🔵 Usa tu inhalador preventivo antes de salir\n🚗 Viaja con ventanillas cerradas\n⏰ El ozono baja después de las 7 PM — agenda salidas para después", "delay_ms": 5800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 ACTIVA TU ALERTA PERSONAL", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 8000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "empático · inmediato · protocolo claro sin pánico",
+        "persona": "persona asmática CDMX, 20-45 años, ya tiene diagnóstico, busca info práctica no alarmas",
+        "avoid": ["drama médico", "decirle que no salga sin alternativa", "términos clínicos"],
+        "must_include": ["ozono 162 ppb", "protocolo práctico", "@airegptcdmx_bot"],
+        "hook_style": "síntoma físico que el usuario reconoce al instante",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe un caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "salud_005",
+      "publish_date": "2026-08-19",
+      "theme": "salud_impacto",
+      "theme_label": "Mascotas · impacto del aire en perros y gatos CDMX",
+      "color_theme": "yellow_warning",
+      "priority": "medium",
+      "contingencia_override": false,
+      "target_emotion": "ternura_preocupacion_luego_accion",
+      "recycle_after_days": 30,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_suave_emotiva" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "¿El aire contaminado también afecta a mi perro? 🐕 Salimos a correr juntos cada mañana.", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "🐾 AIREGPT · ALERTA MASCOTAS", "text": "Sí. Los perros respiran más rápido que los humanos y su nariz está más cerca del suelo — donde se concentran PM2.5 y ozono. 🐽", "delay_ms": 1800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "¡No lo sabía! 😱 ¿Hoy podemos salir?", "delay_ms": 4000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "🗓️ VENTANA SEGURA HOY", "text": "IAS actual: 88 — Regular. Mejor salir antes de las 8 AM o después de las 6 PM. Evita zonas de alto tráfico. 🕐", "delay_ms": 5800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 PROTEGE A TU FAMILIA (PELUDA)", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 7800, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "cálido · curioso · dato sorprendente que genera acción",
+        "persona": "dueño/a de mascota CDMX, 22-40 años, sale a correr o caminar con su perro, muy apegado a su mascota",
+        "avoid": ["tecnicismos veterinarios", "alarmar en exceso", "culpar al dueño"],
+        "must_include": ["PM2.5 y ozono en mascotas", "IAS 88", "ventana segura", "@airegptcdmx_bot"],
+        "hook_style": "dato que el dueño nunca había conectado con su rutina",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe un caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "circulacion_001",
+      "publish_date": "2026-03-07",
+      "theme": "hoy_no_circula",
+      "theme_label": "Restricción vehicular · placa 5 y 6 · multa evitada",
+      "color_theme": "red_alert",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "susto_luego_gratitud",
+      "recycle_after_days": 18,
+      "cta_price": "mensual",
+      "capacidad_destacada": "hoy_no_circula",
+      "music": { "vibe": "alarma_dramatica" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "¿Mañana puedo sacar el carro? Tengo reunión en Polanco 🚗", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "🚨 HOY NO CIRCULA", "text": "Placa 5 y 6 NO circulan mañana en toda la ZMVM. 🚫 Si te detienen: $3,267 MXN de multa + inmovilización.", "delay_ms": 1200, "shake": true, "push_notification": { "active": true, "title": "🚫 TU PLACA NO CIRCULA MAÑANA", "body": "Placa 5 y 6 · Multa si circulas: $3,267 MXN" }, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "📅 TU MES DE VERIFICACIÓN", "text": "Con engomado amarillo, tu verificación es en mayo y noviembre. Te aviso 15 días antes para que no se te pase. ✅", "delay_ms": 3600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¡Qué útil! ¿Y los Verificentros cercanos a mi casa? 🔧", "delay_ms": 5800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "📍 PRÓXIMAMENTE · ABRIL 2026", "text": "En abril lanzamos mapa de Verificentros rankeados por nivel de servicio, filtrados por tu casa y trabajo. 🗺️", "delay_ms": 7400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 BLINDAJE TOTAL", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 9200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "urgente · revelador · amigo que sí sabe",
+        "persona": "automovilista CDMX, 30-45 años, trabaja en Polanco o Santa Fe",
+        "avoid": ["mencionar SEMOVI", "tecnicismos de tráfico", "tono de regaño"],
+        "must_include": ["$3,267 MXN", "mes de verificación", "Verificentros abril", "@airegptcdmx_bot"],
+        "hook_style": "situación cotidiana reconocible al instante",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "circulacion_002",
+      "publish_date": "2026-03-25",
+      "theme": "hoy_no_circula",
+      "theme_label": "Doble HNC sabatino · engomado + verificación",
+      "color_theme": "red_alert",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "confusion_luego_claridad",
+      "recycle_after_days": 21,
+      "cta_price": "mensual",
+      "capacidad_destacada": "hoy_no_circula",
+      "music": { "vibe": "alarma_dramatica" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Es sábado, ¿puedo salir aunque mi placa sea 7? 🤔", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "🚨 DOBLE RESTRICCIÓN HOY", "text": "Hoy aplica HNC sabatino + verificación. Placa 7 con engomado amarillo sin verificar: NO CIRCULA. 🚫 Multa: $3,267 MXN.", "delay_ms": 1400, "shake": true, "push_notification": { "active": true, "title": "🚫 RESTRICCIÓN SABATINA ACTIVA", "body": "Verifica tu engomado antes de salir · $3,267 MXN" }, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "¡No lo sabía! Iba a salir en 10 minutos 😰", "delay_ms": 4000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "📍 VERIFICENTROS CERCANOS · ABRIL", "text": "En abril te digo los Verificentros mejor rankeados cerca de tu casa o trabajo. Sin perder el día buscando. 🗺️", "delay_ms": 5800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 ACTÍVATE HOY", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 7800, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "revelador · preciso · casi te salvé de una multa sabatina",
+        "persona": "automovilista CDMX, 28-45 años, conoce HNC entre semana pero no los sábados",
+        "avoid": ["asumir que el usuario conoce las reglas", "términos burocráticos"],
+        "must_include": ["restricción sabatina", "engomado", "$3,267 MXN", "Verificentros abril", "@airegptcdmx_bot"],
+        "hook_style": "suposición equivocada que casi todos tienen",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "circulacion_003",
+      "publish_date": "2026-04-12",
+      "theme": "hoy_no_circula",
+      "theme_label": "2 carros · cuál sí circula · Verificentros lanzamiento",
+      "color_theme": "blue_calm",
+      "priority": "medium",
+      "contingencia_override": false,
+      "target_emotion": "duda_luego_claridad_util",
+      "recycle_after_days": 20,
+      "cta_price": "mensual",
+      "capacidad_destacada": "hoy_no_circula + verificentros",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Tengo placa 3 y placa 8. ¿Cuál puedo usar mañana? Y necesito verificar pronto 🚗🚗", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "highlight", "label": "🔍 TUS PLACAS MAÑANA", "text": "Mañana martes:\n🟢 Placa 3 — SÍ CIRCULA\n🔴 Placa 8 — NO CIRCULA\nUsa el de placa 3. ✅", "delay_ms": 1200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "📍 VERIFICENTROS · YA DISPONIBLE", "text": "Acaba de lanzar: te muestro los Verificentros mejor calificados cerca de tu casa y trabajo, con tiempo de espera y precio. 🗺️", "delay_ms": 3400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¡Eso sí que necesitaba! ¿Y si hay contingencia cambia todo? 🤔", "delay_ms": 5600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "alert_red", "label": "⚠️ EN CONTINGENCIA SÍ CAMBIA", "text": "Con Fase I las restricciones se amplían a más placas. Te aviso de inmediato con tus opciones actualizadas. 🔔", "delay_ms": 7200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 GESTIONA TUS 2 CARROS", "text": "Registra hasta 3 placas. Desde $49 MXN/mes · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 9000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "práctico · útil · respuesta inmediata",
+        "persona": "familia CDMX con 2 vehículos, 32-50 años, necesita decidir rápido",
+        "avoid": ["explicar todo el reglamento HNC", "tono burocrático"],
+        "must_include": ["múltiples placas", "Verificentros lanzamiento abril", "@airegptcdmx_bot"],
+        "hook_style": "dilema logístico cotidiano de familia con 2 carros",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "contingencia_override_001",
+      "publish_date": "2026-04-30",
+      "theme": "contingencia",
+      "theme_label": "Contingencia Fase I · 8 min antes que el noticiero · alerta por ubicación",
+      "color_theme": "red_alert",
+      "priority": "critical",
+      "contingencia_override": true,
+      "contingencia_instance": 1,
+      "target_emotion": "susto_luego_superioridad_informativa",
+      "recycle_after_days": 7,
+      "cta_price": "mensual",
+      "music": { "vibe": "alarma_dramatica" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "alert_red", "label": "🚨 CONTINGENCIA FASE I", "text": "Declarada hace 8 minutos. Placas 5 y 6 NO circulan hasta las 22:00. Alerta enviada a tu ubicación: Casa 🏠", "delay_ms": 0, "shake": true, "push_notification": { "active": true, "title": "🚨 CONTINGENCIA · TU ZONA", "body": "Placas restringidas · Vigencia hasta 22:00" }, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¡¿Ya?! No había visto nada en las noticias 😱", "delay_ms": 2800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "📡 8 MIN DE VENTAJA", "text": "Monitoreo sensores Smability en tiempo real. Te avisé antes que Reforma y Milenio. ⚡ Y la alerta fue directo a tu Casa registrada.", "delay_ms": 4400, "shake": false, "push_notification": null, "slot_machine": true },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¿Puedo poner también mi trabajo para que me avise allá? 🏢", "delay_ms": 6600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "📍 2 UBICACIONES", "text": "Sí. Registra Casa y Trabajo. Cada alerta llega con el contexto de tu ubicación específica. Sin alertas genéricas. 🎯", "delay_ms": 8400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 ACTIVA TUS 2 UBICACIONES", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 10200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "urgente · exclusivo · yo te avisé primero · y fue en tu zona",
+        "persona": "automovilista CDMX, 28-45 años, siempre se entera tarde de contingencias",
+        "avoid": ["términos técnicos ambientales", "sonar gubernamental"],
+        "must_include": ["8 minutos antes que noticias", "alerta por ubicación Casa/Trabajo", "@airegptcdmx_bot"],
+        "hook_style": "ventaja informativa hiperlocalizada que nunca había tenido",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "contingencia_override_002",
+      "publish_date": "2026-05-18",
+      "theme": "contingencia",
+      "theme_label": "Contingencia Fase I · alerta nocturna · umbral personalizado IAS",
+      "color_theme": "red_alert",
+      "priority": "critical",
+      "contingencia_override": true,
+      "contingencia_instance": 2,
+      "target_emotion": "alivio_por_anticipacion",
+      "recycle_after_days": 7,
+      "cta_price": "anual",
+      "music": { "vibe": "tension_urgente" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "alert_red", "label": "🌙 AIREGPT · ALERTA NOCTURNA", "text": "Son las 10 PM. Mañana hay Contingencia. Placas 1 y 2 NO circulan desde las 5 AM. 🚫 Planea ahora.", "delay_ms": 0, "shake": true, "push_notification": { "active": true, "title": "🌙 MAÑANA HAY CONTINGENCIA", "body": "Placas restringidas · Desde 5 AM · Actúa ahora" }, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "Perfecto. ¿Y puedo pedirle que me avise solo cuando el IAS supere 100 en mi casa? 🏠", "delay_ms": 3000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "⚙️ UMBRAL PERSONALIZADO", "text": "Sí. Define tu umbral por ubicación: 'Avísame cuando IAS > 100 en Casa'. Tú decides cuándo alertar. 🎯", "delay_ms": 5000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¡Eso es exactamente lo que necesitaba! Quiero esto todo el año 🙏", "delay_ms": 7200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 UN AÑO BLINDADO", "text": "$399 MXN/año · Ahorras $189 MXN 💎 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 9200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "aliado nocturno · control total · tú decides las reglas",
+        "persona": "profesional CDMX, 28-42 años, puntual, quiere alertas precisas no spam",
+        "avoid": ["alarmar", "solo restricciones sin contexto práctico"],
+        "must_include": ["umbral IAS personalizado", "alerta nocturna", "$399 año", "@airegptcdmx_bot"],
+        "hook_style": "poder de personalización que ninguna otra app da",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "lluvia_001",
+      "publish_date": "2026-06-03",
+      "theme": "lluvia_alerta",
+      "theme_label": "Lluvia intensa · alerta púrpura por ubicación · curva de exposición",
+      "color_theme": "yellow_warning",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "preocupacion_luego_alivio",
+      "recycle_after_days": 14,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "🟣 AIREGPT · ALERTA PÚRPURA", "text": "Lluvia intensa detectada en tu zona de Trabajo 🌧️ SACMEX: zona sur desde las 3 PM. Alerta en tu ubicación activa.", "delay_ms": 0, "shake": false, "push_notification": { "active": true, "title": "🟣 ALERTA PÚRPURA · TU TRABAJO", "body": "Lluvia intensa desde las 3 PM · Encharcamientos probables" }, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "Justo salgo a esa hora 😩 ¿qué tan malo va a estar el trayecto?", "delay_ms": 2800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "alert_red", "label": "🌧️ TU CURVA DE EXPOSICIÓN", "text": "Tu trayecto casa-trabajo hoy: exposición a lluvia intensa = riesgo de encharcamiento en Viaducto. +90 min de retraso probable. 🚗", "delay_ms": 4400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "💡 RUTA ALTERNA", "text": "Eje 8 Sur tiene menor riesgo hoy. Salir antes de las 2:30 PM o después de las 7 PM reduce tu exposición. ⏰", "delay_ms": 6800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 ACTÍVATE ANTES DE LA LLUVIA", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 9200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "cercano · práctico · vecino que ya revisó el radar",
+        "persona": "chilango/a, 25-40 años, transporte público o auto, sur u oriente CDMX",
+        "avoid": ["términos meteorológicos técnicos", "generalizar toda la ciudad"],
+        "must_include": ["alerta púrpura por ubicación", "curva exposición trayecto", "ruta alterna", "@airegptcdmx_bot"],
+        "hook_style": "escena de lluvia CDMX que cualquier chilango reconoce de inmediato",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "lluvia_002",
+      "publish_date": "2026-07-01",
+      "theme": "lluvia_alerta",
+      "theme_label": "Post-lluvia · aire limpio · ventana de exposición mínima",
+      "color_theme": "green_safe",
+      "priority": "medium",
+      "contingencia_override": false,
+      "target_emotion": "sorpresa_positiva_luego_conexion",
+      "recycle_after_days": 18,
+      "cta_price": "mensual",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Llovió en la mañana. ¿Cuándo es el mejor momento para salir hoy? 🌦️", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "highlight", "label": "🌿 VENTANA LIMPIA ACTIVA", "text": "¡Ahora mismo! IAS: 38 — Buena calidad 🟢 La lluvia lavó las partículas PM2.5. Tu curva de exposición post-lluvia es mínima las próximas 4 horas.", "delay_ms": 1400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "¿Y eso impacta mi gráfica semanal de cigarros? 🤔", "delay_ms": 3600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "📊 TU TETRIS DE CIGARROS", "text": "Sí. Hoy tu bloque Tetris de la semana es verde 🟩 Días como hoy bajan tu acumulado. Cada semana ves cuánto respiraste — bueno y malo. 🎮", "delay_ms": 5400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 VE TU HISTORIA DE EXPOSICIÓN", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 7600, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "positivo · revelador · gamificación de la salud",
+        "persona": "chilango/a curioso/a, 25-38 años, le gusta entender sus datos",
+        "avoid": ["sonar como app del clima", "formalidad"],
+        "must_include": ["IAS 38 post-lluvia", "Tetris semanal de cigarros", "ventana 4 hrs", "@airegptcdmx_bot"],
+        "hook_style": "beneficio inesperado que conecta la lluvia con sus datos personales",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "lluvia_003",
+      "publish_date": "2026-08-05",
+      "theme": "lluvia_alerta",
+      "theme_label": "Granizo · alerta púrpura · 90 min para proteger tu carro",
+      "color_theme": "yellow_warning",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "urgencia_proteccion_propiedad",
+      "recycle_after_days": 20,
+      "cta_price": "mensual",
+      "music": { "vibe": "alarma_dramatica" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "alert_red", "label": "🟣 ALERTA PÚRPURA · GRANIZO", "text": "⚡ Granizo intenso en Benito Juárez, Coyoacán y Álvaro Obregón entre 5 y 6 PM. Alerta en tu zona de Casa activa. 🏠", "delay_ms": 0, "shake": true, "push_notification": { "active": true, "title": "🟣 GRANIZO EN TU ZONA · 90 MIN", "body": "BJ · Coyoacán · Mueve tu carro ahora" }, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¡Mi carro está en la calle! 😱 ¿Cuánto tiempo tengo?", "delay_ms": 2400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "⏰ 90 MINUTOS · ACTÚA YA", "text": "El frente está sobre Tlalpan ahora, avanza norte. Tienes ~90 min. La alerta fue directo a tu ubicación de Casa. 🗺️", "delay_ms": 4000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¡Voy corriendo! Gracias 🙏 ¿También avisa en mi trabajo?", "delay_ms": 6000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "📍 2 UBICACIONES", "text": "Sí. Casa y Trabajo. Cada alerta púrpura llega con el contexto de tu zona específica. No alertas genéricas de toda la ciudad. 🎯", "delay_ms": 7800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 ACTIVA TUS 2 ZONAS", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 9800, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "urgente · accionable · alerta hiperlocalizada",
+        "persona": "automovilista CDMX, 28-45 años, poniente o sur CDMX, carro en la calle",
+        "avoid": ["explicar meteorología", "alertas genéricas de toda la ciudad"],
+        "must_include": ["alerta púrpura por zona", "90 min de ventaja", "Casa y Trabajo", "@airegptcdmx_bot"],
+        "hook_style": "urgencia de proteger algo valioso con tiempo justo suficiente",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "contingencia_override_003",
+      "publish_date": "2026-09-09",
+      "theme": "contingencia",
+      "theme_label": "Contingencia + lluvia simultánea · doble alerta · día de caos total",
+      "color_theme": "red_alert",
+      "priority": "critical",
+      "contingencia_override": true,
+      "contingencia_instance": 3,
+      "target_emotion": "caos_luego_control_total",
+      "recycle_after_days": 14,
+      "cta_price": "anual",
+      "music": { "vibe": "alarma_dramatica" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "alert_red", "label": "🚨 DOBLE ALERTA", "text": "Contingencia Fase I activa 🔴 + Alerta Púrpura de lluvia en tu zona de Trabajo 🟣 El día más complicado del mes.", "delay_ms": 0, "shake": true, "push_notification": { "active": true, "title": "🚨 CONTINGENCIA + LLUVIA", "body": "Lluvia intensa · Plan B ya" }, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¿Cómo lo supiste? Acabo de verlo en las noticias 😰", "delay_ms": 3000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "⚡ SMABILITY + SACMEX + SIMAT", "text": "Cruzo 3 fuentes en tiempo real. Cuando se alinean, te aviso primero — filtrado por tu Casa y Trabajo. 📡", "delay_ms": 5200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "Necesito esto todo el año sin falta 🙏", "delay_ms": 7400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 UN AÑO COMPLETO", "text": "$399 MXN/año · Ahorras $189 MXN 💎 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 9200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "épico · superioridad informativa · caos afuera, calma adentro",
+        "persona": "chilango/a, 28-45 años, harto de enterarse tarde de todo",
+        "avoid": ["catastrofismo", "listar restricciones sin narrativa"],
+        "must_include": ["doble alerta contingencia + lluvia por ubicación", "Smability+SACMEX+SIMAT", "$399 año", "@airegptcdmx_bot"],
+        "hook_style": "contraste entre el caos de la ciudad y la calma de quien sí estaba informado",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "lluvia_005",
+      "publish_date": "2026-10-14",
+      "theme": "lluvia_alerta",
+      "theme_label": "Fin de temporada · resumen de alertas · ROI anual",
+      "color_theme": "green_safe",
+      "priority": "medium",
+      "contingencia_override": false,
+      "target_emotion": "satisfaccion_logro_renovacion",
+      "recycle_after_days": 30,
+      "cta_price": "anual",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "📊 AIREGPT · TU RESUMEN DE TEMPORADA", "text": "Temporada de lluvias casi lista ☀️ En 4 meses: 23 alertas púrpuras · 6 de granizo · 4 contingencias. Todo filtrado a tu Casa y Trabajo. 📍", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¡No me había dado cuenta de cuántas alertas recibí! ¿Y mis cigarros? 😮", "delay_ms": 2800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "🎮 TU TETRIS DE EXPOSICIÓN", "text": "Tu gráfica Tetris acumula semana a semana. En diciembre verás tu Año en Cigarros completo — cuánto respiraste y cuándo. 📅", "delay_ms": 5000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "💎 EL ROI", "text": "Multas evitadas: $13,068 MXN 🛡️ · Tiempo en caos evitado: ~18 hrs ⏱️ · Costo del servicio en ese período: $147 MXN.", "delay_ms": 7400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "user", "style": "normal", "label": "", "text": "$147 contra $13,000. Renuevo de volada 🙌", "delay_ms": 9600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 RENUEVA Y VE TU AÑO COMPLETO", "text": "$399 MXN/año · Ahorras $189 MXN 💎 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 11200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "celebratorio · ROI claro · renovación natural sin presión",
+        "persona": "suscriptor activo CDMX que vivió la temporada de lluvias con AIreGPT",
+        "avoid": ["presión de venta", "tecnicismos"],
+        "must_include": ["alertas púrpuras por ubicación", "Tetris de cigarros", "$147 vs $13,068", "$399 año", "@airegptcdmx_bot"],
+        "hook_style": "contraste ROI que habla por sí solo",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "valor_001",
+      "publish_date": "2026-03-10",
+      "theme": "valor_precio",
+      "theme_label": "Comparativa $49 vs multa vs Uber surge · el precio más obvio de CDMX",
+      "color_theme": "blue_calm",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "racionalidad_luego_accion",
+      "recycle_after_days": 25,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "💰 AIREGPT · COMPARATIVA REAL", "text": "¿Cuánto cuesta NO saber que tu placa no circula?\n🚫 Multa: $3,267 MXN\n🚗 Uber surge día contingencia: ~$380 MXN\n☕ AIreGPT: $49 MXN/mes", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "Puesto así… es obvio 😅 ¿Pero realmente funciona?", "delay_ms": 2800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "📡 ASÍ FUNCIONA", "text": "Monitoreo tu placa + el IAS en tu Casa y Trabajo + lluvia en tu ruta. Todo llega a tu Telegram antes de que necesites decidir. 🎯", "delay_ms": 4600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¿Y si quiero el año completo? 🤔", "delay_ms": 6800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 ELIGE TU PLAN", "text": "📅 $49/mes · 📆 $229/6 meses · 🗓️ $399/año (ahorras $189)\n5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 8800, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "racional · directo · los números hablan solos",
+        "persona": "automovilista CDMX, 28-45 años, toma decisiones con datos, no con impulsos",
+        "avoid": ["presión emocional", "drama", "comparaciones con apps gratuitas"],
+        "must_include": ["$3,267 vs $49", "3 tiers de precio", "@airegptcdmx_bot"],
+        "hook_style": "comparativa de costos que nadie había puesto junta antes",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "valor_002",
+      "publish_date": "2026-03-28",
+      "theme": "valor_precio",
+      "theme_label": "Plan anual · matemática simple · costo por día",
+      "color_theme": "blue_calm",
+      "priority": "medium",
+      "contingencia_override": false,
+      "target_emotion": "sorpresa_por_accesibilidad",
+      "recycle_after_days": 25,
+      "cta_price": "anual",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "¿Cuánto me sale al día si pago el año? 🧮", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "highlight", "label": "🧮 MATEMÁTICA AIREGPT", "text": "$399 MXN ÷ 365 días = $1.09 MXN por día. Menos que un chicle. 🍬\nPor eso recibes:\n🌫️ Alertas de aire · 🌧️ Lluvia · 🚗 HNC · 🎮 Tetris de cigarros", "delay_ms": 1200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "¡$1.09 al día por todo eso! 😮 ¿Y el descuento sobre el mensual?", "delay_ms": 3800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "💎 TU AHORRO REAL", "text": "Mensual x 12 = $588 MXN. Anual = $399 MXN. Ahorras $189 MXN — casi 4 meses gratis. Sin hacer nada. ✅", "delay_ms": 5600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 $1.09 AL DÍA · ACTIVA HOY", "text": "$399 MXN/año · Ahorras $189 MXN 💎 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 7800, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "sorpresivo · accesible · matemática que desmitifica el precio",
+        "persona": "chilango/a, 25-40 años, consciente del dinero, busca valor real por lo que paga",
+        "avoid": ["exagerar beneficios", "comparaciones vagas"],
+        "must_include": ["$1.09 por día", "$189 de ahorro", "lista de features", "@airegptcdmx_bot"],
+        "hook_style": "costo diario ridículamente bajo que nadie había calculado",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "valor_003",
+      "publish_date": "2026-05-06",
+      "theme": "valor_precio",
+      "theme_label": "Plan semestral · temporada de lluvias · momento ideal para activar",
+      "color_theme": "yellow_warning",
+      "priority": "medium",
+      "contingencia_override": false,
+      "target_emotion": "urgencia_estacional_luego_decision",
+      "recycle_after_days": 30,
+      "cta_price": "semestral",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "🌧️ AIREGPT · TEMPORADA ACTIVA", "text": "Mayo arranca la temporada de lluvias en CDMX. Los próximos 6 meses son los más complicados del año: lluvia + contingencias + HNC. 📅", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "Justo estaba pensando en activarme. ¿Qué plan me conviene? 🤔", "delay_ms": 2600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "💡 EL PLAN PERFECTO PARA LA TEMPORADA", "text": "El semestral cubre exactamente mayo-octubre — toda la temporada de lluvias. $229 MXN por 6 meses. Ahorras $65 vs mensual. ✅", "delay_ms": 4400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¿Y qué incluye exactamente? 📋", "delay_ms": 6600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "📦 TODO INCLUIDO", "text": "🟣 Alertas púrpuras de lluvia · 🚨 Contingencias en tiempo real · 🚗 HNC diario · 🌫️ IAS en Casa y Trabajo", "delay_ms": 8200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 ACTIVA LA TEMPORADA", "text": "$229 MXN/6 meses · Ahorras $65 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 10400, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "oportuno · estratégico · este es el momento exacto",
+        "persona": "chilango/a, 27-42 años, planificador/a, sabe que mayo cambia todo en CDMX",
+        "avoid": ["presión de venta agresiva", "listar features sin contexto estacional"],
+        "must_include": ["temporada lluvias mayo-octubre", "$229 semestral", "ahorro $65", "@airegptcdmx_bot"],
+        "hook_style": "inicio de temporada como momento de decisión natural",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "social_proof_001",
+      "publish_date": "2026-04-01",
+      "theme": "social_proof",
+      "theme_label": "Usuario evitó multa real · testimonio simulado",
+      "color_theme": "green_safe",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "identificacion_luego_deseo",
+      "recycle_after_days": 28,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "AIreGPT me avisó anoche que mi placa no circulaba hoy. Pedí Uber antes del surge. Llegué a tiempo y ahorré $3,267 😅🙏", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "highlight", "label": "✅ MISIÓN CUMPLIDA", "text": "Eso es exactamente para lo que existo 🎯 La alerta llegó a tu Trabajo registrado 14 horas antes. Sin buscar, sin verificar. Solo apareció. 📱", "delay_ms": 2000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "Ya le mandé el link a 3 amigos 😂 Esto debería saberlo todo CDMX", "delay_ms": 4400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "cta", "label": "🚀 COMPÁRTELO", "text": "Cada amigo que actives con tu link obtiene 5 días gratis — igual que tú cuando empezaste. Desde $49/mes.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 6400, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "orgulloso · cercano · historia que cualquier chilango quisiera tener",
+        "persona": "automovilista CDMX, 28-42 años, comparte sus wins con amigos, activo en grupos de WhatsApp",
+        "avoid": ["sonar a publicidad falsa", "exagerar la historia"],
+        "must_include": ["$3,267 ahorrados", "alerta 14 hrs antes", "referidos 5 días gratis", "@airegptcdmx_bot"],
+        "hook_style": "historia de alivio que el lector quisiera protagonizar",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "social_proof_002",
+      "publish_date": "2026-05-27",
+      "theme": "social_proof",
+      "theme_label": "Mamá con asma · recomendación de salud por padecimiento",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "ternura_identificacion_luego_accion",
+      "recycle_after_days": 30,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_suave_emotiva" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Le puse AIreGPT a mi mamá. Tiene asma y vivía asustada sin saber cuándo era peligroso salir 😔", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "highlight", "label": "🫁 PERFIL DE SALUD ACTIVO", "text": "Con el perfil de asma activado, ajusto los umbrales de alerta específicamente para vías respiratorias sensibles. El IAS límite baja de 100 a 75. 🎯", "delay_ms": 1800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "¿Y le da recomendaciones específicas para el asma? 🤔", "delay_ms": 4000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "💊 RECOMENDACIONES PERSONALIZADAS", "text": "Sí. Según el IAS de su Casa cada mañana recibe: horario seguro de salida · si usar inhalador preventivo. 📋", "delay_ms": 5800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "user", "style": "normal", "label": "", "text": "Ahora sale más tranquila y yo me preocupo menos 🥹", "delay_ms": 8000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 ACTÍVALO PARA QUIEN CUIDAS", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 10000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "emotivo · familiar · información como acto de amor",
+        "persona": "hijo/a adulto CDMX, 25-42 años, cuida a familiar con condición respiratoria",
+        "avoid": ["tecnicismos médicos", "alarmar sobre el asma", "sonar a consulta médica"],
+        "must_include": ["perfil asma umbral IAS 75", "recomendaciones salud personalizadas", "@airegptcdmx_bot"],
+        "hook_style": "historia de cuidado familiar que cualquiera reconoce",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "onboarding_001",
+      "publish_date": "2026-04-15",
+      "theme": "onboarding",
+      "theme_label": "Cómo activar AIreGPT en 3 pasos · primera vez",
+      "color_theme": "blue_calm",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "curiosidad_luego_facilidad",
+      "recycle_after_days": 21,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "¿Cómo funciona esto? Vi que se activa por Telegram 📱", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "highlight", "label": "🚀 3 PASOS Y LISTO", "text": "1️⃣ Abre @airegptcdmx_bot en Telegram\n2️⃣ Registra tu Casa y Trabajo 📍\n3️⃣ Define tus alertas: aire, lluvia, HNC\nEso es todo. Las alertas llegan solas. ✅", "delay_ms": 1400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "¿No necesito instalar ninguna app extra? 🤔", "delay_ms": 3800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "✅ SOLO TELEGRAM", "text": "Nada extra. Si ya tienes Telegram, ya tienes AIreGPT. Sin crear cuenta, sin permisos raros, sin notificaciones basura. 📲", "delay_ms": 5600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "user", "style": "normal", "label": "", "text": "¿Y los 5 días gratis son sin tarjeta? 🙌", "delay_ms": 7600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 SÍ · SIN TARJETA", "text": "5 días gratis 🎁 Sin tarjeta. Sin trucos. Desde $49 MXN/mes si decides quedarte.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 9400, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "simple · sin fricción · esto es más fácil de lo que crees",
+        "persona": "chilango/a, 22-40 años, usa Telegram, escéptico sobre apps nuevas",
+        "avoid": ["tecnicismos", "listar demasiados features de golpe", "sonar a tutorial corporativo"],
+        "must_include": ["3 pasos", "solo Telegram", "5 días gratis sin tarjeta", "@airegptcdmx_bot"],
+        "hook_style": "barrera falsa que el usuario tenía y que se desmonta en segundos",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "onboarding_002",
+      "publish_date": "2026-07-22",
+      "theme": "onboarding",
+      "theme_label": "Configurar umbral IAS + perfil de salud + 2 ubicaciones desde cero",
+      "color_theme": "blue_calm",
+      "priority": "medium",
+      "contingencia_override": false,
+      "target_emotion": "control_personalizacion_luego_confianza",
+      "recycle_after_days": 25,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Acabo de activar los 5 días gratis. ¿Qué configuro primero? 🆕", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "highlight", "label": "📍 PASO 1 · TUS UBICACIONES", "text": "Registra tu Casa y Trabajo. Todas las alertas llegarán filtradas por tu zona. Sin ruido de toda la ciudad. 🎯", "delay_ms": 1600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "⚙️ PASO 2 · TU UMBRAL", "text": "Define cuándo quieres que te avise: 'Alerta cuando IAS > 100 en Casa' o 'Dime el IAS a las 9 AM'. Tú controlas. 📊", "delay_ms": 3800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "🏥 PASO 3 · TU PERFIL DE SALUD", "text": "¿Asma, alergias, cardiovascular? Activa tu condición y ajusto los umbrales y recomendaciones específicamente para ti. 🫁", "delay_ms": 6200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "user", "style": "normal", "label": "", "text": "¡Ya lo configuré todo! Esto sí es personalizado 🙌", "delay_ms": 8600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 AHORA SÍ ESTÁS BLINDADO", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 10400, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "guía amigable · paso a paso · tú tienes el control",
+        "persona": "nuevo usuario CDMX, 25-42 años, acaba de activar la prueba gratuita, quiere sacarle provecho",
+        "avoid": ["abrumar con opciones", "sonar a manual de usuario"],
+        "must_include": ["3 pasos de configuración", "umbral personalizado", "perfil de salud", "@airegptcdmx_bot"],
+        "hook_style": "primer día de algo poderoso que el usuario acaba de desbloquear",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "medicos_001",
+      "publish_date": "2026-04-22",
+      "theme": "directorio_medicos",
+      "theme_label": "Lanzamiento directorio neumólogos · cerca de casa y trabajo",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "alivio_por_recurso_nuevo",
+      "recycle_after_days": 30,
+      "cta_price": "mensual",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Mi médico me dijo que debería ver a un neumólogo por el aire de CDMX. ¿Dónde encuentro uno cerca? 🏥", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "highlight", "label": "🆕 DIRECTORIO AIREGPT · LANZAMIENTO", "text": "¡Acaba de lanzar! 🎉 Tengo neumólogos, alergólogos y cardiólogos especializados, filtrados por tu Casa y Trabajo. 📍", "delay_ms": 1600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "¿Los rankea por algo? No quiero perder tiempo con uno malo 🤔", "delay_ms": 3800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "⭐ RANKEADOS Y FILTRADOS", "text": "Sí. Por distancia a tu Casa/Trabajo · calificación de pacientes · especialidad exacta. Sin buscar en Google. 🎯", "delay_ms": 5800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "user", "style": "normal", "label": "", "text": "Esto completa todo. Aire + salud + médicos. Increíble 🙌", "delay_ms": 8000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 ACCEDE AL DIRECTORIO", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 10000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "útil · completo · el siguiente paso natural",
+        "persona": "chilango/a, 28-50 años, ya consciente del impacto del aire",
+        "avoid": ["sonar a directorio genérico", "prometer diagnósticos"],
+        "must_include": ["directorio neumólogos", "filtrado por Casa y Trabajo", "rankeados", "@airegptcdmx_bot"],
+        "hook_style": "necesidad real que todos tienen pero nadie había resuelto de forma localizada",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "tetris_001",
+      "publish_date": "2026-08-26",
+      "theme": "tetris_exposicion",
+      "theme_label": "Gráfica Tetris semanal · acumulado de cigarros · gamificación",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "sorpresa_gamificada_luego_consciencia",
+      "recycle_after_days": 21,
+      "cta_price": "semestral",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "🎮 AIREGPT · TU SEMANA EN CIGARROS", "text": "Tu Tetris de exposición de esta semana:\n🟥 Lun: 3.2 cig · 🟥 Mar: 2.8 · 🟨 Mié: 1.1 · 🟩 Jue: 0.4\nTotal semanal: 10.4 cigarros invisibles 🚬", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¡10 cigarros en una semana y yo sin fumar! 😱 ¿Eso es mucho?", "delay_ms": 2800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "alert_red", "label": "📊 CONTEXTO DE TU ACUMULADO", "text": "El promedio chilango en ruta larga: 12-15 cig/semana. Tú vas en 10.4 — puedes bajar con ajustes de horario y ruta. 📉", "delay_ms": 4800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¿Y al final del año veré todo acumulado tipo Spotify? 🤩", "delay_ms": 7000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "🎁 TU AÑO EN CIGARROS", "text": "Exacto. En diciembre tendrás tu resumen: total anual · mes más sucio · cuántos días de Edad Urbana acumulaste. 📅", "delay_ms": 9000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 EMPIEZA A TRAZAR TU CURVA", "text": "$229 MXN/6 meses · Ahorras $65 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 11200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "gamificado · revelador · dato visual que engancha",
+        "persona": "chilango/a, 25-40 años, usa apps como Spotify Wrapped, le gustan sus datos",
+        "avoid": ["fatalismo", "culpa por la exposición", "tecnicismos de salud"],
+        "must_include": ["Tetris semanal de cigarros", "promedio chilango", "Año en Cigarros", "@airegptcdmx_bot"],
+        "hook_style": "dato numérico acumulado que nadie esperaba ver sobre sí mismo",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "tetris_002",
+      "publish_date": "2026-12-09",
+      "theme": "tetris_exposicion",
+      "theme_label": "Tu Año en Cigarros · resumen anual tipo Spotify Wrapped",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "asombro_reflexion_renovacion",
+      "recycle_after_days": 365,
+      "cta_price": "anual",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "🎁 TU AÑO EN CIGARROS · 2026", "text": "Tu resumen anual está listo 🎮\n🚬 Total: 487 cigarros equivalentes\n📅 Mes más sucio: mayo (contingencias)\n🟩 Mes más limpio: julio", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "487… eso es mucho 😔 ¿Cuánto mejoré vs alguien que no usó AIreGPT?", "delay_ms": 3000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "📊 TU IMPACTO REAL", "text": "El promedio sin optimización de ruta: ~620 cigarros/año. Tú tuviste 487. Redujiste tu exposición un 21% con alertas. 🏆", "delay_ms": 5200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¡Eso sí que vale! ¿Cómo bajo más el año que viene? 💪", "delay_ms": 7600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "🎯 PLAN 2027", "text": "Con umbral ajustado a IAS 80 en tu Trabajo puedes reducir otro 15-20%. Tu curva mejora con cada año de datos. 📈", "delay_ms": 9800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 RENUEVA · MEJORA TU CURVA", "text": "$399 MXN/año · Ahorras $189 MXN 💎 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 12000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "retrospectivo · motivador · datos que impulsan a mejorar",
+        "persona": "usuario activo AIreGPT, 25-45 años, acaba de ver su resumen anual, quiere mejorar",
+        "avoid": ["culpa", "datos sin contexto comparativo", "presión de venta"],
+        "must_include": ["487 cigarros equivalentes", "reducción 21%", "plan 2027", "$399 año", "@airegptcdmx_bot"],
+        "hook_style": "número anual que se vuelve comparación motivadora",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "contingencia_override_004",
+      "publish_date": "2026-06-17",
+      "theme": "contingencia",
+      "theme_label": "Contingencia Fase I · usuario en metro · impacto en calidad del aire subterráneo",
+      "color_theme": "red_alert",
+      "priority": "critical",
+      "contingencia_override": true,
+      "contingencia_instance": 4,
+      "target_emotion": "sorpresa_luego_dato_inesperado",
+      "recycle_after_days": 7,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_urgente" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "alert_red", "label": "🚨 CONTINGENCIA FASE I · METRO", "text": "Contingencia activa en superficie. Pero ojo: en días de Fase I el PM2.5 en estaciones del metro sube hasta 2.3x lo normal. 🚇", "delay_ms": 0, "shake": true, "push_notification": { "active": true, "title": "🚨 CONTINGENCIA · METRO AFECTADO", "body": "PM2.5 en estaciones hasta 2.3x · Cuídate bajo tierra" }, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¿El metro también se contamina? Creía que ahí estaba más seguro 😮", "delay_ms": 3000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "🔬 DATO CLAVE", "text": "El sistema de ventilación del metro recircula aire exterior. Ese aire trae partículas elevadas. Tu curva de exposición hoy incluye el metro. 🫁", "delay_ms": 5000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "💡 RECOMENDACIÓN HOY", "text": "Usa cubrebocas en andenes. Las líneas B, 12 y A tienen menor renovación de aire. Prefiere líneas 1, 2 y 3 si puedes. ✅", "delay_ms": 7200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 TU CURVA INCLUYE TODO", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 9400, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "revelador · dato inesperado · protección donde menos lo esperabas",
+        "persona": "usuario de metro CDMX, 22-40 años, usa transporte público por elección o necesidad",
+        "avoid": ["alarmar sin solución", "recomendar no usar el metro"],
+        "must_include": ["PM2.5 metro 2.3x", "curva exposición incluye metro", "líneas recomendadas", "@airegptcdmx_bot"],
+        "hook_style": "dato que destruye una creencia común sobre el metro",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Contingencia activa. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "contingencia_override_005",
+      "publish_date": "2026-07-08",
+      "theme": "contingencia",
+      "theme_label": "Contingencia Fase I · ciclista urbano · exposición máxima en ruta",
+      "color_theme": "red_alert",
+      "priority": "critical",
+      "contingencia_override": true,
+      "contingencia_instance": 5,
+      "target_emotion": "preocupacion_ciclista_luego_protocolo",
+      "recycle_after_days": 7,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_urgente" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Voy en bici al trabajo. ¿Hoy con contingencia es peligroso? 🚴", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "🚨 CONTINGENCIA · CICLISTAS", "text": "Alerta crítica. Pedalear en Fase I: respiras 4-6x más aire. Tu curva de exposición hoy = 8.7 cigarros en 45 min de trayecto. 🚬", "delay_ms": 1600, "shake": true, "push_notification": { "active": true, "title": "🚨 CICLISTAS · CONTINGENCIA", "body": "45 min en bici hoy = 8.7 cigarros equivalentes" }, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "😨 ¿Qué hago? No puedo faltar al trabajo", "delay_ms": 4200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "🛡️ PROTOCOLO CICLISTA HOY", "text": "🔵 Cubrebocas N95 obligatorio\n⏰ Sal antes de las 7 AM\n🗺️ Ruta por Reforma tiene mejor ventilación\n🚇 Considera metro + bici", "delay_ms": 6000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 TU CURVA DE CICLISTA", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 9000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "urgente · práctico · ciclista informado es ciclista protegido",
+        "persona": "ciclista urbano CDMX, 22-38 años, usa bici por convicción",
+        "avoid": ["decirle que no pedalee", "alarmar sin alternativa", "culpar al ciclista"],
+        "must_include": ["8.7 cigarros en 45 min bici", "protocolo N95", "horario madrugada", "@airegptcdmx_bot"],
+        "hook_style": "dato de exposición que el ciclista nunca había calculado",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Contingencia activa. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "contingencia_override_006",
+      "publish_date": "2026-08-12",
+      "theme": "contingencia",
+      "theme_label": "Contingencia Fase I · home office · calidad del aire en interiores",
+      "color_theme": "red_alert",
+      "priority": "critical",
+      "contingencia_override": true,
+      "contingencia_instance": 6,
+      "target_emotion": "falsa_seguridad_luego_realidad",
+      "recycle_after_days": 7,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Hoy hago home office así que la contingencia no me afecta, ¿verdad? 🏠", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "⚠️ CONTINGENCIA · INTERIORES", "text": "No tan rápido. El IAS en tu zona de Casa es 128. Con ventanas cerradas el PM2.5 interior puede llegar al 60-80% del exterior en 2-3 horas. 🏠", "delay_ms": 1800, "shake": true, "push_notification": { "active": true, "title": "⚠️ CONTINGENCIA EN TU CASA TAMBIÉN", "body": "IAS 128 · Ventanas cerradas no es suficiente" }, "slot_machine": false },
+        { "id": 3, "side": "user", "style": "normal", "label": "", "text": "¡No lo sabía! ¿Qué hago si no tengo purificador? 😟", "delay_ms": 4400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "💡 PROTOCOLO HOME OFFICE HOY", "text": "✅ Ventanas cerradas todo el día\n✅ Ventilador interno — no extraer aire exterior\n✅ Evita cocinar con gas hoy — suma contaminantes", "delay_ms": 6400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 UMBRAL EN TU CASA ACTIVADO", "text": "Define 'avísame cuando IAS > 100 en Casa' y te cuido aunque no salgas. Desde $49/mes · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 9200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "revelador · cotidiano · el riesgo que nadie ve desde su sala",
+        "persona": "profesional CDMX home office, 26-42 años, cree que estar en casa lo protege",
+        "avoid": ["alarmismo exagerado", "recomendar productos de purificación costosos"],
+        "must_include": ["IAS 128 interior", "protocolo home office", "umbral por ubicación Casa", "@airegptcdmx_bot"],
+        "hook_style": "creencia falsa de seguridad que el lector probablemente tiene ahora mismo",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Contingencia activa. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "contingencia_override_007",
+      "publish_date": "2026-09-23",
+      "theme": "contingencia",
+      "theme_label": "Contingencia Fase I · usuario con mascota + hijo · doble perfil activo",
+      "color_theme": "red_alert",
+      "priority": "critical",
+      "contingencia_override": true,
+      "contingencia_instance": 7,
+      "target_emotion": "vulnerabilidad_familiar_luego_proteccion_total",
+      "recycle_after_days": 7,
+      "cta_price": "semestral",
+      "music": { "vibe": "tension_suave_emotiva" },
+      "messages": [
+        { "id": 1, "side": "user", "style": "normal", "label": "", "text": "Tengo un hijo de 5 años y un labrador. ¿Cómo los protejo hoy con contingencia? 👨‍👦🐕", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "bot", "style": "alert_red", "label": "🚨 CONTINGENCIA · FAMILIA", "text": "Activé perfil doble: 👦 Infantil (pulmones absorben 50% más) · 🐕 Mascota (exposición 2x). Hoy es día de máxima precaución.", "delay_ms": 1800, "shake": true, "push_notification": { "active": true, "title": "🚨 PROTEGE A TU FAMILIA HOY", "body": "Niños y mascotas en riesgo alto" }, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "🛡️ PROTOCOLO FAMILIAR HOY", "text": "👦 Niño: sin recreo al aire libre\n🐕 Perro: paseo máx 10 min, noche o madrugada\n🏠 Casa: ventilación interna únicamente", "delay_ms": 4400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¿Y puedo ver cuánto acumularon ellos en la semana? 📊", "delay_ms": 7000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "🎮 TETRIS FAMILIAR", "text": "Próximamente: Tetris de exposición por perfil. Verás la curva de tu hijo y tu mascota separada de la tuya. 📅", "delay_ms": 9000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 PROTEGE A TODOS", "text": "$229 MXN/6 meses · Ahorras $65 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 11400, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "protector · completo · nadie se queda sin cobertura",
+        "persona": "padre o madre CDMX, 28-42 años, familia con hijo pequeño y mascota",
+        "avoid": ["prometer features no lanzados como disponibles", "alarmar sin protocolo claro"],
+        "must_include": ["perfil infantil 50% más exposición", "mascota exposición 2x", "protocolo familiar", "@airegptcdmx_bot"],
+        "hook_style": "la familia completa en una sola pregunta que cualquier papá chilango haría",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Contingencia activa. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "verificentros_001",
+      "publish_date": "2026-04-05",
+      "theme": "verificentros",
+      "theme_label": "Lanzamiento Verificentros rankeados · filtrados por casa y trabajo",
+      "color_theme": "blue_calm",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "alivio_por_feature_esperado",
+      "recycle_after_days": 30,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_moderada" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "🆕 AIREGPT · LANZAMIENTO ABRIL", "text": "¡Ya está disponible! 🎉 Mapa de Verificentros en CDMX rankeados por nivel de servicio, tiempo de espera y precio. Filtrado por tu Casa y Trabajo. 📍", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¡Por fin! Siempre pierdo el día buscando uno 😩 ¿Cómo los rankea?", "delay_ms": 2400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "⭐ RANKING REAL", "text": "Por:\n📍 Distancia a tu Casa o Trabajo\n⏱️ Tiempo promedio de espera\n💰 Rango de precio\n⭐ Calificación de usuarios. Sin anuncios. 🎯", "delay_ms": 4200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¿Y me avisa cuándo tengo que verificar? 📅", "delay_ms": 6600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "🔔 RECORDATORIO AUTOMÁTICO", "text": "Sí. 15 días antes de tu mes de verificación te aviso con los 3 Verificentros mejor rankeados cerca de ti. Sin buscar nada. 📲", "delay_ms": 8400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 ACCEDE AL MAPA", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 10600, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "lanzamiento · problema resuelto · sin fricción",
+        "persona": "automovilista CDMX, 28-48 años, pospone la verificación por no saber dónde ir",
+        "avoid": ["términos burocráticos de verificación", "sonar a directorio genérico"],
+        "must_include": ["Verificentros rankeados", "recordatorio 15 días antes", "filtrado por ubicación", "@airegptcdmx_bot"],
+        "hook_style": "problema cotidiano que todos han vivido y que ahora tiene solución",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "edad_urbana_001",
+      "publish_date": "2026-09-02",
+      "theme": "edad_urbana",
+      "theme_label": "Edad Urbana · modo de transporte · quién envejece más rápido en CDMX",
+      "color_theme": "purple_health",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "competencia_reflexiva_luego_accion",
+      "recycle_after_days": 25,
+      "cta_price": "semestral",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "⏳ AIREGPT · EDAD URBANA", "text": "¿Quién envejece más rápido en CDMX según cómo se mueve?\n🚗 Auto en tráfico: +18 días/año\n🚇 Metro: +11 días\n🚴 Bici: +8 días\n🚶 A pie: +4 días", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "Voy en auto todos los días 😬 ¿Eso significa que tengo +18 días ya?", "delay_ms": 3000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "📊 TU CURVA PERSONALIZADA", "text": "Depende de tu ruta y horario. Ingresa tu trayecto y calculo tu Edad Urbana real — no el promedio, la tuya. 🎯", "delay_ms": 5200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "¿Y puedo reducirla cambiando algo sin dejar el carro? 🤔", "delay_ms": 7400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "✅ SÍ · MICRO-DECISIONES", "text": "Salir 30 min antes evita el pico de PM2.5. Ruta alterna en IAS alto. Ventanillas cerradas en contingencia. Cada ajuste baja tu curva. 📉", "delay_ms": 9600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 CALCULA TU EDAD URBANA", "text": "$229 MXN/6 meses · Ahorras $65 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 12000, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "competitivo · reflexivo · dato que hace pensar sin culpar",
+        "persona": "automovilista CDMX, 28-45 años, nunca había conectado su modo de transporte con su salud",
+        "avoid": ["decirle que deje el carro", "fatalismo", "comparaciones moralistas"],
+        "must_include": ["+18 días/año auto", "curva personalizada por trayecto", "micro-decisiones", "@airegptcdmx_bot"],
+        "hook_style": "ranking de modos de transporte por envejecimiento celular que nadie había visto",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "contingencia_override_008",
+      "publish_date": "2026-10-07",
+      "theme": "contingencia",
+      "theme_label": "Contingencia Fase I · otoño · ozone season final + ROI acumulado",
+      "color_theme": "red_alert",
+      "priority": "critical",
+      "contingencia_override": true,
+      "contingencia_instance": 8,
+      "target_emotion": "cansancio_luego_valor_acumulado",
+      "recycle_after_days": 7,
+      "cta_price": "anual",
+      "music": { "vibe": "tension_urgente" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "alert_red", "label": "🚨 CONTINGENCIA #8 · OCTUBRE", "text": "Esta es la contingencia 8 del año en CDMX 🔴 Placas restringidas no circulan. Alerta en tu Casa y Trabajo activa. 📍", "delay_ms": 0, "shake": true, "push_notification": { "active": true, "title": "🚨 CONTINGENCIA #8 DEL AÑO", "body": "Casa y Trabajo alertados" }, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¿Ya van 8? No me había dado cuenta de cuántas llevamos 😮", "delay_ms": 3000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "📊 TU ROI ACUMULADO", "text": "En las 8 contingencias alertadas:\n💸 Multas evitadas: $26,136 MXN\n⏱️ Tiempo de caos evitado: ~24 hrs\n📅 Costo del servicio: $245 MXN", "delay_ms": 5400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "Eso es brutal. ¿Y quedan más contingencias este año? 🤔", "delay_ms": 8000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "highlight", "label": "📅 SE ESTIMAN 3 MÁS", "text": "Históricamente se estiman 11 contingencias anuales. Quedan ~3. Sigue blindado. 🛡️", "delay_ms": 10200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 CIERRA EL AÑO BLINDADO", "text": "$399 MXN/año · Ahorras $189 MXN 💎 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 12800, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "acumulativo · ROI contundente · cierra el año fuerte",
+        "persona": "suscriptor activo CDMX, 28-45 años, ya lleva meses con AIreGPT, le impacta ver el ROI acumulado",
+        "avoid": ["repetir el pitch inicial", "sonar a venta forzada de fin de año"],
+        "must_include": ["contingencia #8", "$26,136 multas evitadas", "3 contingencias restantes", "$399 año", "@airegptcdmx_bot"],
+        "hook_style": "contador acumulado que sorprende al propio usuario",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Contingencia activa. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "contingencia_override_009",
+      "publish_date": "2026-11-04",
+      "theme": "contingencia",
+      "theme_label": "Contingencia Fase I · noviembre · frío + contaminación · combo peligroso",
+      "color_theme": "red_alert",
+      "priority": "critical",
+      "contingencia_override": true,
+      "contingencia_instance": 9,
+      "target_emotion": "peligro_estacional_luego_protocolo",
+      "recycle_after_days": 7,
+      "cta_price": "mensual",
+      "music": { "vibe": "tension_urgente" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "alert_red", "label": "🚨 CONTINGENCIA + FRÍO", "text": "Noviembre activa el combo más peligroso: Fase I + temperatura baja 🌡️ El frío contrae las vías respiratorias y el PM2.5 penetra más profundo. Doble riesgo. 🫁", "delay_ms": 0, "shake": true, "push_notification": { "active": true, "title": "🚨 CONTINGENCIA + FRÍO", "body": "PM2.5 penetra más con temperaturas bajas" }, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "¿El frío empeora la contaminación? No lo sabía 😰", "delay_ms": 3200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "🔬 CIENCIA DETRÁS", "text": "Sí. Inversión térmica: el aire frío atrapa los contaminantes cerca del suelo. CDMX en noviembre = cámara de gas natural. 🏙️", "delay_ms": 5400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "🛡️ PROTOCOLO NOVIEMBRE", "text": "🧣 Cubre nariz y boca al salir al frío\n🚗 Calienta el motor dentro del garage lo menos posible\n⏰ Picos de PM2.5 más tempranos: 7-9 AM", "delay_ms": 8000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 AJUSTA TUS ALERTAS", "text": "Desde $49 MXN/mes · 5 días gratis 🎁 Sin tarjeta.\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 11200, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "científico accesible · estacional · dato nuevo que cambia comportamiento",
+        "persona": "chilango/a, 25-45 años, nunca había conectado el frío con mayor riesgo de contaminación",
+        "avoid": ["catastrofismo invernal", "términos médicos intimidantes"],
+        "must_include": ["inversión térmica noviembre", "PM2.5 penetra más con frío", "protocolo noviembre", "@airegptcdmx_bot"],
+        "hook_style": "dato estacional que destruye la suposición de que el invierno es más limpio",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Contingencia activa. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "contingencia_override_010",
+      "publish_date": "2026-11-25",
+      "theme": "contingencia",
+      "theme_label": "Contingencia Fase I · penúltima del año · usuario reflexiona sobre su decisión anual",
+      "color_theme": "red_alert",
+      "priority": "critical",
+      "contingencia_override": true,
+      "contingencia_instance": 10,
+      "target_emotion": "reflexion_de_cierre_luego_renovacion",
+      "recycle_after_days": 7,
+      "cta_price": "anual",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "alert_red", "label": "🚨 CONTINGENCIA #10", "text": "Placas restringidas no circulan hoy. Esta es la contingencia 10 de 11 estimadas este año en CDMX. Ya casi terminamos. 🛡️", "delay_ms": 0, "shake": true, "push_notification": { "active": true, "title": "🚨 CONTINGENCIA #10 · LA PENÚLTIMA", "body": "Casa y Trabajo alertados" }, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "Ya van 10 y siempre me avisaste antes que nadie 🙏 ¿Cuánto ahorré este año?", "delay_ms": 3400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "💎 TU AÑO EN NÚMEROS", "text": "En 10 contingencias alertadas:\n💸 Multas evitadas: ~$32,670 MXN\n🚬 Cigarros evitados con ajustes de ruta: ~47\n📱 Costo total del servicio: $399 MXN", "delay_ms": 6000, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "user", "style": "normal", "label": "", "text": "$399 contra $32,670. Renuevo ahora mismo 💪", "delay_ms": 8800, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "bot", "style": "cta", "label": "🚀 RENUEVA · 2027", "text": "$399 MXN/año · Ahorras $189 MXN 💎 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 10800, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "balance de fin de año · ROI aplastante · renovación natural y merecida",
+        "persona": "suscriptor leal CDMX, 28-48 años, ha vivido las 10 contingencias con AIreGPT, confía en el servicio",
+        "avoid": ["presión de venta", "repetir features básicos ya conocidos"],
+        "must_include": ["contingencia #10 de 11", "$32,670 multas evitadas vs $399", "renovación 2027", "@airegptcdmx_bot"],
+        "hook_style": "balance de fin de año que el usuario quería ver desde hace meses",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Contingencia activa. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    },
+    {
+      "flow_id": "cierre_anual_001",
+      "publish_date": "2026-12-23",
+      "theme": "cierre_anual",
+      "theme_label": "Cierre 2026 · tu año completo en AIreGPT · renovación 2027",
+      "color_theme": "green_safe",
+      "priority": "high",
+      "contingencia_override": false,
+      "target_emotion": "orgullo_logro_anticipacion_2027",
+      "recycle_after_days": 365,
+      "cta_price": "anual",
+      "music": { "vibe": "reflexiva_cinematica" },
+      "messages": [
+        { "id": 1, "side": "bot", "style": "highlight", "label": "🎁 TU AÑO AIREGPT · 2026", "text": "Se acabó 2026 en CDMX. Aquí tu resumen:\n🚨 11 contingencias alertadas\n🌧️ 31 alertas púrpuras de lluvia\n🚬 487 cigarros equivalentes trazados", "delay_ms": 0, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 2, "side": "user", "style": "normal", "label": "", "text": "Fue un año intenso en CDMX 😅 ¿Y cómo quedé vs el promedio?", "delay_ms": 3200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 3, "side": "bot", "style": "highlight", "label": "🏆 TU POSICIÓN", "text": "Redujiste tu exposición 21% vs el promedio chilango. Tu Edad Urbana acumulada: +9.2 días. El promedio sin AIreGPT: +14.8 días. 📊", "delay_ms": 5600, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 4, "side": "bot", "style": "highlight", "label": "💎 ROI FINAL 2026", "text": "💸 Multas evitadas: $35,937 MXN\n⏱️ Horas de caos evitadas: ~34 hrs\n🏥 Consultas médicas prevenidas: est. 2-3\n📱 Costo total: $399 MXN", "delay_ms": 8400, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 5, "side": "user", "style": "normal", "label": "", "text": "Esos números hablan solos. Ya renové para 2027 🙌", "delay_ms": 11200, "shake": false, "push_notification": null, "slot_machine": false },
+        { "id": 6, "side": "bot", "style": "cta", "label": "🚀 2027 · SEGUIMOS BLINDADOS", "text": "$399 MXN/año · Ahorras $189 MXN 💎 · 5 días gratis 🎁\n👉 <span class='handle'>@airegptcdmx_bot</span>", "delay_ms": 13600, "shake": false, "is_cta": true, "push_notification": null, "slot_machine": false }
+      ],
+      "llm_instructions": {
+        "tone": "celebratorio · año completado · anticipación de 2027 sin presión",
+        "persona": "suscriptor activo CDMX que vivió todo 2026 con AIreGPT, 25-48 años",
+        "avoid": ["presión de renovación", "repetir argumentos de venta ya conocidos"],
+        "must_include": ["11 contingencias", "487 cigarros", "$35,937 vs $399", "Edad Urbana +9.2 vs +14.8", "@airegptcdmx_bot"],
+        "hook_style": "resumen anual que el usuario quería ver — tipo Spotify Wrapped pero de su salud urbana",
+        "max_chars": 220,
+        "prompt_template": "Eres community manager de AIreGPT. Cierre de año 2026. Basándote en [FLOW_MESSAGES] escribe caption IG máx 220 chars. Tono: {tone}. Persona: {persona}. Siempre @airegptcdmx_bot. Máx 3 hashtags. Evita: {avoid}. Hook: {hook_style}."
+      }
+    }
+  ]
+}
