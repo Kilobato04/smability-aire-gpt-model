@@ -4,9 +4,10 @@ import datetime
 import time
 import requests
 import boto3
+import nest_asyncio
+import random 
 from openai import OpenAI
 from playwright.async_api import async_playwright
-import nest_asyncio
 
 nest_asyncio.apply()
 
@@ -30,13 +31,17 @@ html_path = "/tmp/render_temp.html"
 os.system(f"rm -rf {frames_dir} && mkdir -p {frames_dir}")
 
 # ==========================================
-# FASE 1: DESCARGAR AUDIO DE S3
+# FASE 1: DESCARGAR AUDIO ALEATORIO DE S3
 # ==========================================
+# Escogemos un audio al azar del 1 al 40 y le damos formato (ej. aire_015.mp4)
+num_audio = random.randint(1, 40)
+nombre_audio_s3 = f"aire_{num_audio:03d}.mp4"
+
 try:
-    print("🎵 Descargando pista base (aire_038.mp4) desde S3...")
-    s3.download_file(S3_BUCKET, "audios/aire_038.mp4", audio_local)
+    print(f"🎵 Ruleta musical: Descargando pista base ({nombre_audio_s3}) desde S3...")
+    s3.download_file(S3_BUCKET, f"audios/{nombre_audio_s3}", audio_local)
 except Exception as e:
-    print(f"⚠️ Error descargando audio, usando silencio. Error: {e}")
+    print(f"⚠️ Error descargando audio {nombre_audio_s3}, usando silencio. Error: {e}")
     os.system(f"ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo -t 10 {audio_local} -y")
 
 # ==========================================
@@ -310,7 +315,9 @@ os.system(comando_ffmpeg)
 # FASE 6: SUBIDA A S3 Y PUSH A INSTAGRAM
 # ==========================================
 timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M")
-video_s3_key = f"reels_publicados/mapa_{timestamp_str}.mp4"
+
+# 🚀 FIX TÁCTICO: Guardar el video en la nueva subcarpeta de mapas
+video_s3_key = f"reels_maps_publicados/mapa_{timestamp_str}.mp4"
 
 print(f"☁️ Subiendo Master a S3 ({video_s3_key})...")
 s3.upload_file(video_output, S3_BUCKET, video_s3_key, ExtraArgs={'ContentType': 'video/mp4'})
