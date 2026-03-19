@@ -5,6 +5,7 @@ import re
 import boto3
 import requests
 import time
+import random
 from playwright.async_api import async_playwright
 
 # 1. VARIABLES DE ENTORNO (El "Cerebro" manda esto)
@@ -17,16 +18,18 @@ print(f"🎬 Iniciando motor gráfico para: {FLOW_ID}")
 
 # 2. CONFIGURACIÓN DE RUTAS Y S3
 s3 = boto3.client('s3')
-match = re.search(r'\d+', FLOW_ID)
-num_str = match.group() if match else "001"
-audio_filename = f"aire_{num_str}.mp4" 
+
+# 🚀 FIX: Ruleta Musical (Elige un audio aleatorio del 1 al 40)
+num_audio = random.randint(1, 40)
+audio_filename = f"aire_{num_audio:03d}.mp4" 
+
 audio_local = "/tmp/audio.mp4"
 output_mp4 = "/tmp/reel_final.mp4"
 video_dir = "/tmp/videos/"
 
 # Descarga de audio desde la bodega
 try:
-    print(f"🎵 Descargando {audio_filename} desde S3...")
+    print(f"🎵 Ruleta musical: Descargando pista base ({audio_filename}) desde S3...")
     s3.download_file(S3_BUCKET, f"audios/{audio_filename}", audio_local)
 except Exception as e:
     print(f"⚠️ Audio no encontrado. Generando pista de silencio...")
