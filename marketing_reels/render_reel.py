@@ -123,7 +123,7 @@ try:
     CAPTION = os.environ.get("CAPTION_INSTAGRAM", f"Reporte de aire: {FLOW_ID} 😷 #AIreGPT")
 
     # --- INICIO BLOQUE COMENTADO (Descomentar para producción) ---
-    """
+
     if IG_TOKEN and IG_USER_ID:
         print("🤖 Publicando en Instagram...")
         res_crear = requests.post(f"https://graph.facebook.com/v19.0/{IG_USER_ID}/media", data={
@@ -159,7 +159,7 @@ try:
                 print(f"❌ Meta tardó demasiado. Estado final: {status_code}")
         else:
             print(f"❌ Fallo al crear contenedor: {json.dumps(res_crear)}")
-    """
+
     # --- FIN BLOQUE COMENTADO ---
     # ========================================================
 
