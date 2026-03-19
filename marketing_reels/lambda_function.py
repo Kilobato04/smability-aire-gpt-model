@@ -114,6 +114,7 @@ def lambda_handler(event, context):
 
     # 4. 🔥 LE PASAMOS LA ESTAFETA AL OBRERO (CODEBUILD)
     payload_para_codebuild = {
+        'MODE': 'standard', # <--- AVISAMOS QUE ES EL MODO NORMAL
         'FLOW_ID': flow_id,
         'TEMA_COLOR': tema,
         'MESSAGES_JSON': json.dumps(flujo_elegido["messages"]),
@@ -121,16 +122,15 @@ def lambda_handler(event, context):
         'ES_CONTINGENCIA': str(hay_contingencia).lower()
     }
 
-    #--
     try:
         response = codebuild.start_build(
             projectName=CODEBUILD_PROJECT,
-            environmentVariablesOverride=[ # <--- CORREGIDO (Sin "s")
+            environmentVariablesOverride=[
                 {'name': k, 'value': str(v), 'type': 'PLAINTEXT'} for k, v in payload_para_codebuild.items()
             ]
         )
         build_id = response['build']['id']
-        print(f"🚀 ¡CodeBuild disparado con éxito! ID de Trabajo: {build_id}")
+        print(f"🚀 ¡CodeBuild (MODO NORMAL) disparado con éxito! ID de Trabajo: {build_id}")
         
         return {'statusCode': 200, 'body': f'Manager terminó. Trabajo {build_id} enviado a CodeBuild.'}
         
