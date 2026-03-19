@@ -14,6 +14,14 @@ TEMA = os.environ.get("TEMA_COLOR", "red_alert")
 MESSAGES_JSON = os.environ.get("MESSAGES_JSON", "[]")
 S3_BUCKET = os.environ.get("S3_BUCKET", "smability-marketing-reels")
 
+# ==========================================================
+# 🚀 FIX DE SEGURIDAD: EVITAR EL VIDEO FANTASMA
+# ==========================================================
+if MESSAGES_JSON == "[]" or FLOW_ID == "default_001":
+    print("🛑 [SEGURIDAD] No se recibieron datos del Cerebro. Abortando renderizado para evitar videos vacíos.")
+    exit(0) # Apaga el script inmediatamente
+# ==========================================================
+
 print(f"🎬 Iniciando motor gráfico para: {FLOW_ID}")
 
 # 2. CONFIGURACIÓN DE RUTAS Y S3
