@@ -6,7 +6,6 @@ import requests
 import boto3
 import nest_asyncio
 import random 
-from openai import OpenAI
 from playwright.async_api import async_playwright
 
 nest_asyncio.apply()
@@ -20,7 +19,6 @@ IG_USER_ID = os.environ.get("IG_ACCOUNT_ID")
 S3_BUCKET = os.environ.get("S3_BUCKET", "smability-marketing-reels")
 
 s3 = boto3.client('s3')
-client = OpenAI(api_key=OPENAI_KEY)
 
 # Directorios de trabajo en AWS (/tmp/)
 frames_dir = "/tmp/frames"
@@ -45,7 +43,7 @@ except Exception as e:
     os.system(f"ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo -t 10 {audio_local} -y")
 
 # ==========================================
-# FASE 2: CEREBRO OPENAI (CAPTION)
+# FASE 2: CEREBRO OPENAI (CAPTION DIRECTO)
 # ==========================================
 def generar_caption_instagram():
     print("📡 Consultando el Gemelo Digital (API Live)...")
@@ -64,7 +62,7 @@ def generar_caption_instagram():
                 nivel_riesgo = punto.get("risk", "REGULAR")
                 
         print(f"🚨 Alerta detectada: {peor_estacion.upper()} con {int(max_ias)} PTS ({nivel_riesgo})")
-        print("🧠 Generando copy persuasivo con OpenAI...")
+        print("🧠 Generando copy persuasivo con peticiones directas...")
         
         prompt = f"""
         Actúa como el Community Manager de AIreGPT. Escribe un caption corto y directo para un Instagram Reel (máximo 3 o 4 líneas). 
@@ -74,17 +72,26 @@ def generar_caption_instagram():
         Cierre: Agrega exactamente 3 hashtags relevantes (ej. #CDMX #CalidadDelAire #AIreGPT #Contingencia). No uses emojis excesivos, mantenlo profesional.
         """
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
+        # 🚀 FIX: Usamos `requests` igual que en la Lambda. A prueba de fallos de actualizaciones.
+        headers = {
+            "Authorization": f"Bearer {OPENAI_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "gpt-4o-mini",
+            "messages": [
                 {"role": "system", "content": "Eres un experto en marketing de retención y alertas climáticas."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7 
-        )
-        return response.choices[0].message.content
+            "temperature": 0.7 
+        }
+        
+        res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload, timeout=20)
+        res.raise_for_status()
+        return res.json()["choices"][0]["message"]["content"].strip()
+        
     except Exception as e:
-        print(f"❌ Error en el proceso: {e}")
+        print(f"❌ Error en el proceso OpenAI: {e}")
         return "Reporte de Calidad del Aire. Conecta Telegram a @airegptcdmx_bot. #AIreGPT #CDMX"
 
 caption_del_dia = generar_caption_instagram()
