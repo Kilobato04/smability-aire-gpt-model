@@ -68,10 +68,23 @@ def lambda_handler(event, context):
     with open("master_flows.json", "r", encoding="utf-8") as f:
         master_data = json.load(f)
         
-    if hay_contingencia:
+    # ========================================================
+    # 🎯 MODO FRANCOTIRADOR (Para Tests Manuales)
+    # ========================================================
+    if event.get("force_flow_id"):
+        force_id = event.get("force_flow_id")
+        print(f"🎯 MODO FRANCOTIRADOR: Forzando el flujo [{force_id}]")
+        flujo_elegido = next((f for f in master_data["flows"] if f.get("flow_id") == force_id), None)
+        
+        if not flujo_elegido:
+            print(f"❌ Error: El ID {force_id} no existe en master_flows.json")
+            return {'statusCode': 400, 'body': 'Flow ID no encontrado'}
+            
+    elif hay_contingencia:
         print("⚡ OVERRIDE: Modo Contingencia Activado.")
         flujos_contingencia = [f for f in master_data["flows"] if f.get("contingencia_override")]
         flujo_elegido = flujos_contingencia[0] # Tomamos el de emergencia
+        
     else:
         # Día normal: Filtramos primero y elegimos uno al azar directamente
         flujos_normales = [f for f in master_data["flows"] if not f.get("contingencia_override")]
