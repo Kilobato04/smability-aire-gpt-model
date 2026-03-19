@@ -18,7 +18,7 @@ echo -e "${GREEN}🚀 INICIANDO DESPLIEGUE - MARKETING ENGINE${NC}"
 # 1. SINCRONIZACIÓN AUTOMÁTICA (GIT)
 echo -e "📦 ${YELLOW}Sincronizando cambios con GitHub...${NC}"
 git add .
-git commit -m "Deploy automático: Update Marketing Engine" > /dev/null 2>&1 || echo "   (Sin cambios pendientes de commit...)"
+git commit -m "Deploy automático: Update Marketing Engine + Mapa Dinámico" > /dev/null 2>&1 || echo "   (Sin cambios pendientes de commit...)"
 echo -e "⬆️  Subiendo cambios a rama ${REPO_BRANCH}..."
 git push origin $REPO_BRANCH
 
@@ -29,12 +29,18 @@ fi
 echo -e "${GREEN}✅ GitHub actualizado correctamente.${NC}"
 
 # 2. EMPAQUETADO Y DESPLIEGUE DIRECTO A LAMBDA
-echo -e "📦 ${YELLOW}Empaquetando dependencias (OpenAI) y código...${NC}"
+echo -e "📦 ${YELLOW}Empaquetando dependencias y código...${NC}"
 rm -rf package function.zip
 mkdir package
 pip3 install -r requirements.txt -t package/ > /dev/null 2>&1
+
+# 🚀 FIX: Copiamos la flota completa de archivos al ZIP de la Lambda por seguridad
 cp lambda_function.py package/
 cp master_flows.json package/
+cp render_reel.py package/ 2>/dev/null || :
+cp render_map_reel.py package/ 2>/dev/null || :
+cp template_base.html package/ 2>/dev/null || :
+cp buildspec.yml package/ 2>/dev/null || :
 
 cd package
 zip -rq ../function.zip .
