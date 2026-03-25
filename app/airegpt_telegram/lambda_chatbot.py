@@ -743,6 +743,23 @@ def send_telegram_photo_local(chat_id, photo_path, caption, markup=None):
         print(f"❌ [TG UPLOAD ERROR]: {e}")
         send_telegram(chat_id, caption, markup)
 
+def send_telegram_video(chat_id, video_url, caption="", markup=None):
+    """Envía un video nativo embebido directamente en el chat de Telegram"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendVideo"
+    payload = {
+        "chat_id": chat_id, 
+        "video": video_url, 
+        "caption": caption, 
+        "parse_mode": "Markdown"
+    }
+    if markup: payload["reply_markup"] = markup
+    try:
+        r = requests.post(url, json=payload, timeout=20)
+        if r.status_code != 200:
+            print(f"❌ [TG VIDEO FAIL]: {r.text}")
+    except Exception as e:
+        print(f"❌ [TG VIDEO ERROR]: {e}")
+
 # --- HANDLER ---
 def lambda_handler(event, context):
     # ---------------------------------------------------------
@@ -1372,6 +1389,21 @@ def lambda_handler(event, context):
             elif data == "SAVE_OTHER":
                 resp = "✍️ **¿Qué nombre le ponemos?**\n\nEscribe el nombre que quieras (Ej. Ponle *'Escuela'*, *'Gym'*, *'Casa Mamá'*)."
 
+            elif data == "PLAY_ONBOARDING":
+                # URL pública del S3. ¡Telegram irá a descargarla y la enviará al chat!
+                video_url = "https://smability-marketing-reels.s3.us-east-1.amazonaws.com/outputs/onboarding_airegpt.MP4"
+                
+                # Le decimos al usuario "El bot está subiendo un video..."
+                send_telegram_action(chat_id, "upload_video") 
+                
+                # Enviamos el video nativo
+                send_telegram_video(
+                    chat_id, 
+                    video_url, 
+                    "🎥 *Tutorial AIreGPT (50 seg)*\nDescubre cómo blindarte contra multas y contingencias."
+                )
+                return {'statusCode': 200, 'body': 'OK'}
+
             # =========================================================
             # 🚬 FLUJO GAMIFICACIÓN: CIGARROS, EDAD URBANA Y ONBOARDING
             # =========================================================
@@ -1565,14 +1597,11 @@ def lambda_handler(event, context):
                 print(f"🆕 [START] User: {user_id}")
                 send_persistent_gps_button(chat_id)
                 
-                # URL absoluta de tu bucket de S3 (Reels)
-                video_tutorial_url = "https://smability-marketing-reels.s3.us-east-1.amazonaws.com/outputs/onboarding_airegpt.MP4"
-                
                 markup_onboarding = {
                     "inline_keyboard": [
                         [{"text": "📍 Configurar mi Casa", "callback_data": "SET_LOC_casa"}],
                         [{"text": "🚗 Registrar mi Auto", "callback_data": "SET_VEHICLE_start"}],
-                        [{"text": "🎥 Ver Video Tutorial (50 seg)", "url": video_tutorial_url}]
+                        [{"text": "🎥 Ver Video Tutorial (30 seg)", "callback_data": "PLAY_ONBOARDING"}]
                     ]
                 }
                 msg_envio = cards.CARD_ONBOARDING.format(**card_args)
