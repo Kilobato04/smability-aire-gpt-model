@@ -1565,10 +1565,14 @@ def lambda_handler(event, context):
                 print(f"🆕 [START] User: {user_id}")
                 send_persistent_gps_button(chat_id)
                 
+                # URL absoluta de tu bucket de S3 (Reels)
+                video_tutorial_url = "https://smability-marketing-reels.s3.us-east-1.amazonaws.com/outputs/onboarding_airegpt.MP4"
+                
                 markup_onboarding = {
                     "inline_keyboard": [
                         [{"text": "📍 Configurar mi Casa", "callback_data": "SET_LOC_casa"}],
-                        [{"text": "🚗 Registrar mi Auto", "callback_data": "SET_VEHICLE_start"}]
+                        [{"text": "🚗 Registrar mi Auto", "callback_data": "SET_VEHICLE_start"}],
+                        [{"text": "🎥 Ver Video Tutorial (50 seg)", "url": video_tutorial_url}]
                     ]
                 }
                 msg_envio = cards.CARD_ONBOARDING.format(**card_args)
