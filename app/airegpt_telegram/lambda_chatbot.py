@@ -1601,7 +1601,7 @@ def lambda_handler(event, context):
                     "inline_keyboard": [
                         [{"text": "📍 Configurar mi Casa", "callback_data": "SET_LOC_casa"}],
                         [{"text": "🚗 Registrar mi Auto", "callback_data": "SET_VEHICLE_start"}],
-                        [{"text": "🎥 Ver Video Tutorial (30 seg)", "callback_data": "PLAY_ONBOARDING"}]
+                        [{"text": "🎥 Ver Video Tutorial (50 seg)", "callback_data": "PLAY_ONBOARDING"}]
                     ]
                 }
                 msg_envio = cards.CARD_ONBOARDING.format(**card_args)
