@@ -1102,7 +1102,9 @@ def lambda_handler(event, context):
                     nombre_destino = locs[dest_key].get('display_name', dest_key.capitalize()) if dest_key and dest_key in locs else "Destino"
                     
                     vector_t = None
-                    es_ho = (transp.get('medio') == 'home_office')
+                    # 🛡️ FIX FIN DE SEMANA
+                    es_fin_de_semana = (datetime.utcnow() - timedelta(hours=6)).weekday() >= 5
+                    es_ho = (transp.get('medio') == 'home_office') or es_fin_de_semana
                     
                     # Llamada a la API de calidad de aire con el destino dinámico
                     if dest_key and dest_key != 'casa' and not es_ho:
@@ -1142,7 +1144,8 @@ def lambda_handler(event, context):
                         
                         # 🚀 FIX: TEXTO DINÁMICO REFORZADO
                         if es_ho or not dest_key: 
-                            rutina_txt = "🏠 **Tu rutina:** Modalidad Home Office"
+                            texto_rutina_base = "Modalidad Fin de Semana" if es_fin_de_semana else "Modalidad Home Office"
+                            rutina_txt = f"🏠 **Tu rutina:** {texto_rutina_base}"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
                         else:
                             emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
@@ -1441,7 +1444,9 @@ def lambda_handler(event, context):
                     nombre_destino = locs[dest_key].get('display_name', dest_key.capitalize()) if dest_key and dest_key in locs else "Destino"
                     
                     vector_t = None
-                    es_ho = (transp.get('medio') == 'home_office')
+                    # 🛡️ FIX FIN DE SEMANA
+                    es_fin_de_semana = (datetime.utcnow() - timedelta(hours=6)).weekday() >= 5
+                    es_ho = (transp.get('medio') == 'home_office') or es_fin_de_semana
                     
                     # Llamada a la API de calidad de aire con el destino dinámico
                     if dest_key and dest_key != 'casa' and not es_ho:
@@ -1481,7 +1486,8 @@ def lambda_handler(event, context):
                         
                         # 🚀 FIX: TEXTO DINÁMICO REFORZADO
                         if es_ho or not dest_key: 
-                            rutina_txt = "🏠 **Tu rutina:** Modalidad Home Office"
+                            texto_rutina_base = "Modalidad Fin de Semana" if es_fin_de_semana else "Modalidad Home Office"
+                            rutina_txt = f"🏠 **Tu rutina:** {texto_rutina_base}"
                             cigs_txt = f"Respiraste el equivalente a *{cigs} cigarros invisibles* filtrados por tu casa."
                         else:
                             emoji_rut = medio_str.split(' ')[0] if ' ' in medio_str else '📍'
