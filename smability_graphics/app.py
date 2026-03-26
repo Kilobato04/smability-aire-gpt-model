@@ -88,7 +88,9 @@ def ejecutar_job_nocturno():
             
             # 2. API Call Trabajo (Si aplica)
             vector_t = None
-            es_ho = (transp.get('medio') == 'home_office')
+            # 🛡️ FIX FIN DE SEMANA: Validamos si "ayer" fue sábado (5) o domingo (6)
+            es_fin_de_semana = ayer.weekday() >= 5
+            es_ho = (transp.get('medio') == 'home_office') or es_fin_de_semana
 
             if dest_key and not es_ho:
                 lat_t, lon_t = locs[dest_key]['lat'], locs[dest_key]['lon']
@@ -235,7 +237,10 @@ def generar_grafica_serpiente(user_id):
     transp = user.get('profile_transport', {'medio': 'auto_ventana', 'tiempo_traslado_horas': 2})
     medio_transporte = transp.get('medio', 'transito').upper().replace('_', ' ')
     duracion_traslado = float(transp.get('tiempo_traslado_horas', transp.get('horas', 2)))
-    es_ho = (transp.get('medio') == 'home_office')
+    
+    # 🛡️ FIX FIN DE SEMANA: Forzamos Home Office si es Sábado o Domingo
+    es_fin_de_semana = get_mexico_time().weekday() >= 5
+    es_ho = (transp.get('medio') == 'home_office') or es_fin_de_semana
 
     if es_ho or not destino_key:
         hora_salida, hora_llegada_casa = 25, 25 # Se queda en casa
