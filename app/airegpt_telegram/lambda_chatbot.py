@@ -346,14 +346,30 @@ def confirm_saved_location(user_id, tipo):
                         Key={'user_id': str(user_id)},
                         UpdateExpression=f"REMOVE locations.{k}.is_destination"
                     )
-        # --------------------------------------------
+
         
-        # --- FIX ÍTEM 6: INYECTAR ALERTA DEFAULT DE 100 PTS ---
+        # --- FIX ÍTEM 6 & DOBLE ANZUELO: INYECTAR ALERTAS DEFAULT ---
         alerta_default = {'umbral': 100, 'active': True, 'consecutive_sent': 0}
+        
+        # Preparamos los valores base para DynamoDB
+        vals = {
+            ':val': {
+                'lat': draft['lat'], 
+                'lon': draft['lon'], 
+                'display_name': display_name, 
+                'active': True,
+                'is_destination': es_destino
+            },
+            ':alert_val': alerta_default
+        }
 
         # 3. Query: Guardamos y BORRAMOS el draft para no reusarlo por error
-        # Inyectamos alerts.threshold.#loc = :alert_val en la misma operación
-        if is_new: 
+        if key == 'casa' and is_new:
+            # 🎯 DOBLE ANZUELO: Inyectar reporte a las 9:00 AM diario para Casa
+            schedule_default = {'time': '09:00', 'days': [0, 1, 2, 3, 4, 5, 6], 'active': True}
+            update_expr = "SET locations.#loc = :val, alerts.threshold.#loc = :alert_val, alerts.schedule.#loc = :sched_val REMOVE draft_location"
+            vals[':sched_val'] = schedule_default
+        elif is_new: 
             update_expr = "SET locations.#loc = :val, alerts.threshold.#loc = :alert_val REMOVE alerts.schedule.#loc, draft_location"
         else: 
             update_expr = "SET locations.#loc = :val, alerts.threshold.#loc = :alert_val REMOVE draft_location"
@@ -362,16 +378,7 @@ def confirm_saved_location(user_id, tipo):
             Key={'user_id': str(user_id)}, 
             UpdateExpression=update_expr, 
             ExpressionAttributeNames={'#loc': key}, 
-            ExpressionAttributeValues={
-                ':val': {
-                    'lat': draft['lat'], 
-                    'lon': draft['lon'], 
-                    'display_name': display_name, 
-                    'active': True,
-                    'is_destination': es_destino # <--- AQUÍ SE ANCLA EL DESTINO
-                },
-                ':alert_val': alerta_default
-            }
+            ExpressionAttributeValues=vals
         )
         
         # 4. Confirmación
@@ -379,6 +386,9 @@ def confirm_saved_location(user_id, tipo):
         count = len(user_final.get('locations', {}))
         
         msg = f"✅ **'{display_name}' guardada exitosamente.**\n🚨 *Alerta de emergencia activada (>100 pts).*"
+        
+        if key == 'casa' and is_new:
+            msg += "\n⏰ *Reporte diario programado (09:00 AM).*"
         
         # Feedback visual de la ruta
         if es_destino:
