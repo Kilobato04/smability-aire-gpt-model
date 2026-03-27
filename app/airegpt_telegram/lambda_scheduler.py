@@ -237,9 +237,11 @@ def process_user(user, current_hour_str, contingency_data):
     health = user.get('health_profile', {})
     h_str = ", ".join([v.get('condition','') for v in health.values()]) if health else None
 
-    # 🛡️ GATEKEEPER ACTUALIZADO:
-    # Si es Premium o si es la "Hora de Oro" (9am) para Free, permitimos.
-    can_alerts = is_premium or (current_hour_int == 9)
+    # 🛡️ GATEKEEPER STRICTO (TRIAL / FREE)
+    free_alerts_sent = int(user.get('free_alerts_sent', 0))
+    
+    # Puede procesar alertas si está en Trial/Premium, O si es Free pero aún le quedan "vidas"
+    can_alerts = is_premium or (free_alerts_sent < 3)
     can_contingency = True # Las contingencias las mandamos a todos o según tu lógica
 
     # 1. CONTINGENCIA (Filtro por Tier de Business Logic)
@@ -297,7 +299,12 @@ def process_user(user, current_hour_str, contingency_data):
                 if not isinstance(config, dict) or not config.get('active'): 
                     continue
 
-                # 🚩 EL FILTRO: ¿Ya alcanzó el límite de su plan (Ej: 1 para Free)?
+                # 🚩 FILTRO DE EXPIRACIÓN: Si es FREE, no hay reportes diarios gratis.
+                if not is_premium:
+                    print(f"🔒 [EXPIRED] {first_name} es FREE. No tiene acceso al reporte matutino programado.")
+                    break # Abortamos el envío del reporte programado
+                
+                # 🚩 EL FILTRO DE LÍMITE: ¿Ya alcanzó el límite de su plan?
                 if sent_this_run >= max_allowed:
                     print(f"🔒 [LIMIT] {first_name} alcanzó límite de reportes ({tier})")
                     break # Deja de procesar más ubicaciones
@@ -459,16 +466,18 @@ def process_user(user, current_hour_str, contingency_data):
                             count = int(config.get('consecutive_sent', 0))
                             print(f"   🚨 [TRIGGER] CONDICIÓN CUMPLIDA. Consecutive sent: {count}")
 
-                            # --- FIX NIVEL 4: CICLO DE ALERTAS FREE Y PREMIUM ---
-                            tier = user.get('subscription', {}).get('status', 'FREE')
-                            
+                            # --- FIX NIVEL 4: SEPARACIÓN CLARA TRIAL/PREMIUM vs FREE ---
+                            # 'is_premium' ya fue validado por Stripe al inicio de la función
                             should_send = False
                             is_paywall = False
                             
-                            if tier in ["PREMIUM", "TRIAL"]:
-                                if count < 3: should_send = True # Premium/Trial no recibe spam
+                            if is_premium:
+                                # TRIAL y PREMIUM reciben alertas de emergencia ilimitadas en su vida.
+                                # 'count' es solo un anti-spam para no avisar 3 horas seguidas del mismo evento.
+                                if count < 3: 
+                                    should_send = True 
                             else:
-                                # LÓGICA FREE: 3 alertas de vida
+                                # LÓGICA FREE: 3 alertas de emergencia en toda su vida
                                 free_alerts_sent = int(user.get('free_alerts_sent', 0))
                                 if free_alerts_sent < 3:
                                     should_send = True
@@ -477,9 +486,9 @@ def process_user(user, current_hour_str, contingency_data):
                                         table.update_item(Key={'user_id': user_id}, UpdateExpression="SET free_alerts_sent = :val", ExpressionAttributeValues={':val': free_alerts_sent + 1})
                                     except: pass
                                 else:
-                                    # Se le acabaron las de prueba
+                                    # Se le acabaron las de prueba. Muro de pago al canto.
                                     is_paywall = True
-                                    should_send = True 
+                                    should_send = True
                             
                             if should_send:
                                 if is_paywall:
