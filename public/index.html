@@ -608,33 +608,24 @@
         
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // --- 3. DEFINICIÓN DE CAPAS (SÁNDWICH PRO) ---
+        // --- 3. DEFINICIÓN DE CAPAS ---
         
-        // Nivel 1: Fondo (Abajo)
-        map.createPane('basePane');   map.getPane('basePane').style.zIndex = 200;
+        // Nivel 1: Fondo Mapbox (Abajo)
+        map.createPane('basePane');   
+        map.getPane('basePane').style.zIndex = 200;
 
-        // Nivel 2: Tu Modelo (En medio)
-        map.createPane('gridPane');   map.getPane('gridPane').style.zIndex = 400;
+        // Nivel 2: Tu Modelo de Calidad del Aire (En medio)
+        map.createPane('gridPane');   
+        map.getPane('gridPane').style.zIndex = 400;
 
-        // Nivel 3: Etiquetas y Calles (Arriba)
-        map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 600;
-        map.getPane('labelsPane').style.pointerEvents = 'none'; // Click traspasa
-
-        // --- 4. CARGAR LOS MAPAS ---
-
-        // A. FONDO: CARTO DARK NO LABELS (Negro Puro)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-            pane: 'basePane', 
-            opacity: 1,
-            maxZoom: 19,
-            attribution: '© OpenStreetMap, © CARTO'
-        }).addTo(map);
-
-        // B. TU OVERLAY PERSONALIZADO (Mapbox: Calles rojas/blancas)
-        const labelsLayer = L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}&v=1`, {
-            pane: 'labelsPane', 
-            opacity: 1, 
-            tileSize: 512, zoomOffset: -1, maxZoom: 19
+        // --- 4. CARGAR EL MAPA BASE (Homologado a RainApp) ---
+        
+        const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiYTU2YmIyYzZiNjUxOGI5MDQ5YWVmNmRkZDg5ZTQ0NDQifQ.U_W7cH_L3M5l4DZX3fbljA';
+        
+        L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
+            pane: 'basePane',
+            maxZoom: 18,
+            attribution: '© Mapbox'
         }).addTo(map);
         
         // Filtro opcional por si el rojo/blanco brilla demasiado
