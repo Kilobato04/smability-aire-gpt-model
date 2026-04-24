@@ -627,8 +627,6 @@
             attribution: '© Mapbox'
         }).addTo(map);
         
-        // Filtro opcional por si el rojo/blanco brilla demasiado
-        labelsLayer.getContainer().style.filter = "brightness(1)";
         
         const CONFIG = {
             ias: { name: 'Índice Aire y Salud', unit: 'Pts', min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] },
