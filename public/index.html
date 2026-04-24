@@ -620,8 +620,7 @@
 
         // --- 4. CARGAR EL MAPA BASE (Homologado a RainApp) ---
         
-        const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiYTU2YmIyYzZiNjUxOGI5MDQ5YWVmNmRkZDg5ZTQ0NDQifQ.U_W7cH_L3M5l4DZX3fbljA';
-        
+        // Usamos directamente tu MAPBOX_TOKEN que ya está declarado arriba
         L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
             pane: 'basePane',
             maxZoom: 18,
