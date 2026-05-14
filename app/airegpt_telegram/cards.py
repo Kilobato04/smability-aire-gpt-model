@@ -610,38 +610,44 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         hnc_reminder=hnc_str,
         footer=BOT_FOOTER
     )
-# --- 3. ACTUALIZAR BOTONES DE RESUMEN (UPSELLING) ---
+
+# --- 3. ACTUALIZAR BOTONES DE RESUMEN (UPSELLING + MINI APP) ---
 def get_summary_buttons(locations_dict, is_premium=False):
     """
-    Genera botones de consulta para TODAS las ubicaciones guardadas.
-    Argumentos:
-      - locations_dict: El diccionario 'locations' directo de DynamoDB.
-      - is_premium: Booleano para mostrar/ocultar botón de pago.
+    Genera botones de consulta para TODAS las ubicaciones guardadas,
+    inyecta el mapa en vivo y muestra opciones avanzadas.
     """
     keyboard = []
     
-    # 1. Fila de Consultas (Dinámica)
-    # Creamos botones para CADA ubicación en el diccionario
+    # 1. Fila de Consultas (Dinámica - Ej. Casa, Trabajo)
     row_locs = []
     for key, val in locations_dict.items():
         # Nombre bonito para el botón
         label = val.get('display_name', key.capitalize())
-        # Llave segura para el callback (ej. "CHECK_AIR_casa")
+        # Llave segura para el callback
         safe_key = str(key).replace(" ", "_")
         
         row_locs.append({"text": f"💨 {label}", "callback_data": f"CHECK_AIR_{safe_key}"})
     
-    # Si son muchas, las dividimos en filas de 2 para que no se vea feo
-    # (Chunking list into size 2)
+    # Dividimos en filas de 2 para mantener el diseño compacto
     for i in range(0, len(row_locs), 2):
         keyboard.append(row_locs[i:i+2])
+        
+    # 2. NUEVO RENGLÓN: El Gatillo de la Mini App (Radar)
+    # Este botón abre el panel inmersivo sin salir de Telegram
+    keyboard.append([
+        {
+            "text": "🗺️ Radar AIreGPT (En Vivo)", 
+            "web_app": {"url": "https://rainappcdmx.netlify.app/"}
+        }
+    ])
     
-    # 2. Fila de Upselling / Menú Avanzado
+    # 3. Fila de Upselling / Menú Avanzado
     if not is_premium:
-        # Aquí mutamos el botón viejo al nuevo "Go Premium"
+        # Mutamos el botón para los usuarios Free
         keyboard.append([{"text": "💎 Go Premium", "callback_data": "GO_PREMIUM"}])
     else:
-        # Y si YA ES premium, le mostramos su portal avanzado
+        # Portal avanzado para los que ya pagan
         keyboard.append([{"text": "⚙️ Configuración Avanzada", "callback_data": "CONFIG_ADVANCED"}])
         
     return {"inline_keyboard": keyboard}
