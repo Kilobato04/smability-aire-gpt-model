@@ -637,8 +637,8 @@ def get_summary_buttons(locations_dict, is_premium=False):
     # Este botón abre el panel inmersivo sin salir de Telegram
     keyboard.append([
         {
-            "text": "🗺️ Radar AIreGPT (En Vivo)", 
-            "web_app": {"url": "https://rainappcdmx.netlify.app/"}
+            "text": "🔴 AIreGPT Map Live", 
+            "web_app": {"url": "https://map.airegpt.ai/"}
         }
     ])
     
