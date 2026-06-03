@@ -431,12 +431,17 @@ He borrado todos tus datos y configuraciones de mi base de datos de forma perman
 🌬️ *¡Cuídate mucho!* {user_name} Si alguna vez necesitas volver a consultar la calidad del aire o configurar alertas, solo dime *Hola*."""
 
 # --- BOTONES DE EXPOSICIÓN Y ONBOARDING ---
-def get_exposure_button():
-    """Botón para calcular exposición + Retorno al resumen"""
-    return {"inline_keyboard": [
+def get_exposure_button(lat=None, lon=None, loc_key=None):
+    """Botón para calcular exposición + Retorno al resumen + Botón de Lluvia"""
+    kb = [
         [{"text": "💨🚬 ¿Cuántos cigarros respiré?", "callback_data": "CHECK_EXPOSURE"}],
-        [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}] # <--- Añadido aquí
-    ]}
+        [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}] 
+    ]
+    # Si le pasamos coordenadas, inyecta el botón de lluvia como opción principal
+    if lat is not None and lon is not None:
+        safe_key = loc_key if loc_key else "GPS"
+        kb.insert(0, [{"text": "🌧️ Ver Lluvia Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{safe_key}"}])
+    return {"inline_keyboard": kb}
 
 def get_transport_buttons():
     # UX Ajustada: Consolidamos Auto, agregamos Metrobús
@@ -637,7 +642,7 @@ def get_summary_buttons(locations_dict, is_premium=False):
     # Este botón abre el panel inmersivo sin salir de Telegram
     keyboard.append([
         {
-            "text": "🔴 AIreGPT Map Live", 
+            "text": "🔴 AIreGPT Live Map", 
             "web_app": {"url": "https://map.airegpt.ai/"}
         }
     ])
@@ -909,3 +914,70 @@ def get_hnc_buttons():
             [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]
         ]
     }
+
+# --- 2. PEGAR ESTAS NUEVAS CONSTANTES Y FUNCIONES AL FINAL ---
+CARD_RAIN_REPORT = """🌧️ *Reporte de Lluvia y Movilidad*
+📍 {location_desc}
+
+⏱️ *Estado Actual:* {current_intensity} ({current_mm} mm/h)
+{alert_circle} *Alerta:* {alert_text}
+💬 _{short_message}_
+
+🔮 *Pronóstico (próximas 6 hrs):*
+{forecast_table}
+
+🚲 *Ecobici en tu cuadrante* ({total_bikes} bicis en {total_stations} est.):
+{ecobici_list}
+
+{footer}"""
+
+def generate_rain_card(data):
+    ubic = data.get("ubicacion", {})
+    lluvia = data.get("lluvia", {})
+    eco = data.get("movilidad_ecobici", {})
+    pronostico = data.get("pronostico_6h", [])
+
+    loc_desc = f"{ubic.get('col', 'Desconocida')}, {ubic.get('mun', '')} (a {ubic.get('distancia_km', 0)}km)"
+    alerta = lluvia.get("alerta_predictiva", "NORMAL")
+    alert_circle = "🟢" if alerta == "NORMAL" else "🟡" if alerta == "PRECAUCION" else "🔴"
+
+    # Pronóstico con Emojis
+    fc_lines = []
+    for p in pronostico:
+        mm = p.get("mm_h", 0)
+        intense = p.get("intensidad", "Sin lluvia")
+        hora = p.get("hora", "")
+        emj = "☁️" if mm == 0 else "🌦️" if mm < 5 else "⛈️"
+        warn = " ⚠️" if mm > 5 else ""
+        fc_lines.append(f"`{hora}` | {emj} {intense} ({mm} mm/h){warn}")
+    forecast_table = "\n".join(fc_lines) if fc_lines else "Sin datos."
+
+    # Ecobici con hipervínculos (Rutas en Google Maps)
+    eco_lines = []
+    for i, est in enumerate(eco.get("mejores_opciones", [])):
+        nom = est.get("nombre", "")
+        disp = est.get("disponibles", 0)
+        # 🔗 Enlace directo para abrir la ruta en el celular del usuario
+        gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={est.get('lat')},{est.get('lon')}"
+        
+        numeros = ["1️⃣", "2️⃣", "3️⃣"]
+        num_emoji = numeros[i] if i < len(numeros) else "🚲"
+        eco_lines.append(f"{num_emoji} [{nom}]({gmaps_url}) ({disp} disp.)")
+        
+    ecobici_list = "\n".join(eco_lines) if eco_lines else "No hay estaciones cercanas."
+
+    return CARD_RAIN_REPORT.format(
+        location_desc=loc_desc, current_intensity=lluvia.get("intensidad", "N/A"),
+        current_mm=lluvia.get("mm_h", 0), alert_circle=alert_circle, alert_text=alerta,
+        short_message=lluvia.get("mensaje_corto", ""), forecast_table=forecast_table,
+        total_bikes=eco.get("total_bicicletas", 0), total_stations=eco.get("estaciones_en_celda", 0),
+        ecobici_list=ecobici_list, footer=BOT_FOOTER
+    )
+
+def get_rain_buttons(loc_key):
+    # Si viene del GPS y no tiene llave, el regreso lo manda al resumen
+    back_callback = f"CHECK_AIR_{loc_key}" if loc_key and loc_key != "GPS" else "ver_resumen"
+    return {"inline_keyboard": [
+        [{"text": "🌬️ Volver a Calidad del Aire", "callback_data": back_callback}],
+        [{"text": "🗺️ AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}}]
+    ]}
