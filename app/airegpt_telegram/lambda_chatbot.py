@@ -715,14 +715,14 @@ def send_persistent_gps_button(chat_id):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     markup = {
         "keyboard": [
-            [{"text": "📍 Calidad del Aire", "request_location": True}]
+            [{"text": "📍 Calidad del Aire y Lluvia", "request_location": True}]
         ],
         "resize_keyboard": True,
         "is_persistent": True
     }
     payload = {
         "chat_id": chat_id, 
-        "text": "👇 *Pst... Usa este botón en cualquier momento para escanear el aire de donde estás parado:*", 
+        "text": "👇 *Pst... Usa este botón en cualquier momento para ver el aire y la lluvia desde tu ubicación:*",
         "parse_mode": "Markdown",
         "reply_markup": markup
     }
@@ -1016,7 +1016,7 @@ def lambda_handler(event, context):
                     ruta_imagen = os.path.join(directorio_actual, "banners", nombre_png)
                     
                     # Envío
-                    send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button())
+                    send_telegram_photo_local(chat_id, ruta_imagen, report_text, markup=cards.get_exposure_button(lat, lon, loc_key))
                     return {'statusCode': 200, 'body': 'OK'}
                 
                 else:
@@ -1037,6 +1037,33 @@ def lambda_handler(event, context):
                 # Botones de Si/No
                 markup = cards.get_delete_confirmation_buttons(loc_name)
                 send_telegram(chat_id, resp, markup)
+                return {'statusCode': 200, 'body': 'OK'}
+            # ==========================================
+            # 🌧️ NUEVO MÓDULO: REPORTE DE LLUVIA Y ECOBICI
+            # ==========================================
+            elif data.startswith("CHECK_RAIN_"):
+                # Formato esperado: CHECK_RAIN_{lat}_{lon}_{loc_key}
+                parts = data.split("_")
+                if len(parts) >= 5:
+                    r_lat, r_lon = parts[2], parts[3]
+                    r_loc_key = "_".join(parts[4:]) # Reconstruimos la llave (ej. 'casa')
+                    
+                    send_telegram_action(chat_id, "typing")
+                    try:
+                        url_rain = f"https://2paokiaf6ytueh4c4cqnhtvq6e0gcpyk.lambda-url.us-east-1.on.aws/?lat={r_lat}&lon={r_lon}"
+                        r_rain = requests.get(url_rain, timeout=10).json()
+                        
+                        if r_rain.get("status") == "success":
+                            card_rain = cards.generate_rain_card(r_rain)
+                            botones_rain = cards.get_rain_buttons(r_loc_key)
+                            # Enviamos un MENSAJE NUEVO tal cual lo pediste
+                            send_telegram(chat_id, card_rain, markup=botones_rain)
+                        else:
+                            send_telegram(chat_id, "⚠️ No pude obtener los datos de lluvia para esta zona.")
+                    except Exception as e:
+                        print(f"Error fetching rain API: {e}")
+                        send_telegram(chat_id, "⚠️ Error de conexión con el modelo meteorológico.")
+                        
                 return {'statusCode': 200, 'body': 'OK'}
 
             # --- PASO 2: EJECUTAR BORRADO (CASCADA) ---
@@ -1800,6 +1827,9 @@ def lambda_handler(event, context):
             
             # 2. 🚀 FIX 4: LÓGICA SEPARADA (ON-DEMAND VS ONBOARDING)
             botones_pin = []
+
+            # --- INYECCIÓN QUIRÚRGICA: Agregamos el botón de lluvia al GPS ---
+            botones_pin.append([{"text": "🌧️ Ver Lluvia Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_GPS"}])
             
             if not has_casa:
                 # Si no tiene casa, asumimos que está en el Paso 1 del Onboarding
