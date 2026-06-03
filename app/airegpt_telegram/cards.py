@@ -6,7 +6,7 @@ BOT_VERSION = "v6.0"
 # --- NUEVO FOOTER LIMPIO ---
 BOT_FOOTER = """_Nota: Sugerencias de salud preventivas basadas en modelos ambientales. No sustituyen evaluación médica._
 
-[AIreGPT](https://www.smability.io/aire/gpt.html) | [Canal](https://t.me/smability) | [IG](https://instagram.com/airegpt.ai) | [TikTok](https://tiktok.com/@airegpt)"""
+[AIreGPT](https://airegpt.ai/) | [Canal](https://t.me/smability) | [IG](https://instagram.com/airegpt.ai) | [TikTok](https://tiktok.com/@airegpt)"""
 
 IAS_INFO = {
     "Buena": {"msg": "Aire limpio.", "rec": "¡Disfruta el exterior!", "emoji": "🟢"},
@@ -434,13 +434,17 @@ He borrado todos tus datos y configuraciones de mi base de datos de forma perman
 def get_exposure_button(lat=None, lon=None, loc_key=None):
     """Botón para calcular exposición + Retorno al resumen + Botón de Lluvia"""
     kb = [
-        [{"text": "💨🚬 ¿Cuántos cigarros respiré?", "callback_data": "CHECK_EXPOSURE"}],
-        [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}] 
+        [{"text": "💨🚬 ¿Cuántos cigarros respiré?", "callback_data": "CHECK_EXPOSURE"}]
     ]
-    # Si le pasamos coordenadas, inyecta el botón de lluvia como opción principal
+    
+    # Inyectamos el botón de Lluvia en medio (debajo de cigarros)
     if lat is not None and lon is not None:
         safe_key = loc_key if loc_key else "GPS"
-        kb.insert(0, [{"text": "🌧️ Ver Lluvia Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{safe_key}"}])
+        kb.append([{"text": "🌧️ Ver Lluvia Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{safe_key}"}])
+        
+    # El botón de perfil siempre va al final
+    kb.append([{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}])
+    
     return {"inline_keyboard": kb}
 
 def get_transport_buttons():
@@ -978,6 +982,7 @@ def get_rain_buttons(loc_key):
     # Si viene del GPS y no tiene llave, el regreso lo manda al resumen
     back_callback = f"CHECK_AIR_{loc_key}" if loc_key and loc_key != "GPS" else "ver_resumen"
     return {"inline_keyboard": [
-        [{"text": "🌬️ Volver a Calidad del Aire", "callback_data": back_callback}],
-        [{"text": "🗺️ AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}}]
+        [{"text": "🔙 Volver a Calidad del Aire", "callback_data": back_callback}],
+        [{"text": "🔴 AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}}],
+        [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]
     ]}
