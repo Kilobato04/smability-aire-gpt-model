@@ -1,5 +1,6 @@
 import urllib.parse
 import business_logic
+import re
 
 BOT_VERSION = "v6.0"
 
@@ -919,13 +920,13 @@ def get_hnc_buttons():
         ]
     }
 
-# --- 2. PEGAR ESTAS NUEVAS CONSTANTES Y FUNCIONES AL FINAL ---
-CARD_RAIN_REPORT = """🌧️ *Reporte de Lluvia y Movilidad*
-📍 {location_desc}
+# --- 2. PLANTILLA Y FUNCIÓN DE LLUVIA (OPTIMIZADA) ---
+CARD_RAIN_REPORT = """🌧️ *Reporte de Lluvia*
+📍 [Ubicación Actual]({maps_url})
 
 ⏱️ *Estado Actual:* {current_intensity} ({current_mm} mm/h)
 {alert_circle} *Alerta:* {alert_text}
-💬 _{short_message}_
+💬 _{short_message}_{risk_block}
 
 🔮 *Pronóstico (próximas 6 hrs):*
 {forecast_table}
@@ -935,17 +936,24 @@ CARD_RAIN_REPORT = """🌧️ *Reporte de Lluvia y Movilidad*
 
 {footer}"""
 
-def generate_rain_card(data):
-    ubic = data.get("ubicacion", {})
+def generate_rain_card(data, lat, lon):
     lluvia = data.get("lluvia", {})
     eco = data.get("movilidad_ecobici", {})
     pronostico = data.get("pronostico_6h", [])
+    riesgo = data.get("riesgo_historico") # Será None si el endpoint no lo envía
 
-    loc_desc = f"{ubic.get('col', 'Desconocida')}, {ubic.get('mun', '')} (a {ubic.get('distancia_km', 0)}km)"
+    # 1. URL de Google Maps para la Ubicación Actual
+    maps_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
+
     alerta = lluvia.get("alerta_predictiva", "NORMAL")
     alert_circle = "🟢" if alerta == "NORMAL" else "🟡" if alerta == "PRECAUCION" else "🔴"
 
-    # Pronóstico con Emojis
+    # 2. Bloque Dinámico de Riesgo Histórico (Solo aparece si existe la llave)
+    risk_block = ""
+    if riesgo:
+        risk_block = f"\n\n⚠️ *Riesgo Histórico de Inundación:* {riesgo.get('nivel', '')}\n📌 _{riesgo.get('detalle', '')}_"
+
+    # 3. Pronóstico con Emojis
     fc_lines = []
     for p in pronostico:
         mm = p.get("mm_h", 0)
@@ -956,26 +964,38 @@ def generate_rain_card(data):
         fc_lines.append(f"`{hora}` | {emj} {intense} ({mm} mm/h){warn}")
     forecast_table = "\n".join(fc_lines) if fc_lines else "Sin datos."
 
-    # Ecobici con hipervínculos (Rutas en Google Maps)
+    # 4. Ecobici Limpio y con Hipervínculos
     eco_lines = []
     for i, est in enumerate(eco.get("mejores_opciones", [])):
-        nom = est.get("nombre", "")
+        nom_raw = est.get("nombre", "")
+        # Eliminamos el patrón "CE-XXX " o "CE-XXX - " para limpiar el nombre
+        nom = re.sub(r'^CE-\d+\s*-?\s*', '', nom_raw).strip()
+        
         disp = est.get("disponibles", 0)
-        # 🔗 Enlace directo para abrir la ruta en el celular del usuario
-        gmaps_url = f"https://www.google.com/maps/dir/?api=1&destination={est.get('lat')},{est.get('lon')}"
+        # URL directo a Google Maps para la estación
+        gmaps_url = f"https://www.google.com/maps/search/?api=1&query={est.get('lat')},{est.get('lon')}"
         
         numeros = ["1️⃣", "2️⃣", "3️⃣"]
         num_emoji = numeros[i] if i < len(numeros) else "🚲"
+        
+        # Formato Markdown: [Nombre Limpio](URL)
         eco_lines.append(f"{num_emoji} [{nom}]({gmaps_url}) ({disp} disp.)")
         
     ecobici_list = "\n".join(eco_lines) if eco_lines else "No hay estaciones cercanas."
 
     return CARD_RAIN_REPORT.format(
-        location_desc=loc_desc, current_intensity=lluvia.get("intensidad", "N/A"),
-        current_mm=lluvia.get("mm_h", 0), alert_circle=alert_circle, alert_text=alerta,
-        short_message=lluvia.get("mensaje_corto", ""), forecast_table=forecast_table,
-        total_bikes=eco.get("total_bicicletas", 0), total_stations=eco.get("estaciones_en_celda", 0),
-        ecobici_list=ecobici_list, footer=BOT_FOOTER
+        maps_url=maps_url,
+        current_intensity=lluvia.get("intensidad", "N/A"),
+        current_mm=lluvia.get("mm_h", 0),
+        alert_circle=alert_circle,
+        alert_text=alerta,
+        short_message=lluvia.get("mensaje_corto", ""),
+        risk_block=risk_block,
+        forecast_table=forecast_table,
+        total_bikes=eco.get("total_bicicletas", 0),
+        total_stations=eco.get("estaciones_en_celda", 0),
+        ecobici_list=ecobici_list,
+        footer=BOT_FOOTER
     )
 
 def get_rain_buttons(loc_key):
