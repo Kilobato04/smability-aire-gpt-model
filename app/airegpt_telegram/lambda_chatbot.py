@@ -1054,7 +1054,8 @@ def lambda_handler(event, context):
                         r_rain = requests.get(url_rain, timeout=10).json()
                         
                         if r_rain.get("status") == "success":
-                            card_rain = cards.generate_rain_card(r_rain)
+                            # 🚀 FIX: Aquí le inyectamos r_lat y r_lon a la función
+                            card_rain = cards.generate_rain_card(r_rain, r_lat, r_lon)
                             botones_rain = cards.get_rain_buttons(r_loc_key)
                             # Enviamos un MENSAJE NUEVO tal cual lo pediste
                             send_telegram(chat_id, card_rain, markup=botones_rain)
