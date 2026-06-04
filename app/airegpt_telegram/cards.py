@@ -637,7 +637,10 @@ def get_summary_buttons(locations_dict, is_premium=False):
         # Llave segura para el callback
         safe_key = str(key).replace(" ", "_")
         
-        row_locs.append({"text": f"💨 {label}", "callback_data": f"CHECK_AIR_{safe_key}"})
+        # 🚀 FIX: Asignación dinámica de emoji (Cuadro Azul para Casa, Verde para el resto)
+        emoji_ruta = "🟦" if str(key).lower() == "casa" else "🟩"
+        
+        row_locs.append({"text": f"{emoji_ruta} {label}", "callback_data": f"CHECK_AIR_{safe_key}"})
     
     # Dividimos en filas de 2 para mantener el diseño compacto
     for i in range(0, len(row_locs), 2):
@@ -665,17 +668,18 @@ def get_summary_buttons(locations_dict, is_premium=False):
 # --- MODIFICADO: ELIMINAMOS BOTÓN DE VOLVER ---
 def get_locations_buttons(locations_dict):
     keyboard = []
-    # Fila de "Consultar Aire"
     row_check = []
-    # Fila de "Eliminar"
     row_delete = []
     
     for key, val in locations_dict.items():
-        label = key.capitalize()
-        # Claves cortas para callback (evitar límite de bytes de Telegram)
+        # Usamos el display_name si existe para que se vea más limpio
+        label = val.get('display_name', key.capitalize())
         safe_key = key.upper().replace(" ", "_")[:15] 
         
-        row_check.append({"text": f"💨 {label}", "callback_data": f"CHECK_AIR_{safe_key}"})
+        # 🚀 FIX: Misma lógica de emojis
+        emoji_ruta = "🟦" if str(key).lower() == "casa" else "🟩"
+        
+        row_check.append({"text": f"{emoji_ruta} {label}", "callback_data": f"CHECK_AIR_{safe_key}"})
         row_delete.append({"text": f"🗑️ {label}", "callback_data": f"DELETE_LOC_{safe_key}"})
     
     if row_check: keyboard.append(row_check)
