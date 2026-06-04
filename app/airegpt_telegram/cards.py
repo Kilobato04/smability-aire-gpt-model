@@ -924,7 +924,7 @@ def get_hnc_buttons():
 
 # --- 2. PLANTILLA Y FUNCIÓN DE LLUVIA (OPTIMIZADA) ---
 CARD_RAIN_REPORT = """🌧️ *Reporte de Lluvia*
-📍 [Ubicación Actual]({maps_url})
+📍 [{location_name}]({maps_url})
 
 ⏱️ *Estado Actual:* {current_intensity} ({current_mm} mm/h)
 {alert_circle} *Alerta:* {alert_text}
@@ -938,24 +938,22 @@ CARD_RAIN_REPORT = """🌧️ *Reporte de Lluvia*
 
 {footer}"""
 
-def generate_rain_card(data, lat, lon):
+# 🚀 FIX: Agregamos location_name como parámetro con valor por defecto
+def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
     lluvia = data.get("lluvia", {})
     eco = data.get("movilidad_ecobici", {})
     pronostico = data.get("pronostico_6h", [])
-    riesgo = data.get("riesgo_historico") # Será None si el endpoint no lo envía
+    riesgo = data.get("riesgo_historico") 
 
-    # 1. URL de Google Maps para la Ubicación Actual
     maps_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
 
     alerta = lluvia.get("alerta_predictiva", "NORMAL")
     alert_circle = "🟢" if alerta == "NORMAL" else "🟡" if alerta == "PRECAUCION" else "🔴"
 
-    # 2. Bloque Dinámico de Riesgo Histórico (Solo aparece si existe la llave)
     risk_block = ""
     if riesgo:
         risk_block = f"\n\n⚠️ *Riesgo Histórico de Inundación:* {riesgo.get('nivel', '')}\n📌 _{riesgo.get('detalle', '')}_"
 
-    # 3. Pronóstico con Emojis
     fc_lines = []
     for p in pronostico:
         mm = p.get("mm_h", 0)
@@ -966,26 +964,20 @@ def generate_rain_card(data, lat, lon):
         fc_lines.append(f"`{hora}` | {emj} {intense} ({mm} mm/h){warn}")
     forecast_table = "\n".join(fc_lines) if fc_lines else "Sin datos."
 
-    # 4. Ecobici Limpio y con Hipervínculos
     eco_lines = []
     for i, est in enumerate(eco.get("mejores_opciones", [])):
         nom_raw = est.get("nombre", "")
-        # Eliminamos el patrón "CE-XXX " o "CE-XXX - " para limpiar el nombre
         nom = re.sub(r'^CE-\d+\s*-?\s*', '', nom_raw).strip()
-        
         disp = est.get("disponibles", 0)
-        # URL directo a Google Maps para la estación
         gmaps_url = f"https://www.google.com/maps/search/?api=1&query={est.get('lat')},{est.get('lon')}"
-        
         numeros = ["1️⃣", "2️⃣", "3️⃣"]
         num_emoji = numeros[i] if i < len(numeros) else "🚲"
-        
-        # Formato Markdown: [Nombre Limpio](URL)
         eco_lines.append(f"{num_emoji} [{nom}]({gmaps_url}) ({disp} disp.)")
         
     ecobici_list = "\n".join(eco_lines) if eco_lines else "No hay estaciones cercanas."
 
     return CARD_RAIN_REPORT.format(
+        location_name=location_name, # 🚀 FIX: Inyectamos el nombre aquí
         maps_url=maps_url,
         current_intensity=lluvia.get("intensidad", "N/A"),
         current_mm=lluvia.get("mm_h", 0),
