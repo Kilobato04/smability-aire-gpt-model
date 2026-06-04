@@ -1042,28 +1042,34 @@ def lambda_handler(event, context):
             # 🌧️ NUEVO MÓDULO: REPORTE DE LLUVIA Y ECOBICI
             # ==========================================
             elif data.startswith("CHECK_RAIN_"):
-                # Formato esperado: CHECK_RAIN_{lat}_{lon}_{loc_key}
                 parts = data.split("_")
                 if len(parts) >= 5:
                     r_lat, r_lon = parts[2], parts[3]
-                    r_loc_key = "_".join(parts[4:]) # Reconstruimos la llave (ej. 'casa')
+                    r_loc_key = "_".join(parts[4:])
                     
+                    # 🚀 FIX: Buscar el nombre real de la ubicación
+                    loc_display = "Ubicación Actual"
+                    if r_loc_key != "GPS":
+                        user_fresh = get_user_profile(user_id)
+                        locs = user_fresh.get('locations', {})
+                        # Extraemos el nombre bonito (Ej. Casa -> Casa)
+                        loc_display = locs.get(r_loc_key, {}).get('display_name', r_loc_key.capitalize())
+
                     send_telegram_action(chat_id, "typing")
                     try:
                         url_rain = f"https://2paokiaf6ytueh4c4cqnhtvq6e0gcpyk.lambda-url.us-east-1.on.aws/?lat={r_lat}&lon={r_lon}"
                         r_rain = requests.get(url_rain, timeout=10).json()
                         
                         if r_rain.get("status") == "success":
-                            # 🚀 FIX: Aquí le inyectamos r_lat y r_lon a la función
-                            card_rain = cards.generate_rain_card(r_rain, r_lat, r_lon)
+                            # 🚀 FIX: Le pasamos el nombre detectado a la función
+                            card_rain = cards.generate_rain_card(r_rain, r_lat, r_lon, location_name=loc_display)
                             botones_rain = cards.get_rain_buttons(r_loc_key)
-                            # Enviamos un MENSAJE NUEVO tal cual lo pediste
                             send_telegram(chat_id, card_rain, markup=botones_rain)
                         else:
                             send_telegram(chat_id, "⚠️ No pude obtener los datos de lluvia para esta zona.")
                     except Exception as e:
                         print(f"Error fetching rain API: {e}")
-                        send_telegram(chat_id, "⚠️ Error de conexión con el modelo meteorológico.")
+                        send_telegram(chat_id, "⚠️ Error de conexión con el radar meteorológico.")
                         
                 return {'statusCode': 200, 'body': 'OK'}
 
