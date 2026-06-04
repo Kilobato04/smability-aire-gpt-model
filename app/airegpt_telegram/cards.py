@@ -197,8 +197,7 @@ Para avisarte exactamente qué días no circulas y cuándo te toca verificar, re
 
 CARD_REPORT = """🌤️ *{greeting}, {user_name}!*
 
-Tu *reporte* de 📍 **[{location_name}]({maps_url})**:
-🗺️ {region} • 🕒 {report_time}
+Tu *reporte* de 📍 **[{location_name}]({maps_url})** • 🕒 {report_time}
 
 {risk_circle} *Calidad {risk_category} ({ias_value} pts)* | ☣️ {pollutant}
 
@@ -225,8 +224,7 @@ CARD_ALERT_IAS = """🚨 *¡ALERTA DE AIRE!* 🚨
 {footer}"""
 
 CARD_REMINDER = """⏰ *{greeting}, {user_name}!*
-Tu *Reporte* de 📍 **[{location_name}]({maps_url})**:
-🗺️ {region} • 🕒 {report_time}
+Tu *reporte* de 📍 **[{location_name}]({maps_url})** • 🕒 {report_time}
 
 {risk_circle} *Calidad {risk_category} ({ias_value} pts)* | ☣️ {pollutant}
 
