@@ -947,8 +947,23 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
 
     maps_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
 
+    # 🚨 FIX: Emoji SACMEX para el Estado Actual (El Presente)
+    intensidad_str = lluvia.get("intensidad", "Sin lluvia")
+    if "Ligera" in intensidad_str: emj_int = "🟢 "
+    elif "Regular" in intensidad_str: emj_int = "🟡 "
+    elif "Fuerte" in intensidad_str: emj_int = "🟠 "
+    elif "Intensa" in intensidad_str: emj_int = "🔴 "
+    elif "Torrencial" in intensidad_str: emj_int = "🟣 "
+    else: emj_int = ""
+    intensidad_display = f"{emj_int}{intensidad_str}"
+
+    # 🚨 FIX: Colores SGIRPC para la Alerta Temprana (El Futuro)
     alerta = lluvia.get("alerta_predictiva", "NORMAL")
-    alert_circle = "🟢" if alerta == "NORMAL" else "🟡" if alerta == "PRECAUCION" else "🔴"
+    if alerta == "AMARILLA": alert_circle = "🟡"
+    elif alerta == "NARANJA": alert_circle = "🟠"
+    elif alerta == "ROJA": alert_circle = "🔴"
+    elif alerta == "PURPURA": alert_circle = "🟣"
+    else: alert_circle = "🟢"
 
     risk_block = ""
     if riesgo:
@@ -970,16 +985,18 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
         nom = re.sub(r'^CE-\d+\s*-?\s*', '', nom_raw).strip()
         disp = est.get("disponibles", 0)
         gmaps_url = f"https://www.google.com/maps/search/?api=1&query={est.get('lat')},{est.get('lon')}"
+        
         numeros = ["1️⃣", "2️⃣", "3️⃣"]
         num_emoji = numeros[i] if i < len(numeros) else "🚲"
+        
         eco_lines.append(f"{num_emoji} [{nom}]({gmaps_url}) ({disp} disp.)")
         
     ecobici_list = "\n".join(eco_lines) if eco_lines else "No hay estaciones cercanas."
 
     return CARD_RAIN_REPORT.format(
-        location_name=location_name, # 🚀 FIX: Inyectamos el nombre aquí
+        location_name=location_name,
         maps_url=maps_url,
-        current_intensity=lluvia.get("intensidad", "N/A"),
+        current_intensity=intensidad_display, # 🚀 FIX: Inyectamos el emoji + texto aquí
         current_mm=lluvia.get("mm_h", 0),
         alert_circle=alert_circle,
         alert_text=alerta,
