@@ -375,6 +375,23 @@ def ejecutar_configurar_alerta_lluvia(user_id, nombre_ubicacion, umbral):
         print(f"🔥 [RAIN DB CRITICAL ERROR] Falló el guardado en DynamoDB: {str(e)}")
         return f"⚠️ Error al guardar alerta de lluvia: {str(e)}"
 
+def ejecutar_borrar_alerta_lluvia(user_id, nombre_ubicacion):
+    try:
+        key = normalize_key(nombre_ubicacion)
+        
+        # 📝 LOG DE CLOUDWATCH
+        print(f"🗑️ [RAIN DB] Borrando alerta de lluvia para {key} (User: {user_id})")
+        
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="REMOVE alerts.rain.#loc",
+            ExpressionAttributeNames={'#loc': key}
+        )
+        return f"Éxito: Alerta de lluvia eliminada del radar centinela para {nombre_ubicacion.capitalize()}."
+    except Exception as e:
+        print(f"❌ Error al borrar alerta de lluvia: {e}")
+        return f"⚠️ Error al eliminar alerta de lluvia: {str(e)}"
+
 # --- 🗑️ BORRADOS ATÓMICOS ---
 def ejecutar_borrado_elemento(user_id, tipo, args=None):
     try:
