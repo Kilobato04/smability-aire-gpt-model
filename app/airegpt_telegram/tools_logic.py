@@ -337,15 +337,25 @@ def ejecutar_configurar_alerta_lluvia(user_id, nombre_ubicacion, umbral):
         key = normalize_key(nombre_ubicacion)
         umbral_upper = str(umbral).upper()
         
-        # Doble validación de seguridad por si el LLM alucina
         if umbral_upper not in ["ROJA", "PURPURA"]:
             return "⚠️ Solo se permiten alertas de lluvia nivel ROJA o PURPURA."
         
+        # 🚀 FIX: Lectura segura para evitar el error de DynamoDB
+        user_data = table.get_item(Key={'user_id': str(user_id)}).get('Item', {})
+        alerts = user_data.get('alerts', {})
+        
+        # Si no existe el diccionario 'rain', lo creamos
+        if 'rain' not in alerts:
+            alerts['rain'] = {}
+            
+        # Asignamos la nueva alerta
+        alerts['rain'][key] = {'umbral': umbral_upper, 'active': True}
+        
+        # Guardamos el bloque 'alerts' completo y seguro
         table.update_item(
             Key={'user_id': str(user_id)},
-            UpdateExpression="SET alerts.rain.#loc = :v",
-            ExpressionAttributeNames={'#loc': key},
-            ExpressionAttributeValues={':v': {'umbral': umbral_upper, 'active': True}}
+            UpdateExpression="SET alerts = :a",
+            ExpressionAttributeValues={':a': alerts}
         )
         return f"Éxito: Alerta de lluvia {umbral_upper} activada en el radar centinela para {nombre_ubicacion.capitalize()}."
     except Exception as e:
