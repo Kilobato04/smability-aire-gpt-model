@@ -320,5 +320,13 @@ TOOLS_SCHEMA = [
                 "required": ["nombre_ubicacion", "umbral_lluvia"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "borrar_alerta_lluvia",
+            "description": "Elimina la alerta proactiva de lluvia del radar centinela para una ubicación.",
+            "parameters": {"type": "object", "properties": {"nombre_ubicacion": {"type": "string"}}, "required": ["nombre_ubicacion"]}
+        }
     }
 ]
