@@ -1989,8 +1989,8 @@ def lambda_handler(event, context):
                             args.get('nombre_nuevo')
                         )
                         
-                    # --- 1. ESCRITURA Y CONFIGURACIÓN ---
-                    elif fn in ["configurar_transporte", "guardar_perfil_salud", "guardar_salud", "configurar_auto", "configurar_alerta_ias", "configurar_alerta_contingencia", "configurar_recordatorio"]:
+                    # --- 1. ESCRITURA Y CONFIGURACIÓN --
+                    elif fn in ["configurar_transporte", "guardar_perfil_salud", "guardar_salud", "configurar_auto", "configurar_alerta_ias", "configurar_alerta_contingencia", "configurar_recordatorio", "configurar_alerta_lluvia"]:
                         if fn == "configurar_transporte":
                             r = tools_logic.ejecutar_configurar_transporte(user_id, args.get('medio'), args.get('horas_al_dia', args.get('horas', 2)))
                         elif fn in ["guardar_perfil_salud", "guardar_salud"]:
@@ -2005,7 +2005,6 @@ def lambda_handler(event, context):
                             r = configure_schedule_alert(user_id, args.get('nombre_ubicacion'), args.get('hora'), dias_gpt)                      
                         elif fn in ["configurar_alerta_ias", "configurar_alerta_por_umbral"]:
                             r = tools_logic.ejecutar_configurar_alerta_ias(user_id, args.get('nombre_ubicacion'), args.get('umbral_ias', args.get('umbral', 100)))
-                        # 👇 NUEVA HERRAMIENTA DE LLUVIA 👇
                         elif fn == "configurar_alerta_lluvia":
                             r = tools_logic.ejecutar_configurar_alerta_lluvia(user_id, args.get('nombre_ubicacion'), args.get('umbral_lluvia'))
 
