@@ -309,6 +309,7 @@ CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
 👤 {user_name} | Plan: {plan_status}
 
 🚨 *Alerta Contingencia:* {contingency_status}
+🌧️ *Alerta de lluvia:* {rain_alerts_display}
 
 📍 *Tus Ubicaciones:*
 {locations_list}
@@ -498,6 +499,19 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         contingency_status = "🔒 **BLOQUEADA** (Solo Premium)"
         print(f"DEBUG_CARDS: Aplicando candado en SALUD para {user_name}")
         health_str = "• 🔒 Contenido Premium"
+
+    if is_premium:
+        rain_list = []
+        rain_alerts = alerts.get('rain', {})
+        if isinstance(rain_alerts, dict):
+            for k, v in rain_alerts.items():
+                if isinstance(v, dict) and v.get('active') and k in locations:
+                    safe_k = clean(locations[k].get('display_name', k)).capitalize()
+                    rain_list.append(f"• {safe_k}: ⛈️ Nivel {v.get('umbral', 'ROJA')}")
+        rain_str = "\n".join(rain_list) if rain_list else "• *Sin alertas activas*"
+        rain_display = f"🌧️ *Alertas de Lluvia:*\n{rain_str}\n"
+    else:
+        rain_display = f"🌧️ *Alertas de Lluvia:* 🔒 **Premium**\n"
     
     # 2. Ubicaciones (Abierto para todos)
     locs = []
@@ -609,6 +623,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         user_name=clean(user_name),
         plan_status=plan_clean.upper(),
         contingency_status=contingency_status,
+        rain_alerts_display=rain_display, # <--- ¡NUEVA LÍNEA AQUÍ!
         locations_list=loc_str,
         health_display=health_str,
         transport_info=trans_str,
