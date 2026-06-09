@@ -50,6 +50,14 @@ TOOLS_SCHEMA = [
     {
         "type": "function",
         "function": {
+            "name": "consultar_lluvia",
+            "description": "Obtiene la tarjeta visual de lluvia, radar predictivo y estaciones Ecobici.",
+            "parameters": {"type": "object", "properties": {"lat": {"type": "number"}, "lon": {"type": "number"}, "nombre_ubicacion": {"type": "string"}}, "required": ["lat", "lon"]}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "borrar_alerta_ias",
             "description": "Elimina alerta.",
             "parameters": {"type": "object", "properties": {"nombre_ubicacion": {"type": "string"}}, "required": ["nombre_ubicacion"]}
