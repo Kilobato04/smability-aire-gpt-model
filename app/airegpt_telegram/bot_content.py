@@ -294,4 +294,23 @@ TOOLS_SCHEMA = [
             "parameters": {"type": "object", "properties": {}}
         }
     }
+    {
+        "type": "function",
+        "function": {
+            "name": "configurar_alerta_lluvia",
+            "description": "Configura una alerta proactiva de lluvia para una ubicación específica guardada.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nombre_ubicacion": {"type": "string"},
+                    "umbral_lluvia": {
+                        "type": "string", 
+                        "enum": ["ROJA", "PURPURA"],
+                        "description": "El nivel de severidad para detonar la alerta. Solo acepta ROJA o PURPURA."
+                    }
+                },
+                "required": ["nombre_ubicacion", "umbral_lluvia"]
+            }
+        }
+    }
 ]
