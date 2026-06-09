@@ -501,6 +501,7 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         print(f"DEBUG_CARDS: Aplicando candado en SALUD para {user_name}")
         health_str = "• 🔒 Contenido Premium"
 
+    # 1.5 Alertas de Lluvia (NUEVO BLOQUE CON TEMPORALIDAD)
     if is_premium:
         rain_list = []
         rain_alerts = alerts.get('rain', {})
@@ -508,7 +509,10 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
             for k, v in rain_alerts.items():
                 if isinstance(v, dict) and v.get('active') and k in locations:
                     safe_k = clean(locations[k].get('display_name', k)).capitalize()
-                    rain_list.append(f"• {safe_k}: ⛈️ Nivel {v.get('umbral', 'ROJA')}")
+                    # Leemos la propiedad de la DB, por defecto 'Diaria'
+                    temporalidad_txt = v.get('temporalidad', 'diaria').capitalize()
+                    rain_list.append(f"• {safe_k}: ⛈️ Nivel {v.get('umbral', 'ROJA')} ({temporalidad_txt})")
+                    
         rain_str = "\n".join(rain_list) if rain_list else "• *Sin alertas activas*"
         rain_display = f"🌧️ *Alertas de Lluvia:*\n{rain_str}\n"
     else:
