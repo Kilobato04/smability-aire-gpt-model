@@ -331,6 +331,27 @@ def ejecutar_configurar_alerta_ias(user_id, nombre_ubicacion, umbral):
     except:
         return "⚠️ Error en umbral."
 
+# --- 🌧️ ALERTAS DE LLUVIA PROACTIVAS ---
+def ejecutar_configurar_alerta_lluvia(user_id, nombre_ubicacion, umbral):
+    try:
+        key = normalize_key(nombre_ubicacion)
+        umbral_upper = str(umbral).upper()
+        
+        # Doble validación de seguridad por si el LLM alucina
+        if umbral_upper not in ["ROJA", "PURPURA"]:
+            return "⚠️ Solo se permiten alertas de lluvia nivel ROJA o PURPURA."
+        
+        table.update_item(
+            Key={'user_id': str(user_id)},
+            UpdateExpression="SET alerts.rain.#loc = :v",
+            ExpressionAttributeNames={'#loc': key},
+            ExpressionAttributeValues={':v': {'umbral': umbral_upper, 'active': True}}
+        )
+        return f"Éxito: Alerta de lluvia {umbral_upper} activada en el radar centinela para {nombre_ubicacion.capitalize()}."
+    except Exception as e:
+        print(f"❌ Error en alerta de lluvia: {e}")
+        return f"⚠️ Error al guardar alerta de lluvia: {str(e)}"
+
 # --- 🗑️ BORRADOS ATÓMICOS ---
 def ejecutar_borrado_elemento(user_id, tipo, args=None):
     try:
