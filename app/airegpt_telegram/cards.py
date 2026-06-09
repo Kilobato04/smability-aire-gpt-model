@@ -309,7 +309,8 @@ CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
 👤 {user_name} | Plan: {plan_status}
 
 🚨 *Alerta Contingencia:* {contingency_status}
-🌧️ *Alerta de lluvia:* {rain_alerts_display}
+
+{rain_alerts_display}
 
 📍 *Tus Ubicaciones:*
 {locations_list}
