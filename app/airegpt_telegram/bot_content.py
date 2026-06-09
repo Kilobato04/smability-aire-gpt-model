@@ -293,7 +293,7 @@ TOOLS_SCHEMA = [
             "description": "Elimina todas las condiciones médicas registradas por el usuario.",
             "parameters": {"type": "object", "properties": {}}
         }
-    }
+    },
     {
         "type": "function",
         "function": {
