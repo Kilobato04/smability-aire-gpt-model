@@ -662,6 +662,23 @@ def process_rain_alerts(user):
             
 def lambda_handler(event, context):
     now = get_cdmx_time()
+
+    if event.get('action') == "RUN_RAIN_SENTINEL":
+        print(f"☔ [RAIN SCHEDULER] Despertado por el Modelo Maestro a las {now.strftime('%H:%M')}")
+        try:
+            paginator = dynamodb.meta.client.get_paginator('scan')
+            count = 0
+            for page in paginator.paginate(TableName=DYNAMODB_TABLE):
+                for item in page['Items']: 
+                    if item['user_id'] == 'SYSTEM_STATE': continue
+                    # 🚀 Solo ejecutamos el módulo de lluvia. El de aire se ignora.
+                    process_rain_alerts(item)
+                    count += 1
+            print(f"✅ [RAIN DONE] Escaneo de lluvia finalizado. Usuarios: {count}")
+            return {'statusCode': 200, 'body': 'Rain Sentinel Executed'}
+        except Exception as e:
+            print(f"❌ Error Loop Lluvia: {e}")
+            return {'statusCode': 500, 'body': str(e)}
     
     # 1. Ventana Operativa
     if now.hour < 6 or now.hour > 23: 
