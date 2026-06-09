@@ -560,6 +560,106 @@ def process_user(user, current_hour_str, contingency_data):
                 else:
                     print(f"   ⚠️ [DATA] No se encontró config de location para {loc_name}")
 
+# --- 🌧️ MÓDULO AISLADO: CENTINELA DE LLUVIA (2-STATES / 3 MINUTOS) ---
+def process_rain_alerts(user):
+    user_id = user['user_id']
+    first_name = user.get('first_name', 'Usuario')
+    
+    # Extraemos solo el bloque de lluvia
+    rain_configs = user.get('alerts', {}).get('rain', {})
+    locations = user.get('locations', {})
+    
+    # Si no tiene alertas de lluvia activas, salimos en 1 milisegundo
+    if not isinstance(rain_configs, dict) or not rain_configs:
+        return
+        
+    severity_map = {"NORMAL": 0, "AMARILLA": 1, "NARANJA": 2, "ROJA": 3, "PURPURA": 4}
+    now_utc = datetime.utcnow()
+    
+    for loc_name, config in rain_configs.items():
+        if not isinstance(config, dict) or not config.get('active'):
+            continue
+            
+        loc_data = locations.get(loc_name)
+        if not loc_data: continue
+        
+        # 1. 🛡️ FILTRO COOLDOWN (Freno Anti-SPAM de 3 horas post-tormenta)
+        cooldown_str = config.get('cooldown_until')
+        if cooldown_str:
+            cooldown_dt = datetime.fromisoformat(cooldown_str)
+            if now_utc < cooldown_dt:
+                # Silenciado. La tormenta ya fue notificada recientemente.
+                continue
+        
+        # 2. 📡 CONSULTA AL RADAR (NOWCASTING)
+        lat, lon = loc_data['lat'], loc_data['lon']
+        url_rain = f"https://2paokiaf6ytueh4c4cqnhtvq6e0gcpyk.lambda-url.us-east-1.on.aws/?lat={lat}&lon={lon}"
+        
+        try:
+            r = requests.get(url_rain, timeout=10)
+            if r.status_code != 200: continue
+            
+            data_rain = r.json()
+            alerta_actual = data_rain.get('lluvia', {}).get('alerta_predictiva', 'NORMAL')
+            umbral_usuario = config.get('umbral', 'ROJA').upper()
+            
+            val_actual = severity_map.get(alerta_actual, 0)
+            val_umbral = severity_map.get(umbral_usuario, 3)
+            last_state = config.get('last_state', 'NORMAL')
+            
+            # --- 🧠 LÓGICA DE ESTADOS CONSECUTIVOS (T1 -> T2) ---
+            if val_actual >= val_umbral:
+                if last_state == 'PELIGRO':
+                    # ¡T2 CONFIRMADO! (Pasaron 3 minutos y la tormenta se sostuvo/creció)
+                    print(f"🚨 [RAIN TRIGGER] Tormenta confirmada. Disparando Push a {first_name} en {loc_name}")
+                    
+                    # El nivel real puede ser mayor al umbral (ej. pidió Roja, pero ya es Púrpura)
+                    nivel_msg = alerta_actual if val_actual > val_umbral else umbral_usuario
+                    txt_intensidad = "extrema" if nivel_msg == "PURPURA" else "severa"
+                    
+                    msg = f"🚨 *¡ALERTA DE TORMENTA!* 🚨\n\nSe detecta alta probabilidad de lluvia nivel **{nivel_msg}** acercándose a tu **{loc_name.capitalize()}** en los próximos 10-15 min.\n\n☔ Intensidad proyectada {txt_intensidad}. Toma precauciones."
+                    
+                    # Botones de acción rápida
+                    markup = {
+                        "inline_keyboard": [
+                            [{"text": "🌧️ Ver Lluvia Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{loc_name}"}],
+                            [{"text": "🔴 AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}}]
+                        ]
+                    }
+                    
+                    send_telegram_push(user_id, msg, markup)
+                    
+                    # Activamos el Cooldown de 3 hrs y limpiamos la memoria temporal
+                    cooldown_time = (now_utc + timedelta(hours=3)).isoformat()
+                    table.update_item(
+                        Key={'user_id': str(user_id)},
+                        UpdateExpression="SET alerts.rain.#loc.cooldown_until = :c REMOVE alerts.rain.#loc.last_state",
+                        ExpressionAttributeNames={'#loc': loc_name},
+                        ExpressionAttributeValues={':c': cooldown_time}
+                    )
+                else:
+                    # T1 DETECTADO. Primer impacto. Guardia silenciosa.
+                    print(f"👁️ [RAIN GUARD] {first_name} - {loc_name}: Primer aviso (T1). Esperando 3 min para confirmar.")
+                    table.update_item(
+                        Key={'user_id': str(user_id)},
+                        UpdateExpression="SET alerts.rain.#loc.last_state = :s",
+                        ExpressionAttributeNames={'#loc': loc_name},
+                        ExpressionAttributeValues={':s': 'PELIGRO'}
+                    )
+            else:
+                # El peligro NO rebasa el límite.
+                if last_state == 'PELIGRO':
+                    # Falsa alarma disipada (La nube se rompió o desvió antes de los 3 min). Reseteamos.
+                    print(f"🍃 [RAIN RESET] {first_name} - {loc_name}: Peligro disipado. Limpiando estado.")
+                    table.update_item(
+                        Key={'user_id': str(user_id)},
+                        UpdateExpression="REMOVE alerts.rain.#loc.last_state",
+                        ExpressionAttributeNames={'#loc': loc_name}
+                    )
+                    
+        except Exception as e:
+            print(f"❌ Error Rain Scheduler para {user_id}: {e}")
+            
 def lambda_handler(event, context):
     now = get_cdmx_time()
     
@@ -583,6 +683,9 @@ def lambda_handler(event, context):
                 
                 # Pasamos datos dummy (False, "", "") porque contingency ya se manejó arriba
                 process_user(item, now.strftime("%H:%M"), (False, "", ""))
+
+                # Proceso de Lluvia (Sobrevive por sí solo)
+                process_rain_alerts(item)
                 count += 1
         print(f"✅ [DONE] Usuarios escaneados: {count}")
     except Exception as e: 
