@@ -156,7 +156,7 @@ def delete_location_from_db(user_id, location_name):
         table.update_item(
             Key={'user_id': str(user_id)},
             # BORRADO TRIPLE EN UNA SOLA OPERACIÓN ATÓMICA
-            UpdateExpression="REMOVE locations.#k, alerts.threshold.#k, alerts.schedule.#k",
+            UpdateExpression="REMOVE locations.#k, alerts.threshold.#k, alerts.schedule.#k, alerts.rain.#k",
             ExpressionAttributeNames={'#k': key},
             ReturnValues="UPDATED_NEW"
         )
@@ -1936,6 +1936,7 @@ def lambda_handler(event, context):
                     "configurar_recordatorio": "alertas",
                     "configurar_alerta_ias": "alertas",
                     "configurar_alerta_lluvia": "alertas", # <--- NUEVA LÍNEA
+                    "borrar_alerta_lluvia": "alertas", # <--- NUEVA LÍNEA
                     "configurar_alerta_por_umbral": "alertas",
                     "configurar_alerta_contingencia": "alertas", # 🚩 Mapeado a alertas para el cadenero
                     "guardar_perfil_salud": "guardar_salud",
@@ -1990,7 +1991,7 @@ def lambda_handler(event, context):
                         )
                         
                     # --- 1. ESCRITURA Y CONFIGURACIÓN --
-                    elif fn in ["configurar_transporte", "guardar_perfil_salud", "guardar_salud", "configurar_auto", "configurar_alerta_ias", "configurar_alerta_contingencia", "configurar_recordatorio", "configurar_alerta_lluvia"]:
+                    elif fn in ["configurar_transporte", "guardar_perfil_salud", "guardar_salud", "configurar_auto", "configurar_alerta_ias", "configurar_alerta_contingencia", "configurar_recordatorio", "configurar_alerta_lluvia", "borrar_alerta_lluvia"]:
                         if fn == "configurar_transporte":
                             r = tools_logic.ejecutar_configurar_transporte(user_id, args.get('medio'), args.get('horas_al_dia', args.get('horas', 2)))
                         elif fn in ["guardar_perfil_salud", "guardar_salud"]:
@@ -2007,6 +2008,8 @@ def lambda_handler(event, context):
                             r = tools_logic.ejecutar_configurar_alerta_ias(user_id, args.get('nombre_ubicacion'), args.get('umbral_ias', args.get('umbral', 100)))
                         elif fn == "configurar_alerta_lluvia":
                             r = tools_logic.ejecutar_configurar_alerta_lluvia(user_id, args.get('nombre_ubicacion'), args.get('umbral_lluvia'))
+                        elif fn == "borrar_alerta_lluvia":
+                            r = tools_logic.ejecutar_borrar_alerta_lluvia(user_id, args.get('nombre_ubicacion'))
 
                     # --- 2. CONSULTAS VISUALES (Ubicaciones, Movilidad, Resumen) ---
                     elif fn in ["consultar_resumen_configuracion", "consultar_perfil"]: 
