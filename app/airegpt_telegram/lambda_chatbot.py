@@ -1935,6 +1935,7 @@ def lambda_handler(event, context):
                     "guardar_ubicacion_personalizada": "add_location",
                     "configurar_recordatorio": "alertas",
                     "configurar_alerta_ias": "alertas",
+                    "configurar_alerta_lluvia": "alertas", # <--- NUEVA LÍNEA
                     "configurar_alerta_por_umbral": "alertas",
                     "configurar_alerta_contingencia": "alertas", # 🚩 Mapeado a alertas para el cadenero
                     "guardar_perfil_salud": "guardar_salud",
@@ -2004,6 +2005,9 @@ def lambda_handler(event, context):
                             r = configure_schedule_alert(user_id, args.get('nombre_ubicacion'), args.get('hora'), dias_gpt)                      
                         elif fn in ["configurar_alerta_ias", "configurar_alerta_por_umbral"]:
                             r = tools_logic.ejecutar_configurar_alerta_ias(user_id, args.get('nombre_ubicacion'), args.get('umbral_ias', args.get('umbral', 100)))
+                        # 👇 NUEVA HERRAMIENTA DE LLUVIA 👇
+                        elif fn == "configurar_alerta_lluvia":
+                            r = tools_logic.ejecutar_configurar_alerta_lluvia(user_id, args.get('nombre_ubicacion'), args.get('umbral_lluvia'))
 
                     # --- 2. CONSULTAS VISUALES (Ubicaciones, Movilidad, Resumen) ---
                     elif fn in ["consultar_resumen_configuracion", "consultar_perfil"]: 
