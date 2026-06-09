@@ -253,7 +253,7 @@ def ejecutar_borrar_ubicacion(user_id, nombre):
 
         table.update_item(
             Key={'user_id': str(user_id)},
-            UpdateExpression="REMOVE locations.#k, alerts.threshold.#k, alerts.schedule.#k",
+            UpdateExpression="REMOVE locations.#k, alerts.threshold.#k, alerts.schedule.#k, alerts.rain.#k",
             ExpressionAttributeNames={'#k': key}
         )
         return f"Éxito: Ubicación '{nombre}' y sus alertas han sido eliminadas."
