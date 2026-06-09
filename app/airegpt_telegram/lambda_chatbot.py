@@ -2157,8 +2157,7 @@ def lambda_handler(event, context):
                         else:
                             # Sin coordenadas, r no tiene la palabra "visual", permitiendo que GPT pida la ubicación.
                             r = f"Error: No encontré coordenadas para '{in_name}'."
-
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        
 
                     elif fn == "consultar_lluvia":
                         in_lat = args.get('lat', 0)
@@ -2197,8 +2196,8 @@ def lambda_handler(event, context):
                                 r = "Error de red con el radar."
                         else:
                             r = f"Error: No encontré coordenadas para '{in_name}'."
-
-                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        
+                gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
             # --- CIERRE MAESTRO TRAS EL BUCLE FOR ---
             print(f"🔄 [GPT] Resolviendo respuesta final tras {len(ai_msg.tool_calls)} herramientas.")
