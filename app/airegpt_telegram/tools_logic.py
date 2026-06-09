@@ -337,30 +337,42 @@ def ejecutar_configurar_alerta_lluvia(user_id, nombre_ubicacion, umbral):
         key = normalize_key(nombre_ubicacion)
         umbral_upper = str(umbral).upper()
         
-        # Doble validación de seguridad
+        # 📝 CLOUDWATCH LOG - INICIO DEL PROCESO
+        print(f"🔍 [RAIN DB] Iniciando guardado. User: {user_id} | Ubicación: {key} | Umbral solicitado: {umbral_upper}")
+        
         if umbral_upper not in ["ROJA", "PURPURA"]:
             return "⚠️ Solo se permiten alertas de lluvia nivel ROJA o PURPURA."
         
-        # 🛡️ PASO 1: Garantizar que el contenedor 'rain' exista en la DB
-        # if_not_exists crea el diccionario vacío SOLO si no existía previamente.
+        # Paso 1: Inicializar el contenedor 'rain' con if_not_exists para no borrar 'threshold' ni 'schedule'
         table.update_item(
             Key={'user_id': str(user_id)},
             UpdateExpression="SET alerts.rain = if_not_exists(alerts.rain, :empty)",
             ExpressionAttributeValues={':empty': {}}
         )
         
-        # 💉 PASO 2: Inyección atómica de la ubicación
+        # Paso 2: Inyectar la alerta con la temporalidad "diaria" fija por defecto
+        alerta_payload = {
+            'umbral': umbral_upper,
+            'active': True,
+            'temporalidad': 'diaria'  # 📅 Fijado diario por defecto sin edición adicional
+        }
+        
         table.update_item(
             Key={'user_id': str(user_id)},
             UpdateExpression="SET alerts.rain.#loc = :v",
             ExpressionAttributeNames={'#loc': key},
-            ExpressionAttributeValues={':v': {'umbral': umbral_upper, 'active': True}}
+            ExpressionAttributeValues={':v': alerta_payload}
         )
         
+        # 📝 CLOUDWATCH LOG - VERIFICACIÓN POST-GUARDADO (Lectura Consistente)
+        user_check = table.get_item(Key={'user_id': str(user_id)}, ConsistentRead=True).get('Item', {})
+        print(f"✅ [RAIN DB SUCCESS] Estado actual de alerts en DB: {json.dumps(user_check.get('alerts', {}), default=str)}")
+        
         return f"Éxito: Alerta de lluvia {umbral_upper} activada en el radar centinela para {nombre_ubicacion.capitalize()}."
-    
+        
     except Exception as e:
-        print(f"❌ Error en alerta de lluvia: {e}")
+        # 📝 CLOUDWATCH LOG - EN CASO DE CRASH
+        print(f"🔥 [RAIN DB CRITICAL ERROR] Falló el guardado en DynamoDB: {str(e)}")
         return f"⚠️ Error al guardar alerta de lluvia: {str(e)}"
 
 # --- 🗑️ BORRADOS ATÓMICOS ---
