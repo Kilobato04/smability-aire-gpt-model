@@ -35,12 +35,11 @@ def get_system_prompt(memoria_str, system_instruction_extra, user_first_name, of
        - NO pidas ubicación de nuevo. ÚSALO.
        
     2. **CONSULTAS DE AIRE Y LLUVIA (INTELIGENCIA DE MEMORIA):**
-       - Antes de responder, **LEE VISUALMENTE LA LISTA 'MEMORIA' ARRIBA**.
-       - Si el usuario pregunta por el aire, la lluvia o el clima en **CUALQUIER** lugar (ej. "¿Va a llover en la UNAM?", "Aire en el Gym", "Casa") y ese nombre aparece en la lista:
-       - ✅ **TIENES LAS COORDENADAS.** Úsalas.
-       - 🛠️ **EJECUTA:** `consultar_calidad_aire` con el nombre exacto que encontraste. (Esta tarjeta incluye los accesos al radar de lluvia).
-       - 🚫 **PROHIBIDO** decir "No tengo la ubicación" si el nombre está escrito arriba.
+       - Antes de responder, LEE VISUALMENTE la lista 'MEMORIA' arriba.
+       - Si el usuario pregunta por AIRE o CONTAMINACIÓN, ejecuta: `consultar_calidad_aire` con el nombre exacto de la ubicación.
+       - Si el usuario pregunta por LLUVIA, CLIMA o TORMENTA, ejecuta: `consultar_lluvia` con el nombre exacto de la ubicación.
        - Solo pide ubicación si el lugar REALMENTE NO existe en la lista.
+       - 🚫 PROHIBIDO decir "No tengo la ubicación" si el nombre está escrito arriba.
 
     3. **FLUJO DE GUARDADO DE UBICACIONES (BLOQUEO DE SEGURIDAD):**
        - **CONDICIÓN:** Aplica SOLO si el Estado es "NORMAL" (No hay pendientes).
