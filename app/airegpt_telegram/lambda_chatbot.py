@@ -2158,7 +2158,47 @@ def lambda_handler(event, context):
                             # Sin coordenadas, r no tiene la palabra "visual", permitiendo que GPT pida la ubicación.
                             r = f"Error: No encontré coordenadas para '{in_name}'."
 
-                gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
+
+                    elif fn == "consultar_lluvia":
+                        in_lat = args.get('lat', 0)
+                        in_lon = args.get('lon', 0)
+                        in_name = args.get('nombre_ubicacion', 'tu ubicación')
+                        
+                        # 1. RESOLUCIÓN DE COORDENADAS
+                        loc_key_found = "GPS"
+                        if in_lat == 0 or in_lon == 0:
+                            key = resolve_location_key(user_id, in_name)
+                            if not key: key = resolve_location_key(user_id, user_content)
+                            
+                            if key and key in locs:
+                                in_lat = float(locs[key].get('lat', 0))
+                                in_lon = float(locs[key].get('lon', 0))
+                                in_name = locs[key].get('display_name', key.capitalize())
+                                loc_key_found = key
+                        
+                        # 2. INTENTO DE ENVÍO DE TARJETA DE LLUVIA
+                        if in_lat != 0 and in_lon != 0:
+                            send_telegram_action(chat_id, "typing") 
+                            try:
+                                url_rain = f"https://2paokiaf6ytueh4c4cqnhtvq6e0gcpyk.lambda-url.us-east-1.on.aws/?lat={in_lat}&lon={in_lon}"
+                                r_rain = requests.get(url_rain, timeout=10).json()
+                                
+                                if r_rain.get("status") == "success":
+                                    card_rain = cards.generate_rain_card(r_rain, in_lat, in_lon, location_name=in_name)
+                                    botones_rain = cards.get_rain_buttons(loc_key_found)
+                                    send_telegram(chat_id, card_rain, markup=botones_rain)
+                                    r = f"Éxito: Reporte visual de lluvia enviado para {in_name}."
+                                else:
+                                    r = "Error: No pude obtener los datos del radar."
+                                    send_telegram(chat_id, "⚠️ Error de conexión con el radar meteorológico.")
+                            except Exception as e:
+                                print(f"Error fetching rain API from tool: {e}")
+                                r = "Error de red con el radar."
+                        else:
+                            r = f"Error: No encontré coordenadas para '{in_name}'."
+
+                        gpt_msgs.append({"role": "tool", "tool_call_id": tc.id, "name": fn, "content": str(r)})
 
             # --- CIERRE MAESTRO TRAS EL BUCLE FOR ---
             print(f"🔄 [GPT] Resolviendo respuesta final tras {len(ai_msg.tool_calls)} herramientas.")
