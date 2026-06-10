@@ -310,17 +310,17 @@ CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
 👤 *{user_name}* | Plan: {plan_status}
 🌐 *Cobertura:* ZMVM (Valle de México)
 
-📡 *RADAR CENTINELA (LLUVIA):*
+📡 *ALERTAS DE LLUVIA:*
 {rain_alerts_display}
 
-🌬️ *ESTATUS Y ALERTAS DE AIRE:*
+🌬️ *ALERTAS Y REPORTES DE AIRE:*
 • 🚨 Alerta Contingencia: {contingency_status}
 • 🔔 Alertas por Umbral:
 {alerts_threshold}
 • ⏰ Reportes Programados:
 {alerts_schedule}
 
-🚗 *MI AUTO Y CIRCULACIÓN:*
+🚗 *HOY NO CIRCULA:*
 {vehicle_combined}
 
 ⚙️ *CONFIGURACIÓN DE EXPOSICIÓN:*
