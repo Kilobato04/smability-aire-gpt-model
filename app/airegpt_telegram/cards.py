@@ -305,33 +305,28 @@ CARD_HNC_DETAILED = """🚗 *Reporte Mensual HNC: {mes_nombre}*
 
 {footer}"""
 
+# --- 1. LA PLANTILLA MAESTRA (UX ACTUALIZADA CON COBERTURA) ---
 CARD_SUMMARY = """📊 *RESUMEN DE CUENTA*
-👤 {user_name} | Plan: {plan_status}
+👤 *{user_name}* | Plan: {plan_status}
+🌐 *Cobertura:* ZMVM (Valle de México)
 
-🚨 *Alerta Contingencia:* {contingency_status}
-
+📡 *RADAR CENTINELA (LLUVIA):*
 {rain_alerts_display}
 
-📍 *Tus Ubicaciones:*
-{locations_list}
-
-🏥 *Tu Salud:*
-{health_display}
-
-🚇 *Tu Rutina - Cálculo de Exposición:*
-{transport_info}
-
-🚗 *Tu Auto:*
-{vehicle_info}
-
-🔔 *Alertas de Aire Por Nivel/Umbral:*
+🌬️ *ESTATUS Y ALERTAS DE AIRE:*
+• 🚨 Alerta Contingencia: {contingency_status}
+• 🔔 Alertas por Umbral:
 {alerts_threshold}
-
-⏰ *Reportes de Aire Programados:*
+• ⏰ Reportes Programados:
 {alerts_schedule}
 
-🚫 *¿Tú Auto Circula Hoy?:*
-{hnc_reminder}
+🚗 *MI AUTO Y CIRCULACIÓN:*
+{vehicle_combined}
+
+⚙️ *CONFIGURACIÓN DE EXPOSICIÓN:*
+• 🏥 Mi Salud: {health_display}
+• 📍 Ubicaciones: {locations_list}
+{transport_info}
 
 💡 _Tip: Pregúntame 'Cambia mi transporte a...' para ajustar tu rutina._
 
@@ -485,9 +480,9 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         return str(text).replace("_", " ").replace("*", "").replace("[", "(").replace("]", ")")
 
     # 🛡️ FIX: Detección binaria ultra-estricta
-    # Forzamos string y mayúsculas para que no haya fallos por 'Free' vs 'FREE'
     plan_clean = str(plan_status).upper()
     is_premium = "PREMIUM" in plan_clean or "TRIAL" in plan_clean
+    plan_status_str = "⭐ PREMIUM" if is_premium else "🆓 FREE"
 
     estado_candados = "🔓 ABIERTO (Premium)" if is_premium else "🔒 BLOQUEADO (Free)"
     print(f"DEBUG_CARDS: Generando tarjeta para {user_name} | Plan: {plan_clean} | Estado: {estado_candados}")
@@ -498,50 +493,98 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
         contingency_status = "✅ **ACTIVA**" if is_active_db else "🔕 **DESACTIVADA**"
     else:
         contingency_status = "🔒 **BLOQUEADA** (Solo Premium)"
-        print(f"DEBUG_CARDS: Aplicando candado en SALUD para {user_name}")
-        health_str = "• 🔒 Contenido Premium"
 
-    # 1.5 Alertas de Lluvia (NUEVO BLOQUE CON TEMPORALIDAD)
+    # 2. Alertas de Lluvia (CON EMOJIS DE COLOR)
     if is_premium:
         rain_list = []
         rain_alerts = alerts.get('rain', {})
+        color_emoji = {"AMARILLA": "🟡", "NARANJA": "🟠", "ROJA": "🔴", "PURPURA": "🟣"}
+        
         if isinstance(rain_alerts, dict):
             for k, v in rain_alerts.items():
                 if isinstance(v, dict) and v.get('active') and k in locations:
                     safe_k = clean(locations[k].get('display_name', k)).capitalize()
-                    # Leemos la propiedad de la DB, por defecto 'Diaria'
+                    umbral = v.get('umbral', 'ROJA').upper()
+                    emoji_c = color_emoji.get(umbral, "🔴")
                     temporalidad_txt = v.get('temporalidad', 'diaria').capitalize()
-                    rain_list.append(f"• {safe_k}: ⛈️ Nivel {v.get('umbral', 'ROJA')} ({temporalidad_txt})")
                     
-        rain_str = "\n".join(rain_list) if rain_list else "• *Sin alertas activas*"
-        rain_display = f"🌧️ *Alertas de Lluvia:*\n{rain_str}\n"
+                    rain_list.append(f"• 🌧️ {safe_k}: ⛈️ Nivel {emoji_c} *{umbral}* ({temporalidad_txt})")
+                    
+        rain_display = "\n".join(rain_list) if rain_list else "• *Sin alertas activas*"
     else:
-        rain_display = f"🌧️ *Alertas de Lluvia:* 🔒 **Premium**\n"
+        rain_display = "• 🔒 **Premium**"
     
-    # 2. Ubicaciones (Abierto para todos)
-    locs = []
-    if isinstance(locations, dict):
-        for k, v in locations.items():
-            if v.get('active'):
-                safe_k = clean(k.capitalize())
-                safe_name = clean(v.get('display_name', k))
-                is_dest_label = " 🎯" if v.get('is_destination') else "" 
-                locs.append(f"• **{safe_k}:** {safe_name}{is_dest_label}")
-    loc_str = "\n".join(locs) if locs else "• *Sin ubicaciones guardadas*"
-
-    # 3. SALUD (🔒 Candado si es FREE)
+    # 3. Alertas Umbral (CON SANGRÍA PARA SUB-BULLETS)
     if is_premium:
-        health_str = "• Ninguna"
+        threshold_list = []
+        thresholds_data = alerts.get('threshold', alerts.get('thresholds', {}))
+        if isinstance(thresholds_data, dict):
+            for k, v in thresholds_data.items():
+                if isinstance(v, dict) and v.get('active') and k in locations: 
+                    safe_k = clean(locations[k].get('display_name', k)).capitalize()
+                    val_umbral = v.get('umbral', '100')
+                    threshold_list.append(f"   • {safe_k}: ⚠️ > {val_umbral} pts")
+        
+        threshold_str = "\n".join(threshold_list) if threshold_list else "   • *Sin alertas de umbral*"
+    else:
+        threshold_str = "   • Casa: ⚠️ > 100 pts (Default) 🔒"
+
+    # 4. Reportes Programados (CON SANGRÍA PARA SUB-BULLETS)
+    if is_premium:
+        schedule_list = []
+        schedules = alerts.get('schedule', {})
+        if isinstance(schedules, dict):
+            for k, v in schedules.items():
+                if v.get('active') and k in locations: 
+                    safe_k = clean(locations[k].get('display_name', k)).capitalize()
+                    days = v.get('days', [])
+                    # NOTA: Asegúrate de tener importada o definida tu función format_days_text
+                    days_txt = format_days_text(days) 
+                    schedule_list.append(f"   • {safe_k}: 📧 {v.get('time')} hrs ({days_txt})")
+        schedule_str = "\n".join(schedule_list) if schedule_list else "   • *Sin reportes programados*"
+    else:
+        schedule_str = "   • Casa: 📧 09:00 hrs (Diario) 🔒"
+
+    # 5. Fusión: Auto + Hoy No Circula
+    if is_premium:
+        if vehicle and vehicle.get('active'):
+            plate = vehicle.get('plate_last_digit', '?')
+            holo = clean(vehicle.get('hologram', '?'))
+            
+            # 🔥 Le pasamos la contingencia real del sistema al motor
+            can_drive, r_short, _ = check_driving_status(plate, holo, "hoy", global_contingency)
+            
+            status_text = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
+            alerta_txt = "⚠️ (Doble HNC)" if global_contingency != "None" else ""
+            
+            vehicle_combined = f"• 🚫 Placa **{plate}** (Holo **{holo}**): {status_text} {alerta_txt} ({r_short})"
+        else:
+            vehicle_combined = "• 🔕 Registra tu auto para ver restricciones." 
+    else:
+        vehicle_combined = "• 🔒 **Estatus Diario (Premium)**"
+
+    # 6. Salud (En una sola línea)
+    if is_premium:
+        health_str = "Ninguna"
         if health_data and isinstance(health_data, dict):
             conds = [clean(v.get('condition', '')) for k, v in health_data.items() if v.get('active')]
             if conds:
-                health_str = "• " + ", ".join(conds)
+                health_str = ", ".join(conds)
     else:
-        health_str = "• 🔒 **Perfil Salud (Premium)**"
+        health_str = "🔒 **Perfil Salud (Premium)**"
 
-    # 4. Transporte (🔒 Candado si es FREE - Destino Flexible)
+    # 7. Ubicaciones (Formato colapsado: Casa | Trabajo 🎯)
+    loc_names = []
+    if isinstance(locations, dict):
+        for k, v in locations.items():
+            if v.get('active'):
+                safe_name = clean(v.get('display_name', k))
+                if v.get('is_destination'): safe_name += " 🎯"
+                loc_names.append(safe_name)
+    loc_str = " | ".join(loc_names) if loc_names else "Ninguna"
+
+    # 8. Transporte (Formato Bullets independientes)
     if is_premium:
-        # Buscamos dinámicamente cuál es el destino configurado
         dest_item = next((v for k, v in locations.items() if v.get('is_destination')), None)
         nombre_dest = dest_item.get('display_name', 'Destino') if dest_item else "No definido"
 
@@ -556,87 +599,27 @@ def generate_summary_card(user_name, alerts, vehicle, locations, plan_status, tr
             medio_str = nombres_medios.get(medio_raw, clean(medio_raw).capitalize())
             
             if medio_raw == "home_office":
-                trans_str = f"• Modalidad: **{medio_str}**"
+                trans_str = f"• 🚇 Modo: **{medio_str}**"
             else:
-                # 🎯 FIX APLICADO: Casa ↔ [Nombre dinámico]
-                trans_str = f"• Ruta: **Casa ↔ {nombre_dest}**\n• Modo: **{medio_str}**\n• Tiempo: **{horas} hrs/día**"
+                trans_str = f"• 🧭 Rutina: Casa ↔ {nombre_dest}\n• 🚇 Modo: {medio_str}\n• ⏱️ Trayecto: {horas} hrs/día"
         else:
-            trans_str = "• *Sin configurar*"
+            trans_str = "• 🚇 Modo: *Sin configurar*"
     else:
         trans_str = "• 🔒 **Cálculo de Exposición (Premium)**"
 
-    # 5. Auto (Abierto para todos)
-    veh_str = "• *Sin auto registrado*"
-    if vehicle and vehicle.get('active'):
-        digit = vehicle.get('plate_last_digit', '?')
-        holo = clean(vehicle.get('hologram'))
-        veh_str = f"• Placa **{digit}** (Holo {holo})"
-
-    # 6. Alertas Umbral (🔒 Candado + Valor Default si es FREE)
-    if is_premium:
-        threshold_list = []
-        # Buscamos en ambas llaves por si acaso, priorizando la real de tu DB
-        thresholds_data = alerts.get('threshold', alerts.get('thresholds', {}))
-        
-        if isinstance(thresholds_data, dict):
-            for k, v in thresholds_data.items():
-                # 🚩 VALIDACIÓN CRÍTICA: v debe ser un dict para usar .get('active')
-                if isinstance(v, dict) and v.get('active') and k in locations: 
-                    safe_k = clean(locations[k].get('display_name', k)).capitalize()
-                    # Manejo de Decimal o Int para el umbral
-                    val_umbral = v.get('umbral', '100')
-                    threshold_list.append(f"• {safe_k}: > {val_umbral} pts")
-        
-        threshold_str = "\n".join(threshold_list) if threshold_list else "• *Sin alertas de umbral*"
-    else:
-        threshold_str = "• Casa: > 100 pts (Default) 🔒"
-
-    # 7. Reportes Programados (🔒 Candado + Valor Default si es FREE)
-    if is_premium:
-        schedule_list = []
-        schedules = alerts.get('schedule', {})
-        if isinstance(schedules, dict):
-            for k, v in schedules.items():
-                if v.get('active') and k in locations: 
-                    safe_k = clean(locations[k].get('display_name', k)).capitalize()
-                    days = v.get('days', [])
-                    days_txt = format_days_text(days)
-                    schedule_list.append(f"• {safe_k}: {v.get('time')} hrs ({days_txt})")
-        schedule_str = "\n".join(schedule_list) if schedule_list else "• *Sin reportes programados*"
-    else:
-        schedule_str = "• Casa: 09:00 hrs (Diario) 🔒"
-
-    # 8. Hoy No Circula (Alineado con build_hnc_pill)
-    if is_premium:
-        if vehicle and vehicle.get('active'):
-            plate = vehicle.get('plate_last_digit')
-            holo = vehicle.get('hologram')
-            
-            # 🔥 FIX: Le pasamos la contingencia real del sistema al motor
-            can_drive, r_short, _ = check_driving_status(plate, holo, "hoy", global_contingency)
-            
-            status_text = "🟢 CIRCULA" if can_drive else "🔴 NO CIRCULA"
-            # Hacemos notar visualmente si hay Doble HNC
-            alerta_txt = "⚠️ (Doble HNC)" if global_contingency != "None" else ""
-            hnc_str = f"• Hoy: **{status_text}** {alerta_txt} ({r_short})"
-        else:
-            hnc_str = "• 🔕 Registra tu auto para ver restricciones." 
-    else:
-        hnc_str = "• 🔒 **Estatus Diario (Premium)**"
-        
+    # --- RETORNO CON LAS NUEVAS LLAVES UNIFICADAS ---
     return CARD_SUMMARY.format(
         user_name=clean(user_name),
-        plan_status=plan_clean.upper(),
+        plan_status=plan_status_str,
+        rain_alerts_display=rain_display,
         contingency_status=contingency_status,
-        rain_alerts_display=rain_display, # <--- ¡NUEVA LÍNEA AQUÍ!
-        locations_list=loc_str,
-        health_display=health_str,
-        transport_info=trans_str,
-        vehicle_info=veh_str,
         alerts_threshold=threshold_str,
         alerts_schedule=schedule_str,
-        hnc_reminder=hnc_str,
-        footer=BOT_FOOTER
+        vehicle_combined=vehicle_combined,
+        health_display=health_str,
+        locations_list=loc_str,
+        transport_info=trans_str,
+        footer=BOT_FOOTER # Asegúrate de que BOT_FOOTER esté definido en este archivo
     )
 
 # --- 3. ACTUALIZAR BOTONES DE RESUMEN (UPSELLING + MINI APP) ---
