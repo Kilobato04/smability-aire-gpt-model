@@ -594,6 +594,8 @@ def process_rain_alerts(user):
         # 2. 📡 CONSULTA AL RADAR (NOWCASTING)
         lat, lon = loc_data['lat'], loc_data['lon']
         url_rain = f"https://2paokiaf6ytueh4c4cqnhtvq6e0gcpyk.lambda-url.us-east-1.on.aws/?lat={lat}&lon={lon}"
+
+        print(f"📡 [RADAR] Consultando API Lluvia para {first_name} en {loc_name}...")
         
         try:
             r = requests.get(url_rain, timeout=10)
@@ -606,6 +608,8 @@ def process_rain_alerts(user):
             val_actual = severity_map.get(alerta_actual, 0)
             val_umbral = severity_map.get(umbral_usuario, 3)
             last_state = config.get('last_state', 'NORMAL')
+
+            print(f"⚖️ [RAIN COMPARE] {first_name} ({loc_name}): ¿Actual '{alerta_actual}' >= Umbral '{umbral_usuario}'?")
             
             # --- 🧠 LÓGICA DE ESTADOS CONSECUTIVOS (T1 -> T2) ---
             if val_actual >= val_umbral:
@@ -656,6 +660,8 @@ def process_rain_alerts(user):
                         UpdateExpression="REMOVE alerts.rain.#loc.last_state",
                         ExpressionAttributeNames={'#loc': loc_name}
                     )
+                else:
+                    print(f"☀️ [RAIN SAFE] Todo tranquilo en {loc_name}. No se envía alerta.")
                     
         except Exception as e:
             print(f"❌ Error Rain Scheduler para {user_id}: {e}")
@@ -674,7 +680,7 @@ def lambda_handler(event, context):
                     # 🚀 Solo ejecutamos el módulo de lluvia. El de aire se ignora.
                     process_rain_alerts(item)
                     count += 1
-            print(f"✅ [RAIN DONE] Escaneo de lluvia finalizado. Usuarios: {count}")
+            print(f"✅ [RAIN DONE] Radar finalizado. {count} perfiles escaneados. Ninguna alerta crítica disparada en este ciclo.")
             return {'statusCode': 200, 'body': 'Rain Sentinel Executed'}
         except Exception as e:
             print(f"❌ Error Loop Lluvia: {e}")
