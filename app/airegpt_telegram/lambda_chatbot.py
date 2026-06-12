@@ -864,33 +864,6 @@ def lambda_handler(event, context):
             print(f"❌ Error Broadcast: {e}")
             return {'statusCode': 500, 'body': str(e)}
 
-    # =========================================================
-    # ⛈️ 1.5. MODO CENTINELA DE LLUVIA (Invocado por Modelo Maestro)
-    # =========================================================
-    elif event.get('action') == "RUN_RAIN_SENTINEL":
-        print("☔ [RAIN SCHEDULER] Despertado por el Modelo Maestro...")
-        try:
-            # 1. Asegúrate de tener importada tu función evaluadora de lluvia
-            from rain_sentinel import process_rain_alerts 
-            
-            # 2. Escaneamos la base de datos (Trae a todos los usuarios)
-            response = table.scan()
-            
-            count = 0
-            for user_item in response.get('Items', []):
-                # Validamos si es premium y si tiene la estructura de lluvia antes de procesar
-                tier, _ = stripeairegpt.evaluate_user_tier(user_item)
-                if tier in ['PREMIUM', 'TRIAL'] and 'rain' in user_item.get('alerts', {}):
-                    process_rain_alerts(user_item)
-                    count += 1
-                
-            print(f"✅ [RAIN DONE] Radar finalizado. {count} perfiles escaneados.")
-            return {"statusCode": 200, "body": f"Rain Sentinel scanned {count} users"}
-            
-        except Exception as e:
-            print(f"❌ [RAIN ERROR]: {e}")
-            return {"statusCode": 500, "body": str(e)}
-
     # ---------------------------------------------------------
     # 2. MESSAGES (Manejo de Telegram)
     # ---------------------------------------------------------
