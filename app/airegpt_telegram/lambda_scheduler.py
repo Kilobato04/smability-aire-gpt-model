@@ -560,7 +560,7 @@ def process_user(user, current_hour_str, contingency_data):
                 else:
                     print(f"   ⚠️ [DATA] No se encontró config de location para {loc_name}")
 
-# --- 🌧️ MÓDULO AISLADO: CENTINELA DE LLUVIA (2-STATES / 3 MINUTOS) ---
+# --- 🌧️ MÓDULO AISLADO: CENTINELA DE LLUVIA (T1/T2 + BYPASS CONVECTIVO) ---
 def process_rain_alerts(user):
     user_id = user['user_id']
     first_name = user.get('first_name', 'Usuario')
@@ -569,7 +569,7 @@ def process_rain_alerts(user):
     rain_configs = user.get('alerts', {}).get('rain', {})
     locations = user.get('locations', {})
     
-    # Si no tiene alertas de lluvia activas, salimos en 1 milisegundo
+    # Si no tiene alertas de lluvia activas, salimos rápido
     if not isinstance(rain_configs, dict) or not rain_configs:
         return
         
@@ -609,13 +609,21 @@ def process_rain_alerts(user):
             val_umbral = severity_map.get(umbral_usuario, 3)
             last_state = config.get('last_state', 'NORMAL')
 
-            print(f"⚖️ [RAIN COMPARE] {first_name} ({loc_name}): ¿Actual '{alerta_actual}' >= Umbral '{umbral_usuario}'?")
+            # ⚡ EL BYPASS: Detección de Aceleración Convectiva (Salto de Estado)
+            # Si estábamos en paz (<=1) y brinca a tormenta severa (>=3) en un solo ciclo
+            es_tormenta_explosiva = (val_actual >= 3) and (severity_map.get(last_state, 0) <= 1)
+
+            print(f"⚖️ [RAIN COMPARE] {first_name} ({loc_name}): Actual '{alerta_actual}' >= Umbral '{umbral_usuario}'?")
             
-            # --- 🧠 LÓGICA DE ESTADOS CONSECUTIVOS (T1 -> T2) ---
+            # --- 🧠 LÓGICA DE ESTADOS (T1 -> T2) CON BYPASS CONVECTIVO ---
             if val_actual >= val_umbral:
-                if last_state == 'PELIGRO':
-                    # ¡T2 CONFIRMADO! (Pasaron 3 minutos y la tormenta se sostuvo/creció)
-                    print(f"🚨 [RAIN TRIGGER] Tormenta confirmada. Disparando Push a {first_name} en {loc_name}")
+                # Dispara si ya venía de peligro (T2 Clásico) O si es una explosión (Bypass)
+                if last_state == 'PELIGRO' or es_tormenta_explosiva:
+                    
+                    if es_tormenta_explosiva:
+                        print(f"⚡ [BYPASS ACTIVADO] Aceleración crítica en {loc_name}. Ignorando T2. Disparo inmediato.")
+                    else:
+                        print(f"🚨 [RAIN TRIGGER] Tormenta confirmada clásicamente (T2) en {loc_name}.")
                     
                     # El nivel real puede ser mayor al umbral (ej. pidió Roja, pero ya es Púrpura)
                     nivel_msg = alerta_actual if val_actual > val_umbral else umbral_usuario
@@ -623,7 +631,7 @@ def process_rain_alerts(user):
                     
                     msg = f"🚨 *¡ALERTA DE TORMENTA!* 🚨\n\nSe detecta alta probabilidad de lluvia nivel **{nivel_msg}** acercándose a tu **{loc_name.capitalize()}** en los próximos 10-15 min.\n\n☔ Intensidad proyectada {txt_intensidad}. Toma precauciones."
                     
-                    # Botones de acción rápida
+                    # Botones de acción rápida para AIreGPT
                     markup = {
                         "inline_keyboard": [
                             [{"text": "🌧️ Ver Lluvia Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{loc_name}"}],
@@ -642,8 +650,8 @@ def process_rain_alerts(user):
                         ExpressionAttributeValues={':c': cooldown_time}
                     )
                 else:
-                    # T1 DETECTADO. Primer impacto. Guardia silenciosa.
-                    print(f"👁️ [RAIN GUARD] {first_name} - {loc_name}: Primer aviso (T1). Esperando 3 min para confirmar.")
+                    # T1 DETECTADO. Lluvia gradual. Guardia silenciosa.
+                    print(f"👁️ [RAIN GUARD] {first_name} - {loc_name}: Primer aviso (T1). Lluvia gradual. Esperando confirmación.")
                     table.update_item(
                         Key={'user_id': str(user_id)},
                         UpdateExpression="SET alerts.rain.#loc.last_state = :s",
@@ -653,7 +661,7 @@ def process_rain_alerts(user):
             else:
                 # El peligro NO rebasa el límite.
                 if last_state == 'PELIGRO':
-                    # Falsa alarma disipada (La nube se rompió o desvió antes de los 3 min). Reseteamos.
+                    # Falsa alarma disipada. Reseteamos.
                     print(f"🍃 [RAIN RESET] {first_name} - {loc_name}: Peligro disipado. Limpiando estado.")
                     table.update_item(
                         Key={'user_id': str(user_id)},
