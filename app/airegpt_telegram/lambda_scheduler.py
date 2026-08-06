@@ -602,53 +602,42 @@ def process_rain_alerts(user):
             if r.status_code != 200: continue
             
             data_rain = r.json()
-            alerta_actual = data_rain.get('lluvia', {}).get('alerta_predictiva', 'NORMAL')
+            lluvia_data = data_rain.get('lluvia', {})
+            
+            alerta_actual = lluvia_data.get('alerta_predictiva', 'NORMAL')
             umbral_usuario = config.get('umbral', 'ROJA').upper()
             
             val_actual = severity_map.get(alerta_actual, 0)
             val_umbral = severity_map.get(umbral_usuario, 3)
             last_state = config.get('last_state', 'NORMAL')
 
-            # ⚡ EL BYPASS: Detección de Aceleración Convectiva (Salto de Estado)
-            # Si estábamos en paz (<=1) y brinca a tormenta severa (>=3) en un solo ciclo
-            es_tormenta_explosiva = (val_actual >= 3) and (severity_map.get(last_state, 0) <= 1)
-
-            print(f"⚖️ [RAIN COMPARE] {first_name} ({loc_name}): Actual '{alerta_actual}' >= Umbral '{umbral_usuario}'?")
+            # --- 🚀 NUEVO: DATO TÉRMICO (EXPLOSIVIDAD P90) ---
+            es_tormenta_explosiva = lluvia_data.get('is_explosive', False)
             
+            # ⚖️ TRADUCCIÓN DE ACELERACIÓN A COLOR:
+            # El P90 equivale cinéticamente a una tormenta ROJA (Nivel 3).
+            peso_virtual_explosivo = 3 
+
+            print(f"⚖️ [RAIN COMPARE] {first_name} ({loc_name}): Actual '{alerta_actual}' >= Umbral '{umbral_usuario}' | Explosiva: {es_tormenta_explosiva}")
+            
+            should_fire_alert = False
+            tipo_alerta = "CLASICA"
+
             # --- 🧠 LÓGICA DE ESTADOS (T1 -> T2) CON BYPASS CONVECTIVO ---
-            if val_actual >= val_umbral:
-                # Dispara si ya venía de peligro (T2 Clásico) O si es una explosión (Bypass)
-                if last_state == 'PELIGRO' or es_tormenta_explosiva:
-                    
-                    if es_tormenta_explosiva:
-                        print(f"⚡ [BYPASS ACTIVADO] Aceleración crítica en {loc_name}. Ignorando T2. Disparo inmediato.")
-                    else:
-                        print(f"🚨 [RAIN TRIGGER] Tormenta confirmada clásicamente (T2) en {loc_name}.")
-                    
-                    # El nivel real puede ser mayor al umbral (ej. pidió Roja, pero ya es Púrpura)
-                    nivel_msg = alerta_actual if val_actual > val_umbral else umbral_usuario
-                    txt_intensidad = "extrema" if nivel_msg == "PURPURA" else "severa"
-                    
-                    msg = f"🚨 *¡ALERTA DE TORMENTA!* 🚨\n\nSe detecta alta probabilidad de lluvia nivel **{nivel_msg}** acercándose a tu **{loc_name.capitalize()}** en los próximos 10-15 min.\n\n☔ Intensidad proyectada {txt_intensidad}. Toma precauciones."
-                    
-                    # Botones de acción rápida para AIreGPT
-                    markup = {
-                        "inline_keyboard": [
-                            [{"text": "🌧️ Ver Lluvia Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{loc_name}"}],
-                            [{"text": "🔴 AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}}]
-                        ]
-                    }
-                    
-                    send_telegram_push(user_id, msg, markup)
-                    
-                    # Activamos el Cooldown de 3 hrs y limpiamos la memoria temporal
-                    cooldown_time = (now_utc + timedelta(hours=3)).isoformat()
-                    table.update_item(
-                        Key={'user_id': str(user_id)},
-                        UpdateExpression="SET alerts.rain.#loc.cooldown_until = :c REMOVE alerts.rain.#loc.last_state",
-                        ExpressionAttributeNames={'#loc': loc_name},
-                        ExpressionAttributeValues={':c': cooldown_time}
-                    )
+            
+            # CASO A: EXPLOSIÓN TÉRMICA INMINENTE (Early Warning System)
+            # Solo dispara si la severidad de la explosión (3) es mayor o igual a lo que pidió el usuario
+            if es_tormenta_explosiva and peso_virtual_explosivo >= val_umbral:
+                print(f"⚡ [BYPASS ACTIVADO] Aceleración P90 detectada en {loc_name}. Disparo inmediato de Alerta Temprana.")
+                should_fire_alert = True
+                tipo_alerta = "TEMPRANA"
+            
+            # CASO B: ACUMULACIÓN CLÁSICA (T1 -> T2)
+            elif val_actual >= val_umbral:
+                # Dispara si ya venía de peligro (T2 Clásico)
+                if last_state == 'PELIGRO':
+                    print(f"🚨 [RAIN TRIGGER] Tormenta confirmada clásicamente (T2) en {loc_name}.")
+                    should_fire_alert = True
                 else:
                     # T1 DETECTADO. Lluvia gradual. Guardia silenciosa.
                     print(f"👁️ [RAIN GUARD] {first_name} - {loc_name}: Primer aviso (T1). Lluvia gradual. Esperando confirmación.")
@@ -658,6 +647,7 @@ def process_rain_alerts(user):
                         ExpressionAttributeNames={'#loc': loc_name},
                         ExpressionAttributeValues={':s': 'PELIGRO'}
                     )
+            
             else:
                 # El peligro NO rebasa el límite.
                 if last_state == 'PELIGRO':
@@ -671,6 +661,34 @@ def process_rain_alerts(user):
                 else:
                     print(f"☀️ [RAIN SAFE] Todo tranquilo en {loc_name}. No se envía alerta.")
                     
+            # --- 🚀 DISPARO FINAL HACIA TELEGRAM ---
+            if should_fire_alert:
+                if tipo_alerta == "TEMPRANA":
+                    msg = f"🚀 *[ALERTA TEMPRANA]* 🚨\n\nHe detectado un **colapso térmico repentino** formándose exactamente sobre 📍 **{loc_name.capitalize()}**.\n\n☔ La lluvia acaba de acelerar violentamente. Tienes ~10 minutos antes de que el nivel del asfalto llegue a fase crítica. Toma precauciones ya."
+                else:
+                    nivel_msg = alerta_actual if val_actual > val_umbral else umbral_usuario
+                    txt_intensidad = "extrema" if nivel_msg == "PURPURA" else "severa"
+                    msg = f"🚨 *¡ALERTA DE TORMENTA!* 🚨\n\nSe detecta alta probabilidad de lluvia nivel **{nivel_msg}** acercándose a tu **{loc_name.capitalize()}** en los próximos 10-15 min.\n\n☔ Intensidad proyectada {txt_intensidad}. Toma precauciones."
+                
+                # Botones de acción rápida para AIreGPT
+                markup = {
+                    "inline_keyboard": [
+                        [{"text": "🌧️ Ver Radar Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{loc_name}"}],
+                        [{"text": "🔴 AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}}]
+                    ]
+                }
+                
+                send_telegram_push(user_id, msg, markup)
+                
+                # Activamos el Cooldown de 3 hrs y limpiamos la memoria temporal
+                cooldown_time = (now_utc + timedelta(hours=3)).isoformat()
+                table.update_item(
+                    Key={'user_id': str(user_id)},
+                    UpdateExpression="SET alerts.rain.#loc.cooldown_until = :c REMOVE alerts.rain.#loc.last_state",
+                    ExpressionAttributeNames={'#loc': loc_name},
+                    ExpressionAttributeValues={':c': cooldown_time}
+                )
+                
         except Exception as e:
             print(f"❌ Error Rain Scheduler para {user_id}: {e}")
             
