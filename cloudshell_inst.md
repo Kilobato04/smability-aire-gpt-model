@@ -17,21 +17,24 @@ Para ir directamente al directorio de trabajo en una sola línea (ideal al inici
 
 ```bash
 cd smability-aire-gpt-model
+./deploy_forecast.sh - ajustes de forecast
+./deploy_heavy.sh - ajustes a lambdas modelo pesado
+# Otros
+./deploy_training.sh - correr el entrenamiento
+./deploy_graphics.sh - corre updates de graficos de exposicion y cigarros
+cd crm_api
+./deploy_crm.sh
+cd api_light
+./deploy_api_light.sh - ajustes a lamda-api ligera
+cd app/airegpt_telegram
+./deploy_scheduler_bot.sh - ajustes a bot telegram y al scheduler
+cd marketing_reels
+./deploy_marketing.sh -- corre updates de reel marketing
+
 # Aplicar cambios usando tu script de deploy rápido
 git pull origin main - push despues de commit en github
 git pull origin main --no-rebase     #por si hay mezcla
-cd crm_api
-./deploy_crm.sh
-./deploy_forecast.sh - ajustes de forecast
-./deploy_heavy.sh - ajustes a lambdas modelo pesado
-cd api_light
-./deploy_api_light.sh - ajustes a lamda-api ligera
-./deploy_scheduler_bot.sh - ajustes a bot telegram y al scheduler
-cd app/airegpt_telegram
-./deploy_training.sh - correr el entrenamiento
-./deploy_graphics.sh - corre updates de graficos de exposicion y cigarros
-cd marketing_reels
-./deploy_marketing.sh -- corre updates de reel marketing
+
 ```
 
 ## 3. Borrar todos los zips y scripts viejos
