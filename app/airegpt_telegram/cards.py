@@ -984,13 +984,23 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
     else: emj_int = ""
     intensidad_display = f"{emj_int}{intensidad_str}"
 
-    # 🚨 FIX: Colores SGIRPC para la Alerta Temprana (El Futuro)
+    # 🚨 FIX: Colores SGIRPC para la Alerta Temprana (El Futuro) + Banner
     alerta = lluvia.get("alerta_predictiva", "NORMAL")
-    if alerta == "AMARILLA": alert_circle = "🟡"
-    elif alerta == "NARANJA": alert_circle = "🟠"
-    elif alerta == "ROJA": alert_circle = "🔴"
-    elif alerta == "PURPURA": alert_circle = "🟣"
-    else: alert_circle = "🟢"
+    if alerta == "AMARILLA": 
+        alert_circle = "🟡"
+        banner_img = "banner_lluvia_amarilla.png"
+    elif alerta == "NARANJA": 
+        alert_circle = "🟠"
+        banner_img = "banner_lluvia_naranja.png"
+    elif alerta == "ROJA": 
+        alert_circle = "🔴"
+        banner_img = "banner_lluvia_roja.png"
+    elif alerta == "PURPURA": 
+        alert_circle = "🟣"
+        banner_img = "banner_lluvia_purpura.png"
+    else: 
+        alert_circle = "🟢"
+        banner_img = "banner_lluvia_normal.png"
 
     risk_block = ""
     if riesgo:
@@ -1020,7 +1030,7 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
         
     ecobici_list = "\n".join(eco_lines) if eco_lines else "No hay estaciones cercanas."
 
-    return CARD_RAIN_REPORT.format(
+    texto_tarjeta = CARD_RAIN_REPORT.format(
         location_name=location_name,
         maps_url=maps_url,
         current_intensity=intensidad_display,
@@ -1035,6 +1045,9 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
         footer=BOT_FOOTER
     )
 
+    # 🚀 Retornamos el texto y el nombre de la imagen
+    return texto_tarjeta, banner_img
+    
 def get_rain_buttons(loc_key):
     # Si viene del GPS y no tiene llave, el regreso lo manda al resumen
     back_callback = f"CHECK_AIR_{loc_key}" if loc_key and loc_key != "GPS" else "ver_resumen"
