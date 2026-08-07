@@ -663,17 +663,30 @@ def process_rain_alerts(user):
                     
             # --- 🚀 DISPARO FINAL HACIA TELEGRAM ---
             if should_fire_alert:
+                
+                # Definimos el footer estándar usando tu archivo cards
+                footer_text = cards.BOT_FOOTER
+                
                 if tipo_alerta == "TEMPRANA":
-                    msg = f"🚀 *[ALERTA TEMPRANA]* 🚨\n\nHe detectado un **colapso térmico repentino** formándose exactamente sobre 📍 **{loc_name.capitalize()}**.\n\n☔ La lluvia acaba de acelerar violentamente. Tienes ~10 minutos antes de que el nivel del asfalto llegue a fase crítica. Toma precauciones ya."
+                    msg = cards.CARD_EARLY_WARNING_RAIN.format(
+                        loc_name=loc_name.capitalize(),
+                        footer=footer_text
+                    )
                 else:
                     nivel_msg = alerta_actual if val_actual > val_umbral else umbral_usuario
                     txt_intensidad = "extrema" if nivel_msg == "PURPURA" else "severa"
-                    msg = f"🚨 *¡ALERTA DE TORMENTA!* 🚨\n\nSe detecta alta probabilidad de lluvia nivel **{nivel_msg}** acercándose a tu **{loc_name.capitalize()}** en los próximos 10-15 min.\n\n☔ Intensidad proyectada {txt_intensidad}. Toma precauciones."
+                    
+                    msg = cards.CARD_CLASSIC_RAIN.format(
+                        loc_name=loc_name.capitalize(),
+                        nivel_msg=nivel_msg,
+                        txt_intensidad=txt_intensidad,
+                        footer=footer_text
+                    )
                 
-                # Botones de acción rápida para AIreGPT
+                # Botones de acción rápida para AIreGPT (Cambiamos "Radar" por "Lluvia" para consistencia)
                 markup = {
                     "inline_keyboard": [
-                        [{"text": "🌧️ Ver Radar Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{loc_name}"}],
+                        [{"text": "🌧️ Ver Lluvia Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{loc_name}"}],
                         [{"text": "🔴 AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}}]
                     ]
                 }
