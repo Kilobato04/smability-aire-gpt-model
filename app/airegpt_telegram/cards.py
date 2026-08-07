@@ -931,7 +931,7 @@ def get_hnc_buttons():
 CARD_RAIN_REPORT = """🌧️ *Reporte de Lluvia*
 📍 [{location_name}]({maps_url})
 
-⏱️ *Estado Actual:* {current_intensity} ({current_mm} mm/h)
+⏱️ *Estado:* {current_intensity} ({current_mm} mm/h)
 {alert_circle} *Alerta:* {alert_text}{risk_block}
 
 🔮 *Pronóstico (próximas 6 hrs):*
