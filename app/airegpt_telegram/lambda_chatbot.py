@@ -1061,10 +1061,17 @@ def lambda_handler(event, context):
                         r_rain = requests.get(url_rain, timeout=10).json()
                         
                         if r_rain.get("status") == "success":
-                            # 🚀 FIX: Le pasamos el nombre detectado a la función
-                            card_rain = cards.generate_rain_card(r_rain, r_lat, r_lon, location_name=loc_display)
+                            # 1. Recibimos la tarjeta y el nombre de la imagen
+                            card_rain, banner_img = cards.generate_rain_card(r_rain, r_lat, r_lon, location_name=loc_display)
                             botones_rain = cards.get_rain_buttons(r_loc_key)
-                            send_telegram(chat_id, card_rain, markup=botones_rain)
+                            
+                            # 2. Construimos la ruta de la imagen
+                            import os
+                            directorio_actual = os.path.dirname(os.path.abspath(__file__))
+                            ruta_imagen = os.path.join(directorio_actual, "banners", banner_img)
+                            
+                            # 3. Disparamos como foto usando send_telegram_photo_local
+                            send_telegram_photo_local(chat_id, ruta_imagen, card_rain, markup=botones_rain)
                         else:
                             send_telegram(chat_id, "⚠️ No pude obtener los datos de lluvia para esta zona.")
                     except Exception as e:
@@ -2186,9 +2193,17 @@ def lambda_handler(event, context):
                                 r_rain = requests.get(url_rain, timeout=10).json()
                                 
                                 if r_rain.get("status") == "success":
-                                    card_rain = cards.generate_rain_card(r_rain, in_lat, in_lon, location_name=in_name)
+                                    # 1. Recibimos la tarjeta y el nombre de la imagen
+                                    card_rain, banner_img = cards.generate_rain_card(r_rain, in_lat, in_lon, location_name=in_name)
                                     botones_rain = cards.get_rain_buttons(loc_key_found)
-                                    send_telegram(chat_id, card_rain, markup=botones_rain)
+                                    
+                                    # 2. Construimos la ruta de la imagen
+                                    import os
+                                    directorio_actual = os.path.dirname(os.path.abspath(__file__))
+                                    ruta_imagen = os.path.join(directorio_actual, "banners", banner_img)
+                                    
+                                    # 3. Disparamos como foto
+                                    send_telegram_photo_local(chat_id, ruta_imagen, card_rain, markup=botones_rain)
                                     r = f"Éxito: Reporte visual de lluvia enviado para {in_name}."
                                 else:
                                     r = "Error: No pude obtener los datos del radar."
