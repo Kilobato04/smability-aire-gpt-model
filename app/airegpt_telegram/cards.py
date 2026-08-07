@@ -5,7 +5,7 @@ import re
 BOT_VERSION = "v6.0"
 
 # --- NUEVO FOOTER LIMPIO ---
-BOT_FOOTER = """_Nota: Sugerencias de salud preventivas basadas en modelos ambientales. No sustituyen evaluación médica._
+BOT_FOOTER = """_Nota: Sugerencias de salud y protección preventivas basadas en modelos ambientales. No sustituyen información oficial._
 
 [AIreGPT](https://airegpt.ai/) | [IG](https://instagram.com/airegpt.ai) | [TikTok](https://tiktok.com/@airegpt)"""
 
