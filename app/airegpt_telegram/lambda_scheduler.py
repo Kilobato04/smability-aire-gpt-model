@@ -664,26 +664,17 @@ def process_rain_alerts(user):
             # --- 🚀 DISPARO FINAL HACIA TELEGRAM ---
             if should_fire_alert:
                 
-                # Definimos el footer estándar usando tu archivo cards
-                footer_text = cards.BOT_FOOTER
+                # 1. Determinamos el nivel real que detonó la alerta para colorear el banner
+                nivel_msg = alerta_actual if val_actual > val_umbral else umbral_usuario
                 
-                if tipo_alerta == "TEMPRANA":
-                    msg = cards.CARD_EARLY_WARNING_RAIN.format(
-                        loc_name=loc_name.capitalize(),
-                        footer=footer_text
-                    )
-                else:
-                    nivel_msg = alerta_actual if val_actual > val_umbral else umbral_usuario
-                    txt_intensidad = "extrema" if nivel_msg == "PURPURA" else "severa"
-                    
-                    msg = cards.CARD_CLASSIC_RAIN.format(
-                        loc_name=loc_name.capitalize(),
-                        nivel_msg=nivel_msg,
-                        txt_intensidad=txt_intensidad,
-                        footer=footer_text
-                    )
+                # 2. Generamos el texto y obtenemos el nombre de la imagen desde cards.py
+                msg, banner_img = cards.generate_rain_alert_card(
+                    alert_type=tipo_alerta, 
+                    loc_name=loc_name.capitalize(), 
+                    umbral_detonado=nivel_msg
+                )
                 
-                # Botones de acción rápida para AIreGPT (Cambiamos "Radar" por "Lluvia" para consistencia)
+                # 3. Botones de acción rápida
                 markup = {
                     "inline_keyboard": [
                         [{"text": "🌧️ Ver Lluvia Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{loc_name}"}],
@@ -691,7 +682,13 @@ def process_rain_alerts(user):
                     ]
                 }
                 
-                send_telegram_push(user_id, msg, markup)
+                # 4. Construimos la ruta hacia el banner local
+                import os
+                directorio_actual = os.path.dirname(os.path.abspath(__file__))
+                ruta_imagen = os.path.join(directorio_actual, "banners", banner_img)
+                
+                # 5. ¡Disparamos la alerta push con la foto!
+                send_telegram_photo_local(user_id, ruta_imagen, msg, markup=markup)
                 
                 # Activamos el Cooldown de 3 hrs y limpiamos la memoria temporal
                 cooldown_time = (now_utc + timedelta(hours=3)).isoformat()
