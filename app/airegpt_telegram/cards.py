@@ -982,7 +982,7 @@ def generate_rain_alert_card(alert_type, loc_name, umbral_detonado):
     elif umbral_limpio == "PURPURA": banner_img = "banner_lluvia_purpura.png"
 
     # 2. Generar el texto según el tipo de alerta
-    if alert_type == "ACELERACION":
+    if alert_type == "TEMPRANA":
         texto_tarjeta = CARD_EARLY_WARNING_RAIN.format(
             loc_name=loc_name,
             footer=BOT_FOOTER
