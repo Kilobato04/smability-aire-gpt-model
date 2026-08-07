@@ -965,6 +965,42 @@ CARD_CLASSIC_RAIN = """🚨 *Aviso de Precipitación*
 
 _{footer}_"""
 
+# --- NUEVA FUNCIÓN: Generador de Alertas Push (Scheduler) ---
+def generate_rain_alert_card(alert_type, loc_name, umbral_detonado):
+    """
+    Genera la tarjeta de alerta Push (Aceleración o Clásica) y devuelve 
+    el texto junto con el nombre del banner PNG correspondiente.
+    """
+    # 1. Asignar el banner según el umbral que se cruzó
+    # (Si es 'ROJA' o 'PURPURA' usará esos, si mandan algo menor, tiene fallback)
+    banner_img = "banner_lluvia_normal.png" # Fallback
+    umbral_limpio = str(umbral_detonado).upper()
+    
+    if umbral_limpio == "AMARILLA": banner_img = "banner_lluvia_amarilla.png"
+    elif umbral_limpio == "NARANJA": banner_img = "banner_lluvia_naranja.png"
+    elif umbral_limpio == "ROJA": banner_img = "banner_lluvia_roja.png"
+    elif umbral_limpio == "PURPURA": banner_img = "banner_lluvia_purpura.png"
+
+    # 2. Generar el texto según el tipo de alerta
+    if alert_type == "ACELERACION":
+        texto_tarjeta = CARD_EARLY_WARNING_RAIN.format(
+            loc_name=loc_name,
+            footer=BOT_FOOTER
+        )
+    else:
+        # Alerta Clásica (Volumen)
+        # Aquí puedes definir una intensidad "fake" o mapearla si la tienes en tu data.
+        txt_int = "Intensa" if umbral_limpio in ["ROJA", "PURPURA"] else "Fuerte"
+        texto_tarjeta = CARD_CLASSIC_RAIN.format(
+            loc_name=loc_name,
+            nivel_msg=umbral_limpio,
+            txt_intensidad=txt_int,
+            footer=BOT_FOOTER
+        )
+
+    # 3. Devolvemos el texto y la foto (Igual que en On-Demand)
+    return texto_tarjeta, banner_img
+
 # 🚀 FIX: Función generadora de tarjeta On-Demand (Sin 'short_message')
 def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
     lluvia = data.get("lluvia", {})
