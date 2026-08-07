@@ -926,12 +926,13 @@ def get_hnc_buttons():
     }
 
 # --- 2. PLANTILLA Y FUNCIÓN DE LLUVIA (OPTIMIZADA) ---
+
+# Tarjeta On-Demand 
 CARD_RAIN_REPORT = """🌧️ *Reporte de Lluvia*
 📍 [{location_name}]({maps_url})
 
 ⏱️ *Estado Actual:* {current_intensity} ({current_mm} mm/h)
-{alert_circle} *Alerta:* {alert_text}
-💬 _{short_message}_{risk_block}
+{alert_circle} *Alerta:* {alert_text}{risk_block}
 
 🔮 *Pronóstico (próximas 6 hrs):*
 {forecast_table}
@@ -941,7 +942,30 @@ CARD_RAIN_REPORT = """🌧️ *Reporte de Lluvia*
 
 {footer}"""
 
-# 🚀 FIX: Agregamos location_name como parámetro con valor por defecto
+# Tarjeta de Alerta Temprana (Aceleración)
+CARD_EARLY_WARNING_RAIN = """🚀 *Alerta de Tormenta*
+📍 Ubicación: *{loc_name}*
+
+⚡ *Estatus:* Aumento súbito de intensidad
+💬 Nuestro modelo detecta que la lluvia está ganando fuerza muy rápido justo sobre tu ubicación en *{loc_name}*.
+
+⏱️ *Margen de acción:* Tienes entre 10 y 15 minutos antes de llegar a una fase crítica de acumulación en la calle. Toma precauciones inmediatas.
+
+_{footer}_"""
+
+# Tarjeta de Alerta Clásica (Volumen/Acumulación)
+CARD_CLASSIC_RAIN = """🚨 *Aviso de Precipitación*
+📍 Ubicación: *{loc_name}*
+
+📊 *Nivel proyectado:* Alerta {nivel_msg}
+💬 Nuestro modelo predice una alta probabilidad de lluvia fuerte acercándose a tu ubicación en *{loc_name}* en los próximos 10 a 15 minutos.
+
+☔ *Intensidad:* {txt_intensidad}
+⚠️ Mantente a salvo y evita zonas propensas a encharcamientos.
+
+_{footer}_"""
+
+# 🚀 FIX: Función generadora de tarjeta On-Demand (Sin 'short_message')
 def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
     lluvia = data.get("lluvia", {})
     eco = data.get("movilidad_ecobici", {})
@@ -999,11 +1023,10 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
     return CARD_RAIN_REPORT.format(
         location_name=location_name,
         maps_url=maps_url,
-        current_intensity=intensidad_display, # 🚀 FIX: Inyectamos el emoji + texto aquí
+        current_intensity=intensidad_display,
         current_mm=lluvia.get("mm_h", 0),
         alert_circle=alert_circle,
         alert_text=alerta,
-        short_message=lluvia.get("mensaje_corto", ""),
         risk_block=risk_block,
         forecast_table=forecast_table,
         total_bikes=eco.get("total_bicicletas", 0),
