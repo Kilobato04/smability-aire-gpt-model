@@ -932,8 +932,7 @@ CARD_RAIN_REPORT = """🌧️ *Reporte de Lluvia*
 📍 [{location_name}]({maps_url})
 
 ⏱️ *Estado:* {current_intensity} ({current_mm} mm/h)
-{alert_circle} *Alerta:* {alert_text}{risk_block}
-
+{risk_block}
 🔮 *Pronóstico (próximas 6 hrs):*
 {forecast_table}
 
@@ -951,19 +950,18 @@ CARD_EARLY_WARNING_RAIN = """🚀 *Alerta de Tormenta*
 
 ⏱️ *Margen de acción:* Tienes entre 10 y 15 minutos antes de llegar a una fase crítica de acumulación en la calle. Toma precauciones inmediatas.
 
-_{footer}_"""
+{footer}"""
 
 # Tarjeta de Alerta Clásica (Volumen/Acumulación)
-CARD_CLASSIC_RAIN = """🚨 *Aviso de Precipitación*
+CARD_CLASSIC_RAIN = """🚨 *Alerta de lluvia*
 📍 Ubicación: *{loc_name}*
 
-📊 *Nivel proyectado:* Alerta {nivel_msg}
 💬 Nuestro modelo predice una alta probabilidad de lluvia fuerte acercándose a tu ubicación en *{loc_name}* en los próximos 10 a 15 minutos.
 
-☔ *Intensidad:* {txt_intensidad}
+☔ *Intensidad proyectada:* {txt_intensidad}
 ⚠️ Mantente a salvo y evita zonas propensas a encharcamientos.
 
-_{footer}_"""
+{footer}"""
 
 # --- NUEVA FUNCIÓN: Generador de Alertas Push (Scheduler) ---
 def generate_rain_alert_card(alert_type, loc_name, umbral_detonado):
@@ -971,37 +969,42 @@ def generate_rain_alert_card(alert_type, loc_name, umbral_detonado):
     Genera la tarjeta de alerta Push (Aceleración o Clásica) y devuelve 
     el texto junto con el nombre del banner PNG correspondiente.
     """
-    # 1. Asignar el banner según el umbral que se cruzó
-    # (Si es 'ROJA' o 'PURPURA' usará esos, si mandan algo menor, tiene fallback)
-    banner_img = "banner_lluvia_normal.png" # Fallback
     umbral_limpio = str(umbral_detonado).upper()
-    
-    if umbral_limpio == "AMARILLA": banner_img = "banner_lluvia_amarilla.png"
-    elif umbral_limpio == "NARANJA": banner_img = "banner_lluvia_naranja.png"
-    elif umbral_limpio == "ROJA": banner_img = "banner_lluvia_roja.png"
-    elif umbral_limpio == "PURPURA": banner_img = "banner_lluvia_purpura.png"
 
-    # 2. Generar el texto según el tipo de alerta
+    # Generar el texto y elegir banner según el tipo de alerta
     if alert_type == "TEMPRANA":
+        # Para aceleración, seguimos usando el color del peligro inminente
+        banner_img = "banner_lluvia_normal.png"
+        if umbral_limpio == "AMARILLA": banner_img = "banner_lluvia_amarilla.png"
+        elif umbral_limpio == "NARANJA": banner_img = "banner_lluvia_naranja.png"
+        elif umbral_limpio == "ROJA": banner_img = "banner_lluvia_roja.png"
+        elif umbral_limpio == "PURPURA": banner_img = "banner_lluvia_purpura.png"
+
         texto_tarjeta = CARD_EARLY_WARNING_RAIN.format(
             loc_name=loc_name,
             footer=BOT_FOOTER
         )
     else:
-        # Alerta Clásica (Volumen)
-        # Aquí puedes definir una intensidad "fake" o mapearla si la tienes en tu data.
-        txt_int = "Intensa" if umbral_limpio in ["ROJA", "PURPURA"] else "Fuerte"
+        # Alerta Clásica: SIEMPRE usa el banner azul marino
+        banner_img = "banner_alerta_lluvia.png"
+        
+        # Mapeamos la intensidad en texto basado en el umbral que la detonó
+        if umbral_limpio == "PURPURA": txt_int = "Torrencial (> 20 mm/h)"
+        elif umbral_limpio == "ROJA": txt_int = "Intensa (13 - 20 mm/h)"
+        elif umbral_limpio == "NARANJA": txt_int = "Fuerte (7 - 13 mm/h)"
+        elif umbral_limpio == "AMARILLA": txt_int = "Regular (3 - 7 mm/h)"
+        else: txt_int = "Ligera (< 3 mm/h)"
+        
         texto_tarjeta = CARD_CLASSIC_RAIN.format(
             loc_name=loc_name,
-            nivel_msg=umbral_limpio,
             txt_intensidad=txt_int,
             footer=BOT_FOOTER
         )
 
-    # 3. Devolvemos el texto y la foto (Igual que en On-Demand)
+    # Devolvemos el texto y la foto (Igual que en On-Demand)
     return texto_tarjeta, banner_img
 
-# 🚀 FIX: Función generadora de tarjeta On-Demand (Sin 'short_message')
+# 🚀 FIX: Función generadora de tarjeta On-Demand
 def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
     lluvia = data.get("lluvia", {})
     eco = data.get("movilidad_ecobici", {})
@@ -1010,37 +1013,34 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
 
     maps_url = f"https://www.google.com/maps/search/?api=1&query={lat},{lon}"
 
-    # 🚨 FIX: Emoji SACMEX para el Estado Actual (El Presente)
+    # 🚨 FIX: Emoji SACMEX y Banner basados en el Estado Actual (El Presente)
     intensidad_str = lluvia.get("intensidad", "Sin lluvia")
-    if "Ligera" in intensidad_str: emj_int = "🟢 "
-    elif "Regular" in intensidad_str: emj_int = "🟡 "
-    elif "Fuerte" in intensidad_str: emj_int = "🟠 "
-    elif "Intensa" in intensidad_str: emj_int = "🔴 "
-    elif "Torrencial" in intensidad_str: emj_int = "🟣 "
-    else: emj_int = ""
-    intensidad_display = f"{emj_int}{intensidad_str}"
-
-    # 🚨 FIX: Colores SGIRPC para la Alerta Temprana (El Futuro) + Banner
-    alerta = lluvia.get("alerta_predictiva", "NORMAL")
-    if alerta == "AMARILLA": 
-        alert_circle = "🟡"
+    
+    # Asignamos emoji y banner basado puramente en lo que está pasando AHORA
+    if "Ligera" in intensidad_str: 
+        emj_int = "🟢 "
+        banner_img = "banner_lluvia_normal.png"
+    elif "Regular" in intensidad_str: 
+        emj_int = "🟡 "
         banner_img = "banner_lluvia_amarilla.png"
-    elif alerta == "NARANJA": 
-        alert_circle = "🟠"
+    elif "Fuerte" in intensidad_str: 
+        emj_int = "🟠 "
         banner_img = "banner_lluvia_naranja.png"
-    elif alerta == "ROJA": 
-        alert_circle = "🔴"
+    elif "Intensa" in intensidad_str: 
+        emj_int = "🔴 "
         banner_img = "banner_lluvia_roja.png"
-    elif alerta == "PURPURA": 
-        alert_circle = "🟣"
+    elif "Torrencial" in intensidad_str: 
+        emj_int = "🟣 "
         banner_img = "banner_lluvia_purpura.png"
     else: 
-        alert_circle = "🟢"
+        emj_int = ""
         banner_img = "banner_lluvia_normal.png"
+        
+    intensidad_display = f"{emj_int}{intensidad_str}"
 
     risk_block = ""
     if riesgo:
-        risk_block = f"\n\n⚠️ *Riesgo Histórico de Inundación:* {riesgo.get('nivel', '')}\n📌 _{riesgo.get('detalle', '')}_"
+        risk_block = f"\n⚠️ *Riesgo Histórico de Inundación:* {riesgo.get('nivel', '')}\n📌 _{riesgo.get('detalle', '')}_\n"
 
     fc_lines = []
     for p in pronostico:
@@ -1054,6 +1054,7 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
 
     eco_lines = []
     for i, est in enumerate(eco.get("mejores_opciones", [])):
+        import re
         nom_raw = est.get("nombre", "")
         nom = re.sub(r'^CE-\d+\s*-?\s*', '', nom_raw).strip()
         disp = est.get("disponibles", 0)
@@ -1071,8 +1072,6 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
         maps_url=maps_url,
         current_intensity=intensidad_display,
         current_mm=lluvia.get("mm_h", 0),
-        alert_circle=alert_circle,
-        alert_text=alerta,
         risk_block=risk_block,
         forecast_table=forecast_table,
         total_bikes=eco.get("total_bicicletas", 0),
@@ -1081,7 +1080,6 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
         footer=BOT_FOOTER
     )
 
-    # 🚀 Retornamos el texto y el nombre de la imagen
     return texto_tarjeta, banner_img
     
 def get_rain_buttons(loc_key):
