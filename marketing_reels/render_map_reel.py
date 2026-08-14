@@ -177,11 +177,12 @@ html_content = r"""<!DOCTYPE html>
         map.createPane('basePane');   map.getPane('basePane').style.zIndex = 200;
         map.createPane('gridPane');   map.getPane('gridPane').style.zIndex = 400;
         // Las etiquetas ya vienen integradas en el estilo de Mapbox, eliminamos labelsPane
-        const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiY21rYnJseG1kMDZnczNlb2xrdDhrejE1biJ9.VFEMLEntTg5fDXDefQTnFA';
+        const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiYTU2YmIyYzZiNjUxOGI5MDQ5YWVmNmRkZDg5ZTQ0NDQifQ.U_W7cH_L3M5l4DZX3fbljA';
         
         L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
             pane: 'basePane',
-            maxZoom: 19
+            maxZoom: 19,
+            attribution: '© Mapbox'
         }).addTo(map);
 
         const CONFIG = { ias: { min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] } };
@@ -363,6 +364,9 @@ if IG_TOKEN and IG_USER_ID:
             print(f"🎉 ¡PUBLICADO EXITOSAMENTE EN IG! ID: {res_pub.get('id', 'N/A')}")
         else:
             print(f"❌ Meta tardó demasiado. Estado: {status_code}")
+    else:
+        print(f"❌ ERROR DE META: Fallo al crear contenedor. Respuesta: {json.dumps(res_crear)}")
+        
 else:
     print("⚠️ Faltan tokens de Instagram. El video está en S3, pero no se publicó.")
 
