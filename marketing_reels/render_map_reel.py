@@ -153,9 +153,11 @@ html_content = r"""<!DOCTYPE html>
         @keyframes dotsBlink { 0%, 100% { opacity: .2; } 50% { opacity: 1; } }
 
         .tg-logo { position: absolute; top: 45px; right: 12px; z-index: 7000; width: 36px; height: 36px; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.6)); }
-        .leaflet-interactive { shape-rendering: crispEdges; stroke: none; }
-        .leaflet-labels-pane { opacity: 0.95; filter: brightness(1.2) drop-shadow(0px 0px 2px rgba(0,0,0,0.8)); }
-        .leaflet-base-pane { filter: brightness(2.0) contrast(1.6) saturate(1.2) !important; opacity: 0.9; }
+        /* --- MANEJO DE BORDES Y MAPA BASE (ESTILO FRONT-END) --- */
+        .leaflet-interactive { shape-rendering: crispEdges; stroke: none; stroke-width: 0; outline: none !important; }
+        .leaflet-interactive[stroke="#ffffff"], .leaflet-interactive[stroke="white"] { stroke: #ffffff !important; stroke-width: 1.5px !important; stroke-opacity: 1 !important; shape-rendering: auto; }
+        .leaflet-canvas-layer canvas, canvas.leaflet-zoom-animated { image-rendering: pixelated; }
+        .leaflet-base-pane { opacity: 1.0; } /* Sin filtros forzados, Mapbox ya trae el contraste ideal */
     </style>
 </head>
 <body>
@@ -174,11 +176,13 @@ html_content = r"""<!DOCTYPE html>
 
         map.createPane('basePane');   map.getPane('basePane').style.zIndex = 200;
         map.createPane('gridPane');   map.getPane('gridPane').style.zIndex = 400;
-        map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 600; 
-        map.getPane('labelsPane').style.pointerEvents = 'none';
+        // Las etiquetas ya vienen integradas en el estilo de Mapbox, eliminamos labelsPane
+        const MAPBOX_TOKEN = 'pk.eyJ1Ijoia2lsb2JhdG8iLCJhIjoiY21rYnJseG1kMDZnczNlb2xrdDhrejE1biJ9.VFEMLEntTg5fDXDefQTnFA';
         
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', { pane: 'basePane', maxZoom: 19 }).addTo(map);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', { pane: 'labelsPane', maxZoom: 19 }).addTo(map);
+        L.tileLayer(`https://api.mapbox.com/styles/v1/kilobato/cmkm0j41j009001rz6opkd82a/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
+            pane: 'basePane',
+            maxZoom: 19
+        }).addTo(map);
 
         const CONFIG = { ias: { min: 0, max: 200, stops: [0, 50, 100, 150, 200, 300], colors: ['#00e400', '#ffff00', '#ff7e00', '#ff0000', '#8f3f97', '#7e0023'] } };
         function getColor(val) {
