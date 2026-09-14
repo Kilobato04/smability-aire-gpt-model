@@ -130,6 +130,13 @@ def check_and_broadcast_contingency():
         came_status = db_item.get('came_oficial', {}).get('estatus', 'SIN_CONTINGENCIA') # <--- LEEMOS A LA CAME
         
         print(f"🔍 [DEBUG] DB State: Anterior='{last_phase}' | Detectada='{current_phase}' | CAMe='{came_status}'")
+
+        # --- 🚀 FIX: OVERRIDE LEGAL DE LA AUTORIDAD ---
+        # Si la CAMe ya levantó el castigo (o no hay contingencia), silenciamos 
+        # los sensores forzosamente para destrabar la máquina de estados.
+        if came_status in ['SUSPENDE', 'SIN_CONTINGENCIA', 'NORMAL', 'None']:
+            current_phase = "None"
+        # ----------------------------------------------
         
         # Disparar solo si hay cambio de estado
         if current_phase != last_phase:
