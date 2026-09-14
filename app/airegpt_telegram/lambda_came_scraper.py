@@ -136,12 +136,15 @@ def lambda_handler(event, context):
     fase_nueva = resultado_ia.get('fase', 'None')
     fase_anterior = db_item.get('last_contingency_phase', 'None') # Fase anterior real
     
-    # Disparamos solo si hay un boletín nuevo
-    if fecha_nueva != fecha_vieja and fecha_nueva != "":
+    # 🚀 FIX: Extraemos el estatus viejo y nuevo para evitar el bloqueo por fechas iguales
+    estatus_nuevo = resultado_ia.get('estatus', 'MANTIENE')
+    estatus_viejo = estado_anterior.get('estatus', 'SIN_CONTINGENCIA')
+    
+    # Disparamos si hay un boletín nuevo (fecha distinta) O SI LA DECISIÓN LEGAL CAMBIÓ
+    if (fecha_nueva != fecha_vieja and fecha_nueva != "") or (estatus_nuevo != estatus_viejo):
         
         # 1. Normalizar la fase según el estatus
-        estatus = resultado_ia.get('estatus', 'MANTIENE')
-        if estatus in ["SUSPENDE", "SIN_CONTINGENCIA", "LEVANTA"]:
+        if estatus_nuevo in ["SUSPENDE", "SIN_CONTINGENCIA", "LEVANTA"]:
             fase_db = "None"
             fase_broadcast = "SUSPENDIDA"
         else:
