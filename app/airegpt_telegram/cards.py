@@ -262,14 +262,15 @@ CARD_CONTINGENCY_LIFTED = """🟢 *CONTINGENCIA SUSPENDIDA*
 🕒 {report_time}
 
 🎉 *¡Buenas noticias!*
-La CAMe informa que las condiciones del aire han mejorado.
+La CAMe ha decretado el fin de la emergencia atmosférica. La calidad del aire ha mejorado en la ZMVM.
 
-🚗 *Movilidad:*
-Se levantan las restricciones del Doble Hoy No Circula. Tu auto vuelve a su calendario normal.
+🚗 *Doble Hoy No Circula Desactivado:*
+Se levantan las restricciones extraordinarias de inmediato. Tu vehículo regresa a su calendario de circulación habitual.
+
+🏃‍♂️ *Salud y Exteriores:*
+Es seguro abrir tus ventanas y volver a realizar actividades físicas al aire libre con normalidad.
 
 📄 [Leer Comunicado Oficial]({oficial_link})
-
-_Fuente: CAMe/Smability_
 
 {footer}"""
 
@@ -760,7 +761,7 @@ def generate_contingency_card(phase, report_time, oficial_link=None, pollutant_i
     safe_link = oficial_link if oficial_link else "https://www.gob.mx/comisionambiental"
     
     # Si la fase es "None" o el estatus es suspender, mandamos la VERDE
-    if phase == "None" or phase == "":
+    if phase in ["None", "", "SUSPENDIDA", "SUSPENDE", "SIN_CONTINGENCIA"]:
         return CARD_CONTINGENCY_LIFTED.format(
             report_time=report_time,
             oficial_link=safe_link,
