@@ -671,33 +671,57 @@ def process_rain_alerts(user):
             # --- 🚀 DISPARO FINAL HACIA TELEGRAM ---
             if should_fire_alert:
                 
-                # 1. Determinamos el nivel real que detonó la alerta para colorear el banner
+                # 1. EVALUACIÓN DE TIER (GATEKEEPER)
+                tier, _ = stripeairegpt.evaluate_user_tier(user)
+                is_premium = tier in ["PREMIUM", "TRIAL"]
+                free_alerts_sent = int(user.get('free_alerts_sent', 0))
+
+                # 2. CONTROL DE VIDAS FREE Y PAYWALL DE LLUVIA
+                if not is_premium and free_alerts_sent >= 3:
+                    print(f" 💸 [PAYWALL RAIN] {first_name} superó límite gratuito.")
+                    texto_venta, botones = stripeairegpt.get_paywall_response(tier, 0, "alertas", str(user_id))
+                    paywall_msg = f"🚨 **Se detectó lluvia peligrosa en {loc_name.capitalize()}.**\n\nSin embargo, has agotado tus 3 alertas automáticas gratuitas.\n\nActiva AIreGPT Premium para seguir recibiendo el radar en tiempo real:\n\n{texto_venta}"
+                    send_telegram_push(user_id, paywall_msg, markup=botones)
+                    try:
+                        # Apagamos la alerta para que no haga SPAM en el siguiente ciclo
+                        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression=f"SET alerts.rain.#{loc_name}.active = :false", ExpressionAttributeNames={f"#{loc_name}": loc_name}, ExpressionAttributeValues={':false': False})
+                    except: pass
+                    continue # Salta el envío de la alerta real
+                
+                # 3. RESTAR UNA VIDA SI ES FREE
+                if not is_premium:
+                    try:
+                        table.update_item(Key={'user_id': str(user_id)}, UpdateExpression="SET free_alerts_sent = :val", ExpressionAttributeValues={':val': free_alerts_sent + 1})
+                        free_alerts_sent += 1
+                    except: pass
+                
+                # 4. ENVÍO DE LA ALERTA REAL
                 nivel_msg = alerta_actual if val_actual > val_umbral else umbral_usuario
                 
-                # 2. Generamos el texto y obtenemos el nombre de la imagen desde cards.py
                 msg, banner_img = cards.generate_rain_alert_card(
                     alert_type=tipo_alerta, 
                     loc_name=loc_name.capitalize(), 
                     umbral_detonado=nivel_msg
                 )
                 
-                # 3. Botones de acción rápida
+                # 5. BOTONES CONDICIONADOS
+                boton_mapa = [{"text": "🔴 AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}}] if is_premium else [{"text": "🔴 AIreGPT Live Map 🔒", "callback_data": "PAYWALL_MAPA"}]
+                
                 markup = {
                     "inline_keyboard": [
                         [{"text": "🌧️ Ver Lluvia Local", "callback_data": f"CHECK_RAIN_{lat}_{lon}_{loc_name}"}],
-                        [{"text": "🔴 AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}}]
+                        boton_mapa
                     ]
                 }
                 
-                # 4. Construimos la ruta hacia el banner local
                 import os
                 directorio_actual = os.path.dirname(os.path.abspath(__file__))
                 ruta_imagen = os.path.join(directorio_actual, "banners", banner_img)
                 
-                # 5. ¡Disparamos la alerta push con la foto!
+                # 6. ¡Disparamos la alerta push con la foto!
                 send_telegram_photo_local(user_id, ruta_imagen, msg, markup=markup)
                 
-                # Activamos el Cooldown de 3 hrs y limpiamos la memoria temporal
+                # 7. COOLDOWN Y LIMPIEZA DE MEMORIA
                 cooldown_time = (now_utc + timedelta(hours=3)).isoformat()
                 table.update_item(
                     Key={'user_id': str(user_id)},
