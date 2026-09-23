@@ -731,6 +731,31 @@ def send_persistent_gps_button(chat_id):
     except Exception as e:
         print(f"❌ Error mandando botón GPS: {e}")
 
+# --- 🚨 FIX 1: NUEVO HELPER PARA EL BOTÓN DE MENÚ (MAPA LIVE) ---
+def update_telegram_menu_button(chat_id, is_premium):
+    """Muestra u oculta el botón verde 'Mapa Live' según el plan del usuario"""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setChatMenuButton"
+    if is_premium:
+        payload = {
+            "chat_id": chat_id,
+            "menu_button": {
+                "type": "web_app",
+                "text": "Mapa Live",
+                "web_app": {"url": "https://map.airegpt.ai/"}
+            }
+        }
+    else:
+        payload = {
+            "chat_id": chat_id,
+            "menu_button": {
+                "type": "default" # Regresa al menú de comandos estándar
+            }
+        }
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        print(f"❌ Error actualizando Menu Button: {e}")
+
 def send_telegram_photo_local(chat_id, photo_path, caption, markup=None):
     """Sube una foto desde la carpeta local de la Lambda hacia Telegram"""
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto"
@@ -1410,6 +1435,8 @@ def lambda_handler(event, context):
 
                 # 5. Envío limpio
                 send_telegram(chat_id, card_resumen, markup=botones)
+                # 🚨 FIX: Ajustar el botón de menú inferior
+                update_telegram_menu_button(chat_id, is_prem)
                 return {'statusCode': 200, 'body': 'OK'}
                 
             elif data == "CONFIG_ADVANCED":
@@ -1672,6 +1699,9 @@ def lambda_handler(event, context):
             if text_clean in ["/start", "start", "hola", "empezar"]:
                 print(f"🆕 [START] User: {user_id}")
                 send_persistent_gps_button(chat_id)
+
+                # 🚨 FIX: Ajustar el botón de menú inferior
+                update_telegram_menu_button(chat_id, is_prem_eval)
                 
                 markup_onboarding = {
                     "inline_keyboard": [
@@ -1760,6 +1790,8 @@ def lambda_handler(event, context):
 
                 # 4. Envío unificado
                 send_telegram(chat_id, card_resumen, markup=botones)
+                # 🚨 FIX: Ajustar el botón de menú inferior
+                update_telegram_menu_button(chat_id, is_prem)
                 return {'statusCode': 200, 'body': 'OK'}
 
         print(f"📨 [MSG] User: {user_id} | Content: {user_content}") # LOG CRITICO
