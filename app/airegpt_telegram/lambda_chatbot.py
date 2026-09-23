@@ -1063,7 +1063,14 @@ def lambda_handler(event, context):
                         if r_rain.get("status") == "success":
                             # 1. Recibimos la tarjeta y el nombre de la imagen
                             card_rain, banner_img = cards.generate_rain_card(r_rain, r_lat, r_lon, location_name=loc_display)
-                            botones_rain = cards.get_rain_buttons(r_loc_key)
+                            
+                            # --- 🚨 FIX 2B: LÓGICA DE PAYWALL PARA EL MAPA ---
+                            user_fresh_btn = get_user_profile(user_id)
+                            tier_lluvia, _ = stripeairegpt.evaluate_user_tier(user_fresh_btn)
+                            is_prem_lluvia = tier_lluvia in ['PREMIUM', 'TRIAL']
+                            
+                            botones_rain = cards.get_rain_buttons(r_loc_key, is_premium=is_prem_lluvia)
+                            # --------------------------------------------------
                             
                             # 2. Construimos la ruta de la imagen
                             import os
@@ -1417,6 +1424,18 @@ def lambda_handler(event, context):
                 tier, days_left = stripeairegpt.evaluate_user_tier(user)
                 texto_venta, botones_venta = stripeairegpt.get_paywall_response(tier, days_left, "premium", str(user_id))
                 send_telegram(chat_id, texto_venta, markup=botones_venta)
+                return {'statusCode': 200, 'body': 'OK'}
+
+            elif data == "PAYWALL_MAPA":
+                user = get_user_profile(user_id)
+                tier, days_left = stripeairegpt.evaluate_user_tier(user)
+                texto_venta, botones_venta = stripeairegpt.get_paywall_response(tier, days_left, "mapa", str(user_id))
+                
+                send_telegram(
+                    chat_id, 
+                    "🔴 **El Mapa Interactivo es una función exclusiva.**\n\nDesbloquea el mapa en vivo de lluvia y calidad del aire activando AIreGPT Premium:\n\n" + texto_venta, 
+                    markup=botones_venta
+                )
                 return {'statusCode': 200, 'body': 'OK'}
 
             elif data == "CONFIRM_HARD_DELETE":
@@ -2195,7 +2214,7 @@ def lambda_handler(event, context):
                                 if r_rain.get("status") == "success":
                                     # 1. Recibimos la tarjeta y el nombre de la imagen
                                     card_rain, banner_img = cards.generate_rain_card(r_rain, in_lat, in_lon, location_name=in_name)
-                                    botones_rain = cards.get_rain_buttons(loc_key_found)
+                                    botones_rain = cards.get_rain_buttons(loc_key_found, is_premium=is_prem_val)
                                     
                                     # 2. Construimos la ruta de la imagen
                                     import os
