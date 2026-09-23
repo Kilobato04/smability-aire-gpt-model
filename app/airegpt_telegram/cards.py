@@ -649,13 +649,14 @@ def get_summary_buttons(locations_dict, is_premium=False):
         keyboard.append(row_locs[i:i+2])
         
     # 2. NUEVO RENGLÓN: El Gatillo de la Mini App (Radar)
-    # Este botón abre el panel inmersivo sin salir de Telegram
-    keyboard.append([
-        {
-            "text": "🔴 AIreGPT Live Map", 
-            "web_app": {"url": "https://map.airegpt.ai/"}
-        }
-    ])
+    boton_mapa = {
+        "text": "🔴 AIreGPT Live Map", 
+        "web_app": {"url": "https://map.airegpt.ai/"}
+    } if is_premium else {
+        "text": "🔴 AIreGPT Live Map 🔒", 
+        "callback_data": "PAYWALL_MAPA"
+    }
+    keyboard.append([boton_mapa])
     
     # 3. Fila de Upselling / Menú Avanzado
     if not is_premium:
@@ -1083,11 +1084,15 @@ def generate_rain_card(data, lat, lon, location_name="Ubicación Actual"):
 
     return texto_tarjeta, banner_img
     
-def get_rain_buttons(loc_key):
+def get_rain_buttons(loc_key, is_premium=False):
     # Si viene del GPS y no tiene llave, el regreso lo manda al resumen
     back_callback = f"CHECK_AIR_{loc_key}" if loc_key and loc_key != "GPS" else "ver_resumen"
+    
+    # 🚨 FIX 1B: Candado inteligente para el botón del mapa
+    boton_mapa = {"text": "🔴 AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}} if is_premium else {"text": "🔴 AIreGPT Live Map 🔒", "callback_data": "PAYWALL_MAPA"}
+    
     return {"inline_keyboard": [
         [{"text": "🔙 Volver a Calidad del Aire", "callback_data": back_callback}],
-        [{"text": "🔴 AIreGPT Live Map", "web_app": {"url": "https://map.airegpt.ai/"}}],
+        [boton_mapa],
         [{"text": "👤 Mi Perfil", "callback_data": "ver_resumen"}]
     ]}
